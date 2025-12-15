@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        /* 自訂顏色主題 (更新為清新/現代感配色) */
+        /* 自訂顏色主題 (清新/現代感配色) */
         .bg-custom-primary { background-color: #4A90E2; } /* 主色：深天空藍 */
         .text-custom-primary { color: #4A90E2; }
         .bg-custom-secondary { background-color: #F5A623; } /* 副色：暖金橘 */
@@ -24,6 +24,11 @@
         .timeline-item {
             border-left: 2px solid #4A90E2; /* 使用新的主色 */
             padding-left: 1rem;
+            cursor: pointer; /* **新增：讓使用者知道可以點擊** */
+            transition: background-color 0.2s;
+        }
+        .timeline-item:hover {
+            background-color: #f0f8ff; /* 點擊時有淺色提示 */
         }
         .timeline-container > div:last-child .timeline-item {
             border-left: none; /* 移除最後一個項目的左邊線 */
@@ -202,7 +207,7 @@
             
             <div class="mt-4 p-4 bg-gray-50 rounded-lg shadow-inner">
                 <h3 class="text-lg font-bold text-custom-secondary mb-2">💡 備註：</h3>
-                <p class="text-sm text-gray-600">行程可能因實際交通或天氣微調，請以當地狀況為準。飯店名稱已加上 <a href="#" onclick="return false;" class="text-custom-secondary underline">Google Maps 連結</a>。</p>
+                <p class="text-sm text-gray-600">行程點擊後即可進行修改或刪除。飯店名稱已加上 <a href="#" onclick="return false;" class="text-custom-secondary underline">Google Maps 連結</a>。</p>
             </div>
         </div>
         
@@ -434,6 +439,48 @@
         </div>
     </div>
     
+    <div id="editItineraryModal" class="modal-overlay">
+        <div class="modal-content">
+            
+            <div class="text-center mb-4">
+                <div class="text-custom-secondary font-bold text-lg mb-2 flex items-center justify-center">
+                    <i class="fa-solid fa-pen-to-square mr-2"></i> 修改行程項目
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 border-b pb-2" id="edit-modal-date-info"></h3>
+            </div>
+            <button onclick="closeModal('editItineraryModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+            
+            <form id="edit-itinerary-form" onsubmit="saveItineraryItem(event)">
+                <input type="hidden" id="edit-date-key" name="dateKey">
+                <input type="hidden" id="edit-item-index" name="itemIndex">
+
+                <label for="edit-time" class="text-sm font-semibold text-gray-700 mb-1 block">時間:</label>
+                <div class="flex items-center mb-3">
+                    <input type="text" id="edit-time" placeholder="--:--" pattern="[0-2][0-9]:[0-5][0-9]" class="flex-1 p-2 border rounded-lg text-sm mr-2" required>
+                    <i class="fa-solid fa-clock text-gray-500"></i>
+                </div>
+                
+                <label for="edit-title" class="text-sm font-semibold text-gray-700 mb-1 block">行程標題:</label>
+                <input type="text" id="edit-title" placeholder="行程標題 (如: 晚餐)" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+                
+                <label for="edit-note" class="text-sm font-semibold text-gray-700 mb-1 block">備註/地點:</label>
+                <textarea id="edit-note" rows="2" placeholder="備註 (如: 阿蘇赤牛丼/飯店)" class="w-full p-2 border rounded-lg mb-4 text-sm"></textarea>
+                
+                <div class="flex space-x-2">
+                    <button type="button" onclick="deleteItineraryItem(document.getElementById('edit-date-key').value, parseInt(document.getElementById('edit-item-index').value))" class="flex-1 bg-red-500 text-white p-2 rounded-lg font-bold hover:bg-red-600">
+                        <i class="fa-solid fa-trash-can mr-1"></i> 刪除
+                    </button>
+                    <button type="submit" class="flex-1 bg-custom-primary text-white p-2 rounded-lg font-bold hover:bg-[#3A7AD0]">
+                        <i class="fa-solid fa-save mr-1"></i> 儲存修改
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    
     <script>
         // ===================================
         // 核心數據 (行程、天氣、記帳) - 12/26 ~ 12/31 最終版
@@ -552,9 +599,8 @@
             "12/31": {
                 date: "12/31 (日) - 熊本/返程",
                 events: [
-                    { time: "08:30", icon: "fa-calendar-alt", title: "自由時間/最後採購", note: "把握最後的購物時間" },
-                    { time: "09:30", icon: "fa-bus-simple", title: "搭乘利木津巴士前往機場", 
-                        note: "❖ **建議交通 (市區 → KMJ)**：利木津巴士，約 40 分鐘。提前 1.5–2 小時抵達機場最穩妥。" 
+                    { time: "08:30", icon: "fa-bus-simple", title: "搭乘利木津巴士前往機場", 
+                        note: "❖ **建議交通 (市區 → KMJ)**：利木津巴士，約 40 分鐘。提前 1.5–2 小時抵達機場最穩妥。請準時在 08:30 搭乘。" 
                     },
                     { time: "11:55", icon: "fa-plane-departure", title: "CI0199 KMJ → KHH", note: "預計 13:40 抵達高雄" }, 
                     { time: "18:00", icon: "fa-plane-arrival", title: "跨年夜在台灣", note: "慶祝新年快樂！" },
@@ -603,8 +649,14 @@
             return Object.keys(ITINERARY_DATA).sort();
         }
 
+        /** 取得當前作用中的日期按鈕 */
+        function getActiveDateKey() {
+            const activeBtn = document.querySelector('#date-buttons-container .tab-button.active');
+            return activeBtn ? activeBtn.getAttribute('data-date') : getDateKeys()[0];
+        }
+
         // ===================================
-        // Modal / 新增行程函式
+        // Modal 函式
         // ===================================
         
         function openModal(modalId) {
@@ -625,6 +677,9 @@
                 // 清空表單
                 if (modalId === 'addItineraryModal') {
                     document.getElementById('add-itinerary-form').reset();
+                }
+                if (modalId === 'editItineraryModal') {
+                    document.getElementById('edit-itinerary-form').reset();
                 }
             }
         }
@@ -647,7 +702,17 @@
                 option.textContent = ITINERARY_DATA[dateKey].date;
                 select.appendChild(option);
             });
+
+            // 預設選取當前在看的日期
+            const activeDateKey = getActiveDateKey();
+            if (activeDateKey) {
+                 select.value = activeDateKey;
+            }
         }
+
+        // ===================================
+        // 新增/修改/刪除 行程函式
+        // ===================================
         
         function addItineraryItem(event) {
             event.preventDefault();
@@ -657,8 +722,7 @@
             const title = document.getElementById('new-title').value.trim();
             const note = document.getElementById('new-note').value.trim();
             
-            // 使用預設圖標 (fa-circle-dot)
-            const defaultIcon = 'fa-circle-dot';
+            const defaultIcon = 'fa-circle-dot'; // 新增的項目使用預設圖標
             
             if (!dateKey || !time || !title) {
                 alert('請填寫完整日期、時間和標題！');
@@ -672,9 +736,7 @@
                 note: note
             };
             
-            // 檢查該日期是否存在
             if (ITINERARY_DATA[dateKey]) {
-                // 新增項目
                 ITINERARY_DATA[dateKey].events.push(newItem);
                 
                 // 依時間排序
@@ -686,14 +748,95 @@
                 
                 localStorage.setItem('tripItinerary', JSON.stringify(ITINERARY_DATA));
                 
-                // 重新渲染該日行程
                 renderItinerary(dateKey);
                 
-                // 提示成功並關閉
                 alert(`已成功將「${title}」新增到 ${dateKey} 的行程！`);
                 closeModal('addItineraryModal');
             } else {
                 alert('日期不存在，請聯繫開發者處理核心行程數據！');
+            }
+        }
+        
+        /** 點擊行程項目，載入數據到修改 Modal */
+        function editItineraryItem(dateKey, index) {
+            const item = ITINERARY_DATA[dateKey].events[index];
+            
+            document.getElementById('edit-modal-date-info').textContent = ITINERARY_DATA[dateKey].date;
+            document.getElementById('edit-date-key').value = dateKey;
+            document.getElementById('edit-item-index').value = index;
+            document.getElementById('edit-time').value = item.time;
+            document.getElementById('edit-title').value = item.title;
+            document.getElementById('edit-note').value = item.note.replace(/<br>/g, '\n').replace(/<a.*?<\/a>/, '').trim(); // 移除地圖連結 HTML 和換行符號
+
+            openModal('editItineraryModal');
+        }
+
+        /** 儲存修改後的行程項目 */
+        function saveItineraryItem(event) {
+            event.preventDefault();
+            
+            const dateKey = document.getElementById('edit-date-key').value;
+            const index = parseInt(document.getElementById('edit-item-index').value);
+            const newTime = document.getElementById('edit-time').value.trim();
+            const newTitle = document.getElementById('edit-title').value.trim();
+            const newNote = document.getElementById('edit-note').value.trim();
+            
+            if (!newTime || !newTitle) {
+                alert('時間和標題不能為空！');
+                return;
+            }
+
+            if (ITINERARY_DATA[dateKey] && ITINERARY_DATA[dateKey].events[index]) {
+                const item = ITINERARY_DATA[dateKey].events[index];
+                
+                // 檢查 note 裡是否有地圖連結，如果有就保留
+                let noteToSave = newNote.replace(/\n/g, '<br>');
+                const mapLinkRegex = /<a.*?<\/a>/;
+                const existingMapLinkMatch = item.note.match(mapLinkRegex);
+
+                if (existingMapLinkMatch) {
+                     // 確保地圖連結總是附加在備註的後面
+                     const mapLink = existingMapLinkMatch[0];
+                     if (!noteToSave.includes(mapLink)) {
+                         noteToSave = `${noteToSave} ${mapLink}`;
+                     }
+                }
+
+                // 更新數據
+                item.time = newTime;
+                item.title = newTitle;
+                item.note = noteToSave;
+                // item.icon 不做修改
+                
+                // 依時間重新排序
+                ITINERARY_DATA[dateKey].events.sort((a, b) => {
+                    if (a.time < b.time) return -1;
+                    if (a.time > b.time) return 1;
+                    return 0;
+                });
+                
+                localStorage.setItem('tripItinerary', JSON.stringify(ITINERARY_DATA));
+
+                // 重新渲染並關閉
+                renderItinerary(dateKey);
+                alert(`已成功更新行程：${newTitle}！`);
+                closeModal('editItineraryModal');
+            } else {
+                alert('行程數據無效！');
+            }
+        }
+        
+        /** 刪除行程項目 */
+        function deleteItineraryItem(dateKey, index) {
+            if (confirm(`確定要刪除「${ITINERARY_DATA[dateKey].events[index].title}」這個行程嗎？`)) {
+                if (ITINERARY_DATA[dateKey] && ITINERARY_DATA[dateKey].events.length > index) {
+                    ITINERARY_DATA[dateKey].events.splice(index, 1);
+                    localStorage.setItem('tripItinerary', JSON.stringify(ITINERARY_DATA));
+                    
+                    renderItinerary(dateKey);
+                    alert('行程已刪除。');
+                    closeModal('editItineraryModal');
+                }
             }
         }
 
@@ -745,11 +888,12 @@
                 <div class="timeline-container space-y-4">
             `;
 
-            data.events.forEach(event => {
+            data.events.forEach((event, index) => {
                 const noteContent = event.note ? `<p class="text-sm text-gray-600 mt-1" style="hyphens: auto; word-break: break-word;">${event.note}</p>` : '';
                 
+                // **核心修改：新增 onclick 事件**
                 html += `
-                    <div class="timeline-item relative pb-4">
+                    <div class="timeline-item relative pb-4" onclick="editItineraryItem('${dateKey}', ${index})">
                         <div class="absolute -left-3 top-0 w-6 h-6 bg-white border-2 border-custom-primary rounded-full flex items-center justify-center">
                             <i class="fa-solid ${event.icon} text-custom-primary text-xs"></i>
                         </div>
