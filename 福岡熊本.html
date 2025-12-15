@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>旅行助手｜可愛風</title>
+
+  <!-- Google Fonts: Noto Sans TC -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"/>
+
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: #fff9db; /* 鵝黃色背景 */
+      color: #333;
+      /* 背景加上熊本熊圖標 */
+      background-image: url('https://upload.wikimedia.org/wikipedia/commons/3/3e/Kumamon.png'),
+                        linear-gradient(#ffe082 1px, transparent 1px),
+                        linear-gradient(90deg, #ffe082 1px, transparent 1px);
+      background-size: 80px, 24px 24px, 24px 24px;
+      background-repeat: no-repeat, repeat, repeat;
+      background-position: top 20px right 20px, 0 0, 0 0;
+    }
+    h1, h2, h3 {
+      font-family: 'Noto Sans TC', sans-serif;
+      color: #d84315;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      border: 3px solid #ffcc80;
+      box-shadow: 4px 4px 0 #ffb74d;
+      padding: 1rem;
+    }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #fff;
+      border-top: 3px solid #ffcc80;
+    }
+    .tab-hidden { display: none; }
+    .tab-visible { display: block; }
+    button {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: #ffcc80;
+      border-radius: 12px;
+      padding: 0.5rem 1rem;
+      border: none;
+      color: #fff;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #fb8c00;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-20">
+
+  <!-- Header -->
+  <header class="p-4 bg-white shadow flex justify-between items-center">
+    <h1 class="text-xl flex items-center gap-2">
+      <i class="fa-solid fa-suitcase-rolling text-orange-500"></i> 我的旅行助手（可愛風）
+      <i class="fa-solid fa-star text-yellow-500"></i>
+      <i class="fa-solid fa-heart text-pink-400"></i>
+    </h1>
+    <button id="resetAllBtn">重置資料</button>
+  </header>
+
+  <!-- Content -->
+  <main class="p-4 space-y-4">
+    <!-- 航班與住宿 -->
+    <section class="card">
+      <h2 class="text-lg mb-2">航班資訊 <i class="fa-solid fa-plane text-blue-400"></i></h2>
+      <p>去程：12/26 CI0138 KHH → FUK</p>
+      <p>回程：12/31 CI0199 KMJ → KHH</p>
+    </section>
+    <section class="card">
+      <h2 class="text-lg mb-2">住宿資訊 <i class="fa-solid fa-hotel text-purple-400"></i></h2>
+      <ul class="list-disc pl-5 text-base">
+        <li>12/26 The Ritz-Carlton, Fukuoka</li>
+        <li>12/27–12/29 Nagasaki Marriott Hotel</li>
+        <li>12/29–12/31 KOKO Hotel Premier 熊本</li>
+      </ul>
+    </section>
+
+    <!-- PLAN -->
+    <section id="tab-plan" class="tab-visible card">
+      <h2 class="text-lg mb-2">✅ 一、實際建議搭乘班次 <i class="fa-solid fa-train text-green-500"></i></h2>
+      <p>🚆 12/27 博多 → 長崎 · JR 西九州新幹線 Kamome · 09:32 → 10:52</p>
+      <p>🚆 12/29 長崎 → 熊本 · Kamome + つばめ · 約 1 小時 50 分</p>
+      <p>🚌 12/31 熊本市區 → 熊本機場 · 利木津巴士 08:00 → 08:50</p>
+    </section>
+
+    <!-- GUIDE -->
+    <section id="tab-guide" class="tab-hidden card">
+      <h2 class="text-lg mb-2">✅ 二、北九州 JR Pass 建議 <i class="fa-solid fa-ticket text-red-400"></i></h2>
+      <p>🎫 建議買「北九州 JR Pass 5 日」</p>
+      <p>🔥 啟用日：12/27～12/31 · 剛好涵蓋最貴路段</p>
+      <p>💰 可省約 4,000～9,000 円</p>
+    </section>
+
+    <!-- LISTS -->
+    <section id="tab-lists" class="tab-hidden card">
+      <h2 class="text-lg mb-2">✅ 三、餐廳清單 <i class="fa-solid fa-utensils text-pink-400"></i></h2>
+      <p>🍜 福岡：一蘭、一風堂、中洲屋台</p>
+      <p>🍜 長崎：四海樓、江山樓、Amu Plaza 餐廳</p>
+      <p>🥩 熊本：赤牛丼、馬肉可樂餅、阿蘇鄉土料理</p>
+    </section>
+
+    <!-- INFO -->
+    <section id="tab-info" class="tab-hidden card">
+      <h2 class="text-lg mb-2">INFO · 資訊 <i class="fa-solid fa-circle-info text-blue-400"></i></h2>
+      <ul class="list-disc pl-5 text-base">
+        <li><a class="text-orange-500" target="_blank" href="https://www.jma.go.jp/bosai/map.html">日本氣象廳 · 九州天氣</a></li>
+        <li>警察：110 ｜ 救護車：119</li>
+        <li><a class="text-orange-500" target="_blank" href="https://www.roc-taiwan.org/jp_ja/index.html">在日台灣辦事處</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- Bottom nav -->
+  <nav class="bottom-nav grid grid-cols-4 text-base">
+    <button data-tab="plan" class="text-orange-600">Plan</button>
+    <button data-tab="guide" class="text-gray-700">Guide</button>
+    <button data-tab="lists" class="text-gray-700">Lists</button>
+    <button data-tab="info" class="text-gray-700">Info</button>
+  </nav>
+
+  <script>
+    const tabs = ['plan','guide','lists','info'];
+    function showTab(name){
+      tabs.forEach(t=>{
+        const section=document.getElementById(`tab-${t}`);
+        const btn=document.querySelector(`[data-tab="${t}"]`);
+        if(t===name){section.classList.remove('tab-hidden');btn.classList.add('text-orange-600');}
+        else{section.classList.add('tab-hidden');btn.classList.remove('text-orange-600');}
+      });
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+    document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+  </script>
+</body>
+</html>
