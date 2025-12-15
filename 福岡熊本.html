@@ -17,7 +17,6 @@
       font-family: 'Noto Sans TC', sans-serif;
       background: #fff9db; /* 鵝黃色背景 */
       color: #333;
-      /* 背景加上熊本熊圖標 */
       background-image: url('https://upload.wikimedia.org/wikipedia/commons/3/3e/Kumamon.png'),
                         linear-gradient(#ffe082 1px, transparent 1px),
                         linear-gradient(90deg, #ffe082 1px, transparent 1px);
@@ -41,24 +40,19 @@
       bottom: 0; left: 0; right: 0;
       background: #fff;
       border-top: 3px solid #ffcc80;
+      height: 72px; /* 原本大約48px，現在調整成1.5倍高 */
     }
     .tab-hidden { display: none; }
     .tab-visible { display: block; }
-    button {
+    .bottom-nav button {
       font-family: 'Noto Sans TC', sans-serif;
-      background: #ffcc80;
-      border-radius: 12px;
-      padding: 0.5rem 1rem;
-      border: none;
-      color: #fff;
-      transition: background 0.2s;
-    }
-    button:hover {
-      background: #fb8c00;
+      font-size: 1.1rem; /* 適中大小 */
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
     }
   </style>
 </head>
-<body class="min-h-screen pb-20">
+<body class="min-h-screen pb-24">
 
   <!-- Header -->
   <header class="p-4 bg-white shadow flex justify-between items-center">
@@ -72,7 +66,6 @@
 
   <!-- Content -->
   <main class="p-4 space-y-4">
-    <!-- 航班與住宿 -->
     <section class="card">
       <h2 class="text-lg mb-2">航班資訊 <i class="fa-solid fa-plane text-blue-400"></i></h2>
       <p>去程：12/26 CI0138 KHH → FUK</p>
@@ -87,7 +80,6 @@
       </ul>
     </section>
 
-    <!-- PLAN -->
     <section id="tab-plan" class="tab-visible card">
       <h2 class="text-lg mb-2">✅ 一、實際建議搭乘班次 <i class="fa-solid fa-train text-green-500"></i></h2>
       <p>🚆 12/27 博多 → 長崎 · JR 西九州新幹線 Kamome · 09:32 → 10:52</p>
@@ -95,7 +87,6 @@
       <p>🚌 12/31 熊本市區 → 熊本機場 · 利木津巴士 08:00 → 08:50</p>
     </section>
 
-    <!-- GUIDE -->
     <section id="tab-guide" class="tab-hidden card">
       <h2 class="text-lg mb-2">✅ 二、北九州 JR Pass 建議 <i class="fa-solid fa-ticket text-red-400"></i></h2>
       <p>🎫 建議買「北九州 JR Pass 5 日」</p>
@@ -103,7 +94,6 @@
       <p>💰 可省約 4,000～9,000 円</p>
     </section>
 
-    <!-- LISTS -->
     <section id="tab-lists" class="tab-hidden card">
       <h2 class="text-lg mb-2">✅ 三、餐廳清單 <i class="fa-solid fa-utensils text-pink-400"></i></h2>
       <p>🍜 福岡：一蘭、一風堂、中洲屋台</p>
@@ -111,7 +101,6 @@
       <p>🥩 熊本：赤牛丼、馬肉可樂餅、阿蘇鄉土料理</p>
     </section>
 
-    <!-- INFO -->
     <section id="tab-info" class="tab-hidden card">
       <h2 class="text-lg mb-2">INFO · 資訊 <i class="fa-solid fa-circle-info text-blue-400"></i></h2>
       <ul class="list-disc pl-5 text-base">
@@ -145,3 +134,5 @@
   </script>
 </body>
 </html>
+
+
