@@ -198,7 +198,66 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+/* ===================================================
+  預算編輯與儲存功能
+=================================================== */
 
+// 1. 啟動編輯模式
+window.enableBudgetEdit = function() {
+    const display = document.getElementById('budget-display');
+    const form = document.getElementById('budget-edit-form');
+    const budgetValue = document.getElementById('total-budget').innerText.replace(/,/g, ''); // 移除千位分隔符
+    
+    // 隱藏顯示區塊，顯示編輯表單
+    display.classList.add('hidden');
+    form.classList.remove('hidden');
+    
+    // 將當前值賦予 input 並聚焦
+    const input = document.getElementById('budget-input');
+    input.value = budgetValue;
+    input.focus();
+};
+
+// 2. 取消編輯
+window.cancelBudgetEdit = function() {
+    document.getElementById('budget-display').classList.remove('hidden');
+    document.getElementById('budget-edit-form').classList.add('hidden');
+};
+
+// 3. 儲存預算並更新 Firebase (假設 trip info 儲存在 trips 集合的 'currentTrip' 文件中)
+window.saveBudget = async function() {
+    const newBudgetString = document.getElementById('budget-input').value;
+    const newBudget = parseFloat(newBudgetString);
+
+    if (isNaN(newBudget) || newBudget < 0) {
+        alert("請輸入有效的預算金額。");
+        return;
+    }
+
+    try {
+        // 假設您的 trip info 儲存在一個固定的文件 ID 下
+        const tripDocRef = doc(db, "trips", "currentTrip"); 
+        
+        // 更新 Firebase
+        await updateDoc(tripDocRef, {
+            totalBudget: newBudget 
+        });
+
+        // 更新成功後，刷新顯示和狀態
+        document.getElementById('total-budget').innerText = newBudget.toLocaleString(); // 格式化顯示
+        window.cancelBudgetEdit();
+        
+        // 假設您有一個函式來渲染記帳概況，需要重新調用
+        // window.renderExpenseSummary(); 
+
+    } catch (error) {
+        console.error("更新預算失敗: ", error);
+        alert("更新預算失敗，請檢查網路連線。");
+    }
+};
+
+// ⚠️ 注意：您還需要確保您的數據同步函式 (startDataSync) 在獲取 trip info 時，
+// 能夠將 totalBudget 渲染到 <span id="total-budget"> 裡。
         /* =========================
           全域變數與資料狀態
         ========================= */
@@ -1312,8 +1371,24 @@
                         </h3>
                         <div class="grid grid-cols-2 gap-3 text-sm mb-4">
                             <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
-                                <p class="text-gray-400 text-xs mb-1">預算總額 (TWD)</p>
-                                <p class="font-bold text-gray-700 text-lg">$ <span id="total-budget">50,000</span></p>
+                                <div id="budget-display-container">
+    <p class="text-gray-400 text-xs mb-1">預算總額 (TWD)</p>
+    
+    <p id="budget-display" class="font-bold text-gray-700 text-lg flex items-center cursor-pointer" onclick="window.enableBudgetEdit()">
+        $ <span id="total-budget">50,000</span> <i class="fa-solid fa-pen-to-square ml-2 text-custom-primary text-sm"></i>
+    </p>
+
+    <div id="budget-edit-form" class="hidden flex items-center space-x-2">
+        <span class="font-bold text-gray-700 text-lg">$</span>
+        <input type="number" id="budget-input" value="50000" class="w-24 border-b border-gray-400 focus:outline-none focus:border-custom-primary text-gray-700 text-lg font-bold p-1">
+        <button onclick="window.saveBudget()" class="text-white bg-custom-primary p-1 rounded-md text-sm hover:bg-custom-primary/90">
+            <i class="fa-solid fa-check"></i>
+        </button>
+        <button onclick="window.cancelBudgetEdit()" class="text-gray-500 p-1 rounded-md text-sm hover:text-gray-700">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+</div>
                             </div>
                             <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
                                 <p class="text-gray-400 text-xs mb-1">已花總額 (TWD)</p>
