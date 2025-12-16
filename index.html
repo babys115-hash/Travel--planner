@@ -69,6 +69,14 @@ window.switchExpenseView = function(view) {
         window.renderExpenseTracking(); 
     }
 }
+
+// ⚠️ 確保網頁載入時就設定好預設視圖 (Add)
+document.addEventListener('DOMContentLoaded', () => {
+    // ... 其他初始化代碼 ...
+    window.switchMainNav('itinerary-tab'); 
+    window.switchExpenseView('add'); // ⭐️ 新增：確保記帳頁籤被選中時預設顯示新增表單
+    startDataSync(); 
+});
         /* =========================
           全域變數與資料狀態
         ========================= */
@@ -990,13 +998,6 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
                 class="px-4 py-2 text-gray-700 font-semibold rounded-r-lg bg-white hover:bg-gray-100 transition"
                 onclick="window.switchExpenseView('details')">
             <i class="fas fa-list"></i> 明細
-        </button>
-    </div>
-</div>
-<div id="add-expense-container">
-    <div class="p-4 flex justify-center">
-        <button onclick="window.addExpense()" class="w-full max-w-sm py-3 rounded-xl bg-custom-secondary text-white font-bold hover:bg-custom-secondary/90 transition duration-150">
-            確認新增
         </button>
     </div>
 </div>
