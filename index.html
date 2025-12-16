@@ -341,8 +341,7 @@
         /* ===================================================
           記帳 (EXPENSE) 相關函式
         =================================================== */
-// 放在您的程式碼頂部
-let EXPENSE_DATA = [];
+
 
         // 選擇幣別
         window.selectCurrency = function(currency) {
@@ -726,12 +725,25 @@ let EXPENSE_DATA = [];
         .text-custom-secondary { color: #F5A623; }
         
         /* 行程頁籤的日期按鈕樣式 */
-        .tab-button.active {
-            background-color: #4A90E2; 
-            color: white;
-            border-bottom: none !important; 
-        }
-        
+        .tab-button {
+    /* 確保按鈕不會因為 Flex 而放大 */
+    flex-shrink: 0; 
+    /* 調整 padding 和字體大小 */
+    padding: 0.3rem 0.6rem; 
+    font-size: 0.8rem; /* 整體字體縮小 */
+    line-height: 1.2;
+    text-align: center;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    background-color: #f7f7f7;
+    transition: background-color 0.2s, color 0.2s;
+    border: 1px solid #e0e0e0;
+}
+
+/* Day 1 和日期的字體大小也在 generateDateTabs 函式中控制 */
+/* <div class="font-bold">Day ${index + 1}</div>  <-- 保持這個大小
+    <div class="text-xs">${day.date.substring(5)} (${day.day_of_week})</div> <-- 保持這個大小
+*/
         /* 行程時間軸樣式 */
         .timeline-item {
             border-left: 2px solid #4A90E2; /* 使用新的主色 */
@@ -905,8 +917,8 @@ let EXPENSE_DATA = [];
             
             <div id="itinerary-overview-buttons" class="bg-white p-4 rounded-lg shadow-md sticky top-[72px] z-10">
                 <h3 class="font-bold text-gray-800 mb-2">📅 行程總覽</h3>
-                <div id="date-buttons-container" class="flex flex-wrap justify-center items-center gap-2">
-                    </div>
+                <div id="date-buttons-container" class="p-2 flex gap-1 overflow-x-auto whitespace-nowrap border-b border-gray-200">
+    </div>
             </div>
 
             <div id="itinerary-container" class="bg-white p-4 rounded-lg shadow-md mt-4 min-h-[300px]">
