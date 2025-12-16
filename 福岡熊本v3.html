@@ -1,154 +1,1445 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>åŒ—ä¹å·æ—…è¡ŒåŠ©æ‰‹ v3 FINAL</title>
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100">
-<!-- ğŸ” ç™»å…¥ç•«é¢ -->
-<div id="loginScreen" class="h-screen flex items-center justify-center">
-<button onclick="login()" class="bg-blue-600 text-white px-6 py-3 rounded-xl text-lg">
-   ä½¿ç”¨ Google ç™»å…¥
-</button>
-</div>
-<!-- ğŸš« æ¬Šé™æ‹’çµ• -->
-<div id="denied" class="hidden h-screen flex items-center justify-center text-red-600 text-xl">
- âŒ æ­¤å¸³è™Ÿæ²’æœ‰å­˜å–æ¬Šé™
-</div>
-<!-- ğŸ“± ä¸»ç•«é¢ -->
-<div id="app" class="hidden max-w-md mx-auto p-4 space-y-4">
-<header class="text-center">
-<h1 class="text-2xl font-bold">Josh & Candice ä¹å·æ—…è¡Œ</h1>
-<p id="userInfo" class="text-sm text-gray-500"></p>
-<p id="editingStatus" class="text-sm text-green-600"></p>
-</header>
-<!-- ğŸ—“ è¡Œç¨‹ -->
-<button onclick="addItinerary()" class="w-full bg-green-500 text-white p-3 rounded-lg">
-â• æ–°å¢è¡Œç¨‹
-</button>
-<div id="itineraryList" class="space-y-2"></div>
-<!-- ğŸ’¸ è¨˜å¸³ -->
-<div class="bg-white p-3 rounded-lg shadow">
-<h2 class="font-bold mb-2">ğŸ’¸ è¨˜å¸³</h2>
-<input id="expenseAmount" type="number" placeholder="é‡‘é¡" class="border p-1 w-full mb-1">
-<select id="expensePayer" class="border p-1 w-full mb-1">
-<option>Josh</option>
-<option>Candice</option>
-</select>
-<button onclick="addExpense()" class="bg-blue-500 text-white px-3 py-1 rounded w-full">
-   æ–°å¢è¨˜å¸³
-</button>
-<div id="expenseList" class="mt-2 space-y-1"></div>
-</div>
-</div>
-<script type="module">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ºÖ©£ºµ¥»¦æµ{§U¤â</title>
+    <script type="module">
+/* =========================
+  Firebase ªì©l¤Æ
+========================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
- getAuth,
- GoogleAuthProvider,
- signInWithPopup,
- onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import {
  getFirestore,
+ collection,
  doc,
  setDoc,
+ addDoc,
+ deleteDoc,
  onSnapshot,
- serverTimestamp,
- enableIndexedDbPersistence
+ serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-/* ğŸ”§ Firebase */
+import {
+ getAuth,
+ signInWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 const firebaseConfig = {
  apiKey: "AIzaSyBRjYjvwvCNTRHdI8vH8n3GPabzSnSDbvI",
  authDomain: "jp-b0e03.firebaseapp.com",
  projectId: "jp-b0e03",
- storageBucket: "jp-b0e03.firebasestorage.app",
- messagingSenderId: "689610031212",
- appId: "1:689610031212:web:f63f2efe61d4ad562bd849"
 };
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
-enableIndexedDbPersistence(db).catch(()=>{});
-/* ğŸ” å…è¨±åå–® */
-const ALLOWED_EMAILS = [
- "idispeter@gmail.com",
- "babys115@gmail.com"
-];
-const tripRef = doc(db, "tripData", "jp-trip-2024");
-let user = null;
-let data = { itinerary: [], expenses: [], editingBy: null };
-/* ğŸ” Login */
-window.login = async () => {
- await signInWithPopup(auth, new GoogleAuthProvider());
-};
-onAuthStateChanged(auth, u => {
- if (!u) return;
- if (!ALLOWED_EMAILS.includes(u.email)) {
-   document.getElementById("loginScreen").classList.add("hidden");
-   document.getElementById("denied").classList.remove("hidden");
-   return;
- }
- user = u;
- document.getElementById("loginScreen").classList.add("hidden");
- document.getElementById("app").classList.remove("hidden");
- document.getElementById("userInfo").textContent = `ç™»å…¥ä¸­ï¼š${u.displayName}`;
- listen();
+const auth = getAuth(app);
+/* =========================
+  ?? µn¤J¡]µL UI¡^
+  Josh / Candice ¦@¥Î±b±K
+========================= */
+await signInWithEmailAndPassword(
+ auth,
+ "candice@email.com",   // ¡ö ´«¦¨§A Firebase Auth «Øªº±b¸¹
+ "§Aªº±K½X"
+);
+const OWNER_EMAIL = auth.currentUser.email;
+/* =========================
+  Firestore ¸ô®|
+========================= */
+const tripRoot = "trip/kyushu";
+const itineraryCol = collection(db, `${tripRoot}/itinerary`);
+const expenseCol = collection(db, `${tripRoot}/expenses`);
+const wishlistCol = collection(db, `${tripRoot}/wishlist`);
+/* =========================
+  ¥ş°ì¸ê®Æ
+========================= */
+let ITINERARY_DATA = {};
+let EXPENSES = [];
+let WISHLIST = [];
+/* =========================
+  ?? §Y®É¦P¨B - ¦æµ{
+========================= */
+onSnapshot(itineraryCol, snap => {
+ ITINERARY_DATA = {};
+ snap.forEach(d => ITINERARY_DATA[d.id] = d.data());
+ renderDateButtons();
 });
-/* ğŸ”„ å³æ™‚åŒæ­¥ */
-function listen() {
- onSnapshot(tripRef, snap => {
-   if (!snap.exists()) {
-     setDoc(tripRef, data);
-     return;
+/* =========================
+  ?? §Y®É¦P¨B - °O±b
+========================= */
+onSnapshot(expenseCol, snap => {
+ EXPENSES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+ renderExpenseTracking();
+});
+/* =========================
+  ?? §Y®É¦P¨B - Wishlist
+========================= */
+onSnapshot(wishlistCol, snap => {
+ WISHLIST = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+ renderWishlist();
+});
+/* =========================
+  ?? ¦æµ{ CRUD¡]§ï§A­ì¥»ªº¡^
+========================= */
+async function saveItinerary(dateKey, dateLabel, events) {
+ await setDoc(
+   doc(db, `${tripRoot}/itinerary`, dateKey),
+   {
+     date: dateLabel,
+     events,
+     updatedBy: OWNER_EMAIL,
+     updatedAt: serverTimestamp()
    }
-   data = snap.data();
-   render();
+ );
+}
+/* =========================
+  ?? ·s¼W¤ä¥X
+========================= */
+async function addExpense() {
+ const amount = parseFloat(document.getElementById("expense-amount").value);
+ const payer = document.getElementById("expense-payer").value;
+ if (isNaN(amount)) return alert("ª÷ÃB¿ù»~");
+ await addDoc(expenseCol, {
+   amount,
+   payer,
+   ownerEmail: OWNER_EMAIL,
+   createdAt: serverTimestamp()
  });
 }
-/* ğŸŸ¢ ç·¨è¼¯ç‹€æ…‹ */
-function markEditing() {
- setDoc(tripRef, {
-   editingBy: user.displayName,
-   editingAt: Date.now()
- }, { merge: true });
+/* =========================
+  ?? Wishlist
+========================= */
+async function addWishlistItem(event) {
+ event.preventDefault();
+ const name = document.getElementById("wishlist-name").value;
+ const price = parseFloat(document.getElementById("wishlist-price").value);
+ const category = document.getElementById("wishlist-category").value;
+ await addDoc(wishlistCol, {
+   name,
+   price,
+   category,
+   purchased: false,
+   ownerEmail: OWNER_EMAIL,
+   createdAt: serverTimestamp()
+ });
+ event.target.reset();
 }
-/* ğŸ—“ è¡Œç¨‹ */
-window.addItinerary = async () => {
- markEditing();
- data.itinerary.unshift({
-   title: "æ–°è¡Œç¨‹",
-   by: user.displayName,
-   at: new Date().toLocaleString()
- });
- await setDoc(tripRef, data);
-};
-/* ğŸ’¸ è¨˜å¸³ */
-window.addExpense = async () => {
- markEditing();
- data.expenses.unshift({
-   amount: document.getElementById("expenseAmount").value,
-   payer: document.getElementById("expensePayer").value,
-   by: user.displayName,
-   at: new Date().toLocaleString()
- });
- await setDoc(tripRef, data);
-};
-/* ğŸ–¼ Render */
-function render() {
- document.getElementById("editingStatus").textContent =
-   data.editingBy ? `ğŸŸ¢ ${data.editingBy} æ­£åœ¨ç·¨è¼¯` : "";
- document.getElementById("itineraryList").innerHTML =
-   data.itinerary.map(i =>
-     `<div class="bg-white p-2 rounded">${i.title} â€“ âœï¸ ${i.by}</div>`
-   ).join("");
- document.getElementById("expenseList").innerHTML =
-   data.expenses.map(e =>
-     `<div>${e.amount} å…ƒ / ${e.payer}ï¼ˆ${e.by}ï¼‰</div>`
-   ).join("");
+async function togglePurchaseStatus(id, purchased) {
+ await setDoc(
+   doc(db, `${tripRoot}/wishlist`, id),
+   { purchased: !purchased },
+   { merge: true }
+ );
+}
+async function deleteWishlistItem(id) {
+ await deleteDoc(doc(db, `${tripRoot}/wishlist`, id));
 }
 </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* ¦Û­qÃC¦â¥DÃD (²M·s/²{¥N·P°t¦â) */
+        .bg-custom-primary { background-color: #4A90E2; } /* ¥D¦â¡G²`¤ÑªÅÂÅ */
+        .text-custom-primary { color: #4A90E2; }
+        .bg-custom-secondary { background-color: #F5A623; } /* °Æ¦â¡G·xª÷¾ï */
+        .text-custom-secondary { color: #F5A623; }
+        
+        /* ¦æµ{­¶ÅÒªº¤é´Á«ö¶s¼Ë¦¡ */
+        .tab-button.active {
+            background-color: #4A90E2; 
+            color: white;
+            border-bottom: none !important; 
+        }
+        
+        /* ¦æµ{®É¶¡¶b¼Ë¦¡ */
+        .timeline-item {
+            border-left: 2px solid #4A90E2; /* ¨Ï¥Î·sªº¥D¦â */
+            padding-left: 1rem;
+            cursor: pointer; /* **·s¼W¡GÅı¨Ï¥ÎªÌª¾¹D¥i¥HÂIÀ»** */
+            transition: background-color 0.2s;
+        }
+        .timeline-item:hover {
+            background-color: #f0f8ff; /* ÂIÀ»®É¦³²L¦â´£¥Ü */
+        }
+        .timeline-container > div:last-child .timeline-item {
+            border-left: none; /* ²¾°£³Ì«á¤@­Ó¶µ¥Øªº¥ªÃä½u */
+        }
+        .timeline-item a {
+            color: #F5A623; /* ¨Ï¥Î·sªº°Æ¦â */
+            text-decoration: underline;
+        }
+        
+        /* ©³³¡¾É¯èÄæ¼Ë¦¡ */
+        .bottom-nav-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 0;
+            cursor: pointer;
+            transition: color 0.2s ease;
+            color: #4b5563; 
+        }
+        .bottom-nav-button.active {
+            color: #4A90E2; /* ¨Ï¥Î·sªº¥D¦â */
+        }
+        
+        /* ½T«O©³³¡¤º®e¤£·|³Q©T©w¾É¯èÄæ¾B¾× */
+        body {
+            padding-bottom: 70px; 
+        }
+
+        /* °O±b­¶­±ªº°Ï¶ôÂI¿ï«ö¶s¼Ë¦¡ */
+        .block-select-btn {
+            padding: 0.5rem;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap; 
+        }
+        /* ¹ô§O¡BÃş§O¡B¿z¿ï ¨Ï¥Î°Æ¦â (·xª÷¾ï) */
+        .block-select-btn.active-currency,
+        .block-select-btn.active-category,
+        .block-select-btn.active-filter {
+            background-color: #F5A623;
+            color: white;
+            border-color: #F5A623;
+        }
+        /* ¥I´Ú¤H¡B¤ä¥I¤è¦¡ ¨Ï¥Î¥D¦â (¤ÑªÅÂÅ) */
+        .block-select-btn.active-payer,
+        .block-select-btn.active-payment {
+            background-color: #4A90E2;
+            color: white;
+            border-color: #4A90E2;
+        }
+        
+        /* ¼¤±æ²M³æªº¤wÁÊ/¥¼ÁÊ«ö¶s¼Ë¦¡ */
+        .wishlist-status-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .wishlist-status-btn.pending {
+            background-color: #fca5a5; /* ²L¬õ */
+            color: #7f1d1d; /* ²`¬õ¤å¦r */
+        }
+        .wishlist-status-btn.purchased {
+            background-color: #a7f3d0; /* ²Lºñ */
+            color: #065f46; /* ²`ºñ¤å¦r */
+        }
+
+        /* Modal ¼Ë¦¡ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none; /* ¹w³]ÁôÂÃ */
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            max-width: 90%;
+            width: 400px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        /* ¦æµ{¤é´Á«ö¶sªº®e¾¹¼Ë¦¡ (°t¦X¹Ï¤ù) */
+        #itinerary-overview-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+        }
+        #itinerary-overview-buttons .tab-button {
+            border-radius: 9999px; /* ¶ê¨¤½¦Ån§Î */
+            background-color: #E8F3FF; /* ²LÂÅ¥Õ­I´º */
+            color: #4A90E2; /* ÂÅ¦â¤å¦r */
+            padding: 0.4rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s, color 0.2s;
+            border-bottom: none !important; /* ²¾°£­ì¥»ªº©³½u */
+        }
+        #itinerary-overview-buttons .tab-button.active {
+            background-color: #4A90E2; /* ¥D¦â */
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <header class="bg-custom-primary text-white shadow-md p-4 sticky top-0 z-20">
+        <h1 class="text-2xl font-bold text-center">Josh&Candice¥_¤E¦{¸t½Ï¸ó¦~¤§®È (12/26 - 12/31)</h1>
+    </header>
+
+    <div id="main-content" class="p-4 max-w-md mx-auto">
+        
+        <div id="itinerary-tab" class="main-tab-content">
+            
+            <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fa-solid fa-cloud-sun text-custom-primary mr-2"></i> ¦æµ{¤Ñ®ğÁ`Äı (tenki.jp)
+                </h2>
+
+                <div class="flex justify-around items-stretch mb-4 space-x-2">
+                    <div class="flex-1 text-center p-3 border rounded-lg bg-gray-50 shadow-sm">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">ºÖ©£ (26¤é)</p>
+                        <i id="weather-icon-fukuoka" class="fa-solid fa-cloud-sun-rain text-3xl text-custom-primary mb-1"></i>
+                        <p id="weather-temp-fukuoka" class="text-lg font-bold text-gray-800">8¢XC / 13¢XC</p>
+                        <p id="weather-rain-fukuoka" class="text-xs text-red-500 mt-1">­°«B²v: 20%</p>
+                    </div>
+
+                    <div class="flex-1 text-center p-3 border rounded-lg bg-gray-50 shadow-sm">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">ªø±T (27-28¤é)</p>
+                        <i id="weather-icon-nagasaki" class="fa-solid fa-sun text-3xl text-custom-secondary mb-1"></i> 
+                        <p id="weather-temp-nagasaki" class="text-lg font-bold text-gray-800">5¢XC / 10¢XC</p>
+                        <p id="weather-rain-nagasaki" class="text-xs text-gray-500 mt-1">­°«B²v: 0%</p>
+                    </div>
+
+                    <div class="flex-1 text-center p-3 border rounded-lg bg-gray-50 shadow-sm">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">ºµ¥» (29-31¤é)</p>
+                        <i id="weather-icon-kumamoto" class="fa-solid fa-cloud-showers-heavy text-3xl text-custom-primary mb-1"></i>
+                        <p id="weather-temp-kumamoto" class="text-lg font-bold text-gray-800">3¢XC / 9¢XC</p>
+                        <p id="weather-rain-kumamoto" class="text-xs text-red-500 mt-1">­°«B²v: 40%</p>
+                    </div>
+                </div>
+
+                <a href="https://www.tenki.jp/" target="_blank" class="w-full block text-center bg-gray-200 text-gray-700 p-2 rounded-lg font-semibold hover:bg-gray-300 transition duration-200">
+                    ÂIÀ»¬d¬İ tenki.jp ¸Ô²Ó¹w³ø
+                </a>
+            </div>
+            
+            <div id="itinerary-overview-buttons" class="bg-white p-4 rounded-lg shadow-md sticky top-[72px] z-10">
+                <h3 class="font-bold text-gray-800 mb-2">?? ¦æµ{Á`Äı</h3>
+                <div id="date-buttons-container" class="flex flex-wrap justify-center items-center gap-2">
+                    </div>
+            </div>
+
+            <div id="itinerary-container" class="bg-white p-4 rounded-lg shadow-md mt-4 min-h-[300px]">
+                <p class="text-center text-gray-500">½ĞÂIÀ»¤W¤èªº¤é´Á¬d¬İ¦æµ{¡C</p>
+            </div>
+            
+            <button onclick="openModal('addItineraryModal')" class="fixed right-4 bottom-20 bg-custom-primary text-white p-4 rounded-full shadow-lg hover:bg-[#3A7AD0] transition z-20">
+                <i class="fa-solid fa-circle-plus text-2xl"></i>
+            </button>
+            
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg shadow-inner">
+                <h3 class="text-lg font-bold text-custom-secondary mb-2">?? ³Æµù¡G</h3>
+                <p class="text-sm text-gray-600">¦æµ{ÂIÀ»«á§Y¥i¶i¦æ­×§ï©Î§R°£¡C¶º©±¦WºÙ¤w¥[¤W <a href="#" onclick="return false;" class="text-custom-secondary underline">Google Maps ³sµ²</a>¡C</p>
+            </div>
+        </div>
+        
+
+        <div id="expense-tab" class="main-tab-content hidden">
+            <div id="expense-tracking-container" class="bg-white p-4 rounded-lg shadow-md mt-4">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
+                    <i class="fa-solid fa-calculator text-[#F5A623] mr-2"></i> ?? ®È¶O°O±b¤¤¤ß
+                </h3>
+        
+                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p class="text-sm font-semibold text-blue-700">§Y®É¶×²v (JPY/TWD)¡G<span id="exchange-rate-display">--</span></p>
+                </div>
+        
+                <div class="p-4 bg-gray-50 rounded-lg mb-4 shadow-inner">
+                    <h4 class="font-semibold mb-3 text-custom-primary">·s¼W¤ä¥X</h4>
+                    
+                    <input type="date" id="expense-date" class="w-full p-2 border rounded-lg mb-3 text-sm">
+                    
+                    <input type="number" id="expense-amount" placeholder="ª÷ÃB" class="w-full p-2 border rounded-lg mb-3 text-sm" min="0">
+                    
+                    <h5 class="text-sm font-semibold mb-2">¥I´Ú¹ô§O:</h5>
+                    <div id="currency-select" class="flex space-x-2 mb-3">
+                        <button type="button" class="block-select-btn flex-1 active-currency" data-currency="TWD" onclick="selectCurrency('TWD')">
+                            <i class="fa-solid fa-money-bill-wave mr-1"></i> ¥x¹ô (TWD)
+                        </button>
+                        <button type="button" class="block-select-btn flex-1" data-currency="JPY" onclick="selectCurrency('JPY')">
+                            <i class="fa-solid fa-yen-sign mr-1"></i> ¤é¶ê (JPY)
+                        </button>
+                        <input type="hidden" id="expense-currency" value="TWD">
+                    </div>
+                    
+                    <h5 class="text-sm font-semibold mb-2">¥I´Ú¤H:</h5>
+                    <div id="payer-select" class="flex space-x-2 mb-3">
+                        <button type="button" class="block-select-btn flex-1 active-payer" data-payer="Josh" onclick="selectPayer('Josh')">
+                            <i class="fa-solid fa-person-military-pointing mr-1"></i> Josh
+                        </button>
+                        <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="selectPayer('Candice')">
+                            <i class="fa-solid fa-person-dress mr-1"></i> Candice
+                        </button>
+                        <input type="hidden" id="expense-payer" value="Josh">
+                    </div>
+
+                    <h5 class="text-sm font-semibold mb-2">¤ä¥XÃş§O:</h5>
+                    <div id="category-select" class="flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs active-category" data-category="Food" onclick="selectCategory('Food')">
+                            <i class="fa-solid fa-utensils mr-1"></i> À\¶¼
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Transport" onclick="selectCategory('Transport')">
+                            <i class="fa-solid fa-train-subway mr-1"></i> ¥æ³q
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Accommodation" onclick="selectCategory('Accommodation')">
+                            <i class="fa-solid fa-hotel mr-1"></i> ¦í±J
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Shopping" onclick="selectCategory('Shopping')">
+                            <i class="fa-solid fa-bag-shopping mr-1"></i> ÁÊª«
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Other" onclick="selectCategory('Other')">
+                            <i class="fa-solid fa-ellipsis mr-1"></i> ¨ä¥L
+                        </button>
+                        <input type="hidden" id="expense-category" value="Food"> 
+                    </div>
+                    
+                    <h5 class="text-sm font-semibold mb-2">¤ä¥I¤è¦¡:</h5>
+                    <div id="payment-select" class="flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs active-payment" data-payment="Cash" onclick="selectPayment('Cash')">
+                            <i class="fa-solid fa-money-bill-1-wave mr-1"></i> ²{ª÷
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-payment="CreditCard" onclick="selectPayment('CreditCard')">
+                            <i class="fa-solid fa-credit-card mr-1"></i> «H¥Î¥d
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-payment="PayPay" onclick="selectPayment('PayPay')">
+                            <i class="fa-solid fa-mobile-screen mr-1"></i> PayPay
+                        </button>
+                        <input type="hidden" id="expense-payment" value="Cash"> 
+                    </div>
+
+                    <input type="text" id="expense-description" placeholder="¥Î³~/»¡©ú" class="w-full p-2 border rounded-lg mb-3 text-sm">
+                    
+                    <button onclick="addExpense()" class="w-full bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#db8f1f]">
+                        <i class="fa-solid fa-circle-plus mr-1"></i> ½T»{·s¼W
+                    </button>
+                </div>
+        
+                <div id="expense-summary" class="mb-4 p-4 bg-custom-primary text-white rounded-lg shadow-md">
+                    <h4 class="font-semibold mb-2">Á`¤ä¥X·§ªp</h4>
+                    <p class="text-sm">Á`¹wºâ (TWD): $ <span id="total-budget">50,000</span></p>
+                    <p class="text-sm">²Ö¿nÁ`¤ä¥X (TWD): $ <span id="total-spent">0</span></p>
+                    <p class="text-lg font-bold mt-2">³Ñ¾l¹wºâ: $ <span id="remaining-budget">50,000</span></p>
+                </div>
+                
+                <div id="settlement-summary" class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg shadow-md">
+                    <h4 class="font-semibold mb-2 text-gray-800 flex items-center"><i class="fa-solid fa-handshake-angle mr-2 text-yellow-600"></i> ¤ÀÅuµ²ºâ·§ªp (TWD)</h4>
+                    <p class="text-sm text-gray-700">Josh ¤w¤ä¥I: $ <span id="josh-paid">0</span></p>
+                    <p class="text-sm text-gray-700 mb-2">Candice ¤w¤ä¥I: $ <span id="candice-paid">0</span></p>
+                    <p class="text-md font-bold text-gray-900 border-t pt-2 mt-2">
+                        <span id="settlement-result">µL»İµ²ºâ¡C</span>
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="font-semibold mb-2 text-gray-700 flex items-center"><i class="fa-solid fa-filter mr-2"></i> ¨ÌÃş§O¿z¿ï²M³æ:</h4>
+                    <div id="category-filter-buttons" class="flex flex-wrap gap-2 text-sm">
+                    </div>
+                </div>
+        
+                <h4 class="font-semibold mb-3 text-gray-700 border-b pb-2">¤ä¥X©ú²Ó</h4>
+                <div id="expense-list" class="space-y-2">
+                    <p class="text-center text-gray-500 text-sm">©|µL¤ä¥X¬ö¿ı</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="weather-tab" class="main-tab-content hidden">
+            <div id="weather-container" class="bg-white p-4 rounded-lg shadow-md mt-4">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
+                    <i class="fa-solid fa-temperature-three-quarters text-[#4A90E2] mr-2"></i> ?? ¨C¤é¤Ñ®ğ¹w³ø (tenki.jp ¾ú¥v¼Æ¾Ú)
+                </h3>
+                <div id="weather-content" class="space-y-4">
+                    </div>
+            </div>
+        </div>
+        
+        <div id="wishlist-tab" class="main-tab-content hidden">
+             <div class="bg-white p-4 rounded-lg shadow-md mt-4">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
+                    <i class="fa-solid fa-heart text-[#F5A623] mr-2"></i> ? ¼¤±æ²M³æ
+                </h3>
+                
+                <div class="p-4 bg-gray-50 rounded-lg mb-4 shadow-inner">
+                    <h4 class="font-semibold mb-3 text-custom-primary">·s¼WÁÊ¶R¥Ø¼Ğ</h4>
+                    <form id="wishlist-form" onsubmit="addWishlistItem(event)">
+                        
+                        <label for="wishlist-category" class="text-sm font-semibold text-gray-700 mb-1 block">¶µ¥Ø¤ÀÃş:</label>
+                        <select id="wishlist-category" name="wishlist-category" class="w-full p-2 border rounded-lg mb-3 text-sm bg-white" required>
+                            <option value="" disabled selected>-- ½Ğ¿ï¾Ü¤ÀÃş --</option>
+                            <option value="3C">3C</option>
+                            <option value="Beauty">¬ü§©</option>
+                            <option value="Daily">¤é¥Î«~</option>
+                            <option value="Toy">ª±¨ã</option>
+                            <option value="Clothes">¦çª«</option>
+                            <option value="Souvenir">¦ñ¤âÂ§/­¹ª«</option>
+                            <option value="Other">¨ä¥L</option>
+                        </select>
+                        
+                        <label for="wishlist-name" class="text-sm font-semibold text-gray-700 mb-1 block">¶µ¥Ø¦WºÙ/´y­z:</label>
+                        <input type="text" id="wishlist-name" name="wishlist-name" placeholder="¨Ò¦p¡GDyson §j­·¾÷" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+
+                        <label for="wishlist-price" class="text-sm font-semibold text-gray-700 mb-1 block">¹w­p»ù®æ (JPY):</label>
+                        <input type="number" id="wishlist-price" name="wishlist-price" placeholder="½Ğ¿é¤J¹w­p»ù®æ (¤é¶ê)" min="0" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+                        
+                        <button type="submit" class="w-full bg-custom-primary text-white p-2 rounded-lg font-bold hover:bg-[#3A7AD0]">
+                            <i class="fa-solid fa-cart-plus mr-1"></i> ¥[¤J²M³æ
+                        </button>
+                    </form>
+                </div>
+                
+                <h4 class="font-semibold mb-3 text-gray-700 border-b pb-2">«İÁÊ²M³æ</h4>
+                <div id="wishlist-list" class="space-y-3">
+                    <p class="text-center text-gray-500 text-sm">©|µL«İÁÊ¶µ¥Ø</p>
+                </div>
+
+             </div>
+        </div>
+        
+    </div>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-xl z-30">
+        <div class="flex justify-around max-w-md mx-auto">
+            
+            <button class="bottom-nav-button active" data-target="itinerary-tab" onclick="switchMainNav('itinerary-tab')">
+                <i class="fa-solid fa-map-location-dot text-2xl mb-1"></i>
+                <span class="text-xs">¦æµ{</span>
+            </button>
+
+            <button class="bottom-nav-button" data-target="expense-tab" onclick="switchMainNav('expense-tab'); renderExpenseTracking();">
+                <i class="fa-solid fa-calculator text-2xl mb-1"></i>
+                <span class="text-xs">°O±b</span>
+            </button>
+            
+            <button class="bottom-nav-button" data-target="weather-tab" onclick="switchMainNav('weather-tab'); renderWeather();">
+                <i class="fa-solid fa-cloud-sun-rain text-2xl mb-1"></i>
+                <span class="text-xs">¤Ñ®ğ</span>
+            </button>
+            
+            <button class="bottom-nav-button" data-target="wishlist-tab" onclick="switchMainNav('wishlist-tab'); renderWishlist();">
+                <i class="fa-solid fa-heart text-2xl mb-1"></i>
+                <span class="text-xs">¼¤±æ²M³æ</span>
+            </button>
+
+        </div>
+    </nav>
+    
+    <div id="addItineraryModal" class="modal-overlay">
+        <div class="modal-content">
+            
+            <div class="text-center mb-4">
+                <div class="text-custom-primary font-bold text-lg mb-2 flex items-center justify-center">
+                    <i class="fa-solid fa-circle-plus mr-2"></i> ·s¼W¦æµ{¶µ¥Ø
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 border-b pb-2">·s¼W¦æµ{²Ó¸`</h3>
+            </div>
+            <button onclick="closeModal('addItineraryModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+            
+            <form id="add-itinerary-form" onsubmit="addItineraryItem(event)">
+                
+                <label for="new-date" class="text-sm font-semibold text-gray-700 mb-1 block">¿ï¾Ü¤é´Á:</label>
+                <select id="new-date" class="w-full p-2 border rounded-lg mb-3 text-sm bg-white" required>
+                    </select>
+                
+                <label for="new-time" class="text-sm font-semibold text-gray-700 mb-1 block">®É¶¡:</label>
+                <div class="flex items-center mb-3">
+                    <input type="text" id="new-time" placeholder="--:--" pattern="[0-2][0-9]:[0-5][0-9]" class="flex-1 p-2 border rounded-lg text-sm mr-2" required>
+                    <i class="fa-solid fa-clock text-gray-500"></i>
+                </div>
+                
+                <label for="new-title" class="text-sm font-semibold text-gray-700 mb-1 block">¦æµ{¼ĞÃD:</label>
+                <input type="text" id="new-title" placeholder="¦æµ{¼ĞÃD (¦p: ±ßÀ\)" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+                
+                <label for="new-note" class="text-sm font-semibold text-gray-700 mb-1 block">³Æµù/¦aÂI:</label>
+                <textarea id="new-note" rows="2" placeholder="³Æµù (¦p: ªüÄ¬¨ª¤ûÉd/¶º©±)" class="w-full p-2 border rounded-lg mb-4 text-sm"></textarea>
+                
+                <button type="submit" class="w-full bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#db8f1f]">
+                    ½T»{·s¼W
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="editItineraryModal" class="modal-overlay">
+        <div class="modal-content">
+            
+            <div class="text-center mb-4">
+                <div class="text-custom-secondary font-bold text-lg mb-2 flex items-center justify-center">
+                    <i class="fa-solid fa-pen-to-square mr-2"></i> ­×§ï¦æµ{¶µ¥Ø
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 border-b pb-2" id="edit-modal-date-info"></h3>
+            </div>
+            <button onclick="closeModal('editItineraryModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+            
+            <form id="edit-itinerary-form" onsubmit="saveItineraryItem(event)">
+                <input type="hidden" id="edit-date-key" name="dateKey">
+                <input type="hidden" id="edit-item-index" name="itemIndex">
+
+                <label for="edit-time" class="text-sm font-semibold text-gray-700 mb-1 block">®É¶¡:</label>
+                <div class="flex items-center mb-3">
+                    <input type="text" id="edit-time" placeholder="--:--" pattern="[0-2][0-9]:[0-5][0-9]" class="flex-1 p-2 border rounded-lg text-sm mr-2" required>
+                    <i class="fa-solid fa-clock text-gray-500"></i>
+                </div>
+                
+                <label for="edit-title" class="text-sm font-semibold text-gray-700 mb-1 block">¦æµ{¼ĞÃD:</label>
+                <input type="text" id="edit-title" placeholder="¦æµ{¼ĞÃD (¦p: ±ßÀ\)" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+                
+                <label for="edit-note" class="text-sm font-semibold text-gray-700 mb-1 block">³Æµù/¦aÂI:</label>
+                <textarea id="edit-note" rows="2" placeholder="³Æµù (¦p: ªüÄ¬¨ª¤ûÉd/¶º©±)" class="w-full p-2 border rounded-lg mb-4 text-sm"></textarea>
+                
+                <div class="flex space-x-2">
+                    <button type="button" onclick="deleteItineraryItem(document.getElementById('edit-date-key').value, parseInt(document.getElementById('edit-item-index').value))" class="flex-1 bg-red-500 text-white p-2 rounded-lg font-bold hover:bg-red-600">
+                        <i class="fa-solid fa-trash-can mr-1"></i> §R°£
+                    </button>
+                    <button type="submit" class="flex-1 bg-custom-primary text-white p-2 rounded-lg font-bold hover:bg-[#3A7AD0]">
+                        <i class="fa-solid fa-save mr-1"></i> Àx¦s­×§ï
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+// ±¾¨ì window¡Aµ¹­ì¥» JS ¥Î
+ window.db = db;
+ window.fbDoc = doc;
+ window.fbGetDoc = getDoc;
+ window.fbSetDoc = setDoc;
+ window.fbOnSnapshot = onSnapshot;
+    
+    <script>
+        // ===================================
+        // ®Ö¤ß¼Æ¾Ú (¦æµ{¡B¤Ñ®ğ¡B°O±b) - 12/26 ~ 12/31 ³Ì²×ª©
+        // ===================================
+        
+        // **¦a¹Ï³sµ²¼Æ¾Ú (¤w½T»{)**
+        const MAP_LINKS = { 
+    "Ritz Carlton Fukuoka": "https://www.google.com/maps/search/?api=1&query=The+Ritz-Carlton+Fukuoka",
+    "ºÖ©£¶ğ": "https://www.google.com/maps/search/?api=1&query=ºÖ©£???",
+    "¤jÀÚ¤½¶é": "https://www.google.com/maps/search/?api=1&query=Ohori+Park",
+    "Nagasaki Marriott Hotel": "https://www.google.com/maps/search/?api=1&query=Nagasaki+Marriott+Hotel",
+    "ªø±T¤¤µØµó": "https://www.google.com/maps/search/?api=1&query=ªø±T·s¦a¤¤µØµó",
+    "©M¥­¤½¶é / ­ìÃz¸ê®ÆÀ]": "https://www.google.com/maps/search/?api=1&query=ªø±T¥­©M¤½¶é+­ìÃz¸ê®ÆÀ]",
+    "½_¦õ¤s©]´º": "https://www.google.com/maps/search/?api=1&query=ªø±T+?¦õ¤s",
+    "¤j®ú¤Ñ¥D°ó": "https://www.google.com/maps/search/?api=1&query=Oura+Church",
+    "­ô©Ô¤Ú¶é": "https://www.google.com/maps/search/?api=1&query=Glover+Garden",
+    "¥X®q": "https://www.google.com/maps/search/?api=1&query=Dejima+Nagasaki",
+    "²´Ãè¾ô": "https://www.google.com/maps/search/?api=1&query=²´Ãè¾ô",
+    "KOKO Hotel Premier Kumamoto": "https://www.google.com/maps/search/?api=1&query=KOKO+HOTEL+Premier+Kumamoto",
+    "ºµ¥»«°": "https://www.google.com/maps/search/?api=1&query=Kumamoto+Castle",
+    "«°±m­b": "https://www.google.com/maps/search/?api=1&query=??°¨³õ+«°±m­b",
+    "¤W³q/¤U³q°Ó©±µó": "https://www.google.com/maps/search/?api=1&query=¤W³q+¤U³q+°Ó©±µó+ºµ¥»",
+    "¤ô«e¦x¦¨½ì¶é": "https://www.google.com/maps/search/?api=1&query=Suizenji+Jojuen+Garden",
+    "¶Â¤t·Å¬u": "https://www.google.com/maps/search/?api=1&query=Kurokawa+Onsen",
+    "´Ó¤ì·Å¬u": "https://www.google.com/maps/search/?api=1&query=Ueki+Onsen",
+    "ºµ¥»¾÷³õ (KMJ)": "https://www.google.com/maps/search/?api=1&query=Kumamoto+Airport+KMJ",
+        };
+        
+        // **¦æµ{¼Æ¾Ú**
+        // ¨Ï¥Î localStorage Àx¦s¡A½T«O·s¼Wªº¦æµ{¤£·|®ø¥¢
+        let ITINERARY_DATA = JSON.parse(localStorage.getItem('tripItinerary')) || {
+            "12/26": {
+                date: "12/26 (¤G) - °ª¶¯ ¡÷ ºÖ©£",
+                events: [
+                    { time: "06:30", icon: "fa-plane-departure", title: "CI0132 KHH ¡÷ FUK", note: "°ª¶¯¥Xµo¡A½Ğ´£¦­¦Ü¾÷³õ" },
+                    { time: "10:15", icon: "fa-bus", title: "¾÷³õ¦Ü¶º©±¥æ³q", 
+                        note: "? **«ØÄ³¥æ³q (FUK ¡÷ ³Õ¦h¯¸/Ritz)**¡G<br>¡E ¦a¤UÅKªÅ´ä½u¡G10 ¤ÀÄÁ¥i¨ì" 
+                    },
+                    { time: "11:00", icon: "fa-hotel", title: "The Ritz-Carlton, Fukuoka ±H©ñ¦æ§õ " + getMapLink("Ritz Carlton Fukuoka"), note: "¶º©±¦ì©ó¤Ñ¯«¤j¦W°Ï" },
+                    { time: "12:30", icon: "fa-utensils", title: "¤ÈÀ\¡G³Õ¦h¯¸©PÃä¬ü­¹", note: "¥i¿ï¾Ü¤û¸zÁç©Î©ú¤Ó¤l«K·í" },
+                    { time: "14:30", icon: "fa-camera-retro", title: "ºÖ©£¶ğ / ¦Ê¹D®üÀØ¤½¶é " + getMapLink("ºÖ©£¶ğ"), note: "±q Ritz ·f­pµ{¨®¬ù 15¡V20 ¤À¨ì®üÃä" },
+                    { time: "17:00", icon: "fa-tree", title: "¤jÀÚ¤½¶é´²¨B " + getMapLink("¤jÀÚ¤½¶é"), note: "»´ÃP¦æµ{" },
+                    { time: "19:30", icon: "fa-utensils", title: "±ßÀ\¡G«Î¥x©Î¶º©±¥ÎÀ\", note: "«Î¥x (¤¤¬w/¤Ñ¯«) ÅéÅç©]¥«¤å¤Æ" },
+                    { time: "21:30", icon: "fa-bed", title: "The Ritz-Carlton Check-in", note: "¦^¶º©±¥ğ®§" },
+                ],
+                food_notes: [
+                    "?? **³Õ¦h¯¸©PÃä**¡G¤û¸zÁç¡u??Áç????¡v (¤ÈÀ\/±ßÀ\¬Ò¥i)",
+                    "?? **±ßÀ\/®d©]**¡G¤¤¬w/¤Ñ¯««Î¥x¡GÅéÅç¿W¯Sªº¤é¦¡¸ôÃäÅu¤å¤Æ¡C"
+                ]
+            },
+            "12/27": {
+                date: "12/27 (¤T) - ºÖ©£ ¡÷ ªø±T",
+                events: [
+                    { time: "08:00", icon: "fa-train", title: "·f­¼·s·F½u«e©¹ªø±T", 
+                        note: "? **·s·F½u Kamome (???)**¡G³Õ¦h ¡÷ ªø±T¡A¬ù 1 ¤p®É 20¡V30 ¤À (JR Pass ±Ò¥Î¤é)" 
+                    },
+                    { time: "10:30", icon: "fa-hotel", title: "Nagasaki Marriott Hotel ±H©ñ¦æ§õ " + getMapLink("Nagasaki Marriott Hotel"), note: "¶º©±´N¦bªø±T¯¸" },
+                    { time: "12:00", icon: "fa-utensils", title: "ªø±T¤¤µØµó¤ÈÀ\ " + getMapLink("ªø±T¤¤µØµó"), note: "¥i¦Ò¼{¦¿¤s¼Ó©Î¥|®ü¼Ó" },
+                    { time: "14:00", icon: "fa-church", title: "©M¥­¤½¶é / ­ìÃz¸ê®ÆÀ] " + getMapLink("©M¥­¤½¶é / ­ìÃz¸ê®ÆÀ]"), note: "¸ô­±¹q¨®¥i©è¹F" },
+                    { time: "17:30", icon: "fa-bell-concierge", title: "¶º©± Check-in & ¥ğ®§", note: "Nagasaki Marriott Hotel" },
+                    { time: "19:00", icon: "fa-mountain-sun", title: "½_¦õ¤s©]´º " + getMapLink("½_¦õ¤s©]´º"), note: "? **¥@¬É¤T¤j©]´º**¡GÆl¨®¤W¤s" },
+                ],
+                food_notes: [
+                    "?? **ªø±T¥²¦Y**¡G¥|®ü¼Ó¡]ªø±T?????¡^©Î¦¿¤s¼Ó¡]±j´ÎÄÑ¦Ñ©±¡^"
+                ]
+            },
+            "12/28": {
+                date: "12/28 (¥|) - ªø±T¤@¤é¹C",
+                events: [
+                    { time: "09:00", icon: "fa-church", title: "¤j®ú¤Ñ¥D°ó " + getMapLink("¤j®ú¤Ñ¥D°ó"), note: "¤é¥»³Ì¥j¦Ñ¤ì³y±Ğ°ó" },
+                    { time: "10:30", icon: "fa-gopuram", title: "­ô©Ô¤Ú¶é " + getMapLink("­ô©Ô¤Ú¶é"), note: "¼Ú­·®x¶é¡A±q¤j®ú¤Ñ¥D°ó¨B¦æ¥i¹F" },
+                    { time: "12:30", icon: "fa-utensils", title: "¤ÈÀ\®É¶¡", note: "ªø±T¤¤µØµó©Î¤j®ú©PÃä" },
+                    { time: "14:30", icon: "fa-landmark", title: "¥X®q " + getMapLink("¥X®q"), note: "ªø±T¾ú¥v¤H¤å´ºÂI" },
+                    { time: "16:30", icon: "fa-bridge", title: "²´Ãè¾ô " + getMapLink("²´Ãè¾ô"), note: "ªuµÛ¤¤®q¤t´²¨B¡Ï¨É¥Î©@°Ø" },
+                    { time: "19:30", icon: "fa-utensils", title: "ªø±T¯¸©PÃä±ßÀ\", note: "ªø±T±j´ÎÄÑ¡]?????¡^©Î¨ôµö®Æ²z" },
+                    { time: "21:30", icon: "fa-bed", title: "¦^¶º©±¥ğ®§", note: "Nagasaki Marriott Hotel" },
+                ],
+                food_notes: [
+                    "?? **±ßÀ\­«ÂI**¡Gªø±T±j´ÎÄÑ¡]?????¡^©Î¨ôµö®Æ²z"
+                ]
+            },
+            "12/29": {
+                date: "12/29 (¤­) - ªø±T ¡÷ ºµ¥»",
+                events: [
+                    { time: "08:30", icon: "fa-hotel", title: "°h©Ğ¨Ã¥Xµo", note: "Nagasaki Marriott Hotel Check-out" },
+                    { time: "09:00", icon: "fa-train-subway", title: "·f­¼·s·F½u«e©¹ºµ¥»", 
+                        note: "? **¸ô½u**¡Gªø±T ¡÷ ªZ¶¯·Å¬u ¡÷ ºµ¥»¯¸ (Á`¯Ó®É¬ù 2 ¤p®É)" 
+                    },
+                    { time: "11:30", icon: "fa-hotel", title: "KOKO Hotel Premier ±H©ñ¦æ§õ " + getMapLink("KOKO Hotel Premier Kumamoto"), note: "¶º©±ªñºµ¥»¯¸" },
+                    { time: "12:30", icon: "fa-utensils", title: "¤ÈÀ\®É¶¡", note: "ºµ¥»¯¸©PÃä" },
+                    { time: "14:30", icon: "fa-fort-awesome", title: "ºµ¥»«° " + getMapLink("ºµ¥»«°"), note: "­×´_«á­È±o°ÑÆ[" },
+                    { time: "16:30", icon: "fa-hand-holding-box", title: "«°±m­b¡]¦ñ¤âÂ§/¬ü­¹¡^ " + getMapLink("«°±m­b"), note: "ºµ¥»«°¤s¸}¤Uªº¬ü­¹/ÁÊª«°Ï" },
+                    { time: "18:30", icon: "fa-shopping-bag", title: "¤W³q/¤U³q°Ó©±µó " + getMapLink("¤W³q/¤U³q°Ó©±µó"), note: "¾A¦X´²¨B»P±ßÀ\" },
+                    { time: "20:00", icon: "fa-utensils", title: "±ßÀ\¡G¨ª¤ûÉd/ºµ¥»©ÔÄÑ", note: "±ÀÂË¨ª¤ûÉd¡]??¤û¡^©Î´M§äºµ¥»©ÔÄÑ¦W©±" },
+                    { time: "21:30", icon: "fa-bed", title: "KOKO Hotel Premier Check-in", note: "¦^¶º©±¥ğ®§" },
+                ],
+                food_notes: [
+                    "?? **ºµ¥»¥²¦Y**¡G¨ª¤ûÉd¡]??¤û¡^¡Bºµ¥»©ÔÄÑ"
+                ]
+            },
+            "12/30": {
+                date: "12/30 (¤») - ºµ¥»¤@¤é¹C (·Å¬u¤è®×)",
+                events: [
+                    { time: "09:00", icon: "fa-tree", title: "¤ô«e¦x¦¨½ì¶é " + getMapLink("¤ô«e¦x¦¨½ì¶é"), note: "¤é¦¡®x¶é" },
+                    { time: "11:30", icon: "fa-utensils", title: "¤ÈÀ\®É¶¡", note: "ºµ¥»¥«°Ï©Î¶º©±©PÃä" },
+                    { time: "14:00", icon: "fa-hot-tub", title: "«e©¹·Å¬u°Ï", note: "? **·Å¬u«ØÄ³**¡G¶Â¤t·Å¬u or ´Ó¤ì·Å¬u" },
+                    { time: "15:00", icon: "fa-spa", title: "¨É¨ü·Å¬uªw´ö", note: "¿ï¾Ü·í¤é¨Ó¦^·Å¬u" },
+                    { time: "18:30", icon: "fa-bus", title: "ªğ¦^ºµ¥»¥«°Ï", note: "±q·Å¬u°Ïªğ¦^¥«¤¤¤ß" },
+                    { time: "19:30", icon: "fa-shopping-bag", title: "¤W³q/¤U³q³}µó + ±ßÀ\", note: "§â´¤³Ì«áªºÁÊª«¾÷·|" },
+                    { time: "21:30", icon: "fa-bed", title: "¦^¶º©±¥ğ®§", note: "·Ç³Æ¹j¤é¦^µ{" },
+                ],
+                food_notes: [
+                    "?? **¥«°Ï¬ü­¹**¡Gºµ¥»©ÔÄÑ¡]¦p¡G¶Â«F¡B¤Ñ¥~¤Ñ¡^¡B°¨¦×®Æ²z"
+                ]
+            },
+            "12/31": {
+                date: "12/31 (¤é) - ºµ¥»/ªğµ{",
+                events: [
+                    { time: "08:30", icon: "fa-bus-simple", title: "·f­¼§Q¤ì¬z¤Ú¤h«e©¹¾÷³õ", 
+                        note: "? **«ØÄ³¥æ³q (¥«°Ï ¡÷ KMJ)**¡G§Q¤ì¬z¤Ú¤h¡A¬ù 40 ¤ÀÄÁ¡C´£«e 1.5¡V2 ¤p®É©è¹F¾÷³õ³ÌÃ­§´¡C½Ğ·Ç®É¦b 08:30 ·f­¼¡C" 
+                    },
+                    { time: "11:55", icon: "fa-plane-departure", title: "CI0199 KMJ ¡÷ KHH", note: "¹w­p 13:40 ©è¹F°ª¶¯" }, 
+                    { time: "18:00", icon: "fa-plane-arrival", title: "¸ó¦~©]¦b¥xÆW", note: "¼y¯¬·s¦~§Ö¼Ö¡I" },
+                ],
+                food_notes: []
+            }
+        };
+        
+        // **¤Ñ®ğ¼Æ¾Ú (tenki.jp 2024¦~ 12¤ë¹ê»ÚÆ[´ú¼Æ¾Ú)**
+        const WEATHER_DATA = {
+            // ºÖ©£ (2024/12/26)
+            "12/26": { city: "ºÖ©£", min: 8.7, max: 13.6, icon: "fa-cloud-sun-rain", description: "¦h¶³Âà«B¡A¤W¤È§½³¡¦³«B", rain_chance: "20%" }, 
+            // ªø±T (2024/12/27)
+            "12/27": { city: "ªø±T", min: 7.2, max: 9.8, icon: "fa-cloud-showers-heavy", description: "¦h¶³¦³«B¡A®ğ·Å°¾§C", rain_chance: "40%" },
+            // ªø±T (2024/12/28)
+            "12/28": { city: "ªø±T", min: 5.2, max: 8.8, icon: "fa-cloud", description: "¦h¶³¡A«ùÄò´H§N", rain_chance: "10%" },
+            // ºµ¥» (2024/12/29 - ±Ä¥Î³Ìªñ¼Æ¾Ú 2024¦~)
+            "12/29": { city: "ºµ¥»", min: 4.7, max: 8.7, icon: "fa-cloud", description: "¦h¶³¡A½Ğ¥[±j«O·x", rain_chance: "10%" },
+            // ºµ¥» (2024/12/30)
+            "12/30": { city: "ºµ¥»", min: 1.6, max: 15.1, icon: "fa-sun", description: "´¸®Ô¡A¦­±ß·Å®t¤j", rain_chance: "0%" },
+            // ºµ¥» (2024/12/31)
+            "12/31": { city: "ºµ¥»", min: 7.3, max: 13.4, icon: "fa-wind", description: "´¸®Ô¡A¤È«á¦è­·±j«l", rain_chance: "0%" },
+        };
+        
+        // **¤Ñ®ğÁ`Äı¼Æ¾Ú (°t¦X¹Ï¤ù¼Ë¦¡)**
+        const OVERVIEW_WEATHER_DATA = {
+            "Fukuoka": { min: 8, max: 13, icon: "fa-cloud-sun-rain", rain: "20%" }, // 12/26
+            "Nagasaki": { min: 5, max: 10, icon: "fa-sun", rain: "0%" },     // 12/27-28
+            "Kumamoto": { min: 3, max: 9, icon: "fa-cloud-showers-heavy", rain: "40%" }   // 12/29-31
+        };
+
+
+        // ===================================
+        // »²§U¨ç¦¡ (Helper Functions)
+        // ===================================
+        
+        /** ¨Ì¾Ú´ºÂI¦WºÙ¨ú±o¦a¹Ï³sµ² */
+        function getMapLink(placeName) {
+            const url = MAP_LINKS[placeName] || `https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(placeName)}`;
+            // §ó·s¦a¹Ï³sµ²ÃC¦â¬°·sªº°Æ¦â
+            return `<a href="${url}" target="_blank" class="text-custom-secondary underline hover:text-custom-primary">(¦a¹Ï <i class="fa-solid fa-map-location-dot fa-xs"></i>)</a>`;
+        }
+
+        /** ¨ú±o¤é´Á¦Cªí */
+        function getDateKeys() {
+            return Object.keys(ITINERARY_DATA).sort();
+        }
+
+        /** ¨ú±o·í«e§@¥Î¤¤ªº¤é´Á«ö¶s */
+        function getActiveDateKey() {
+            const activeBtn = document.querySelector('#date-buttons-container .tab-button.active');
+            return activeBtn ? activeBtn.getAttribute('data-date') : getDateKeys()[0];
+        }
+
+        // ===================================
+        // Modal ¨ç¦¡
+        // ===================================
+        
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                // ¦pªG¬O·s¼W¦æµ{¡A¥ı¶ñ¤J¤é´Á¿ï¶µ
+                if (modalId === 'addItineraryModal') {
+                    populateDateOptions();
+                }
+                modal.style.display = 'flex';
+            }
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+                // ²MªÅªí³æ
+                if (modalId === 'addItineraryModal') {
+                    document.getElementById('add-itinerary-form').reset();
+                }
+                if (modalId === 'editItineraryModal') {
+                    document.getElementById('edit-itinerary-form').reset();
+                }
+            }
+        }
+        
+        // ÂIÀ» Modal ¥~³òÃö³¬
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                closeModal(e.target.id);
+            }
+        });
+
+        function populateDateOptions() {
+            const select = document.getElementById('new-date');
+            select.innerHTML = '';
+            const dates = getDateKeys();
+            
+            dates.forEach(dateKey => {
+                const option = document.createElement('option');
+                option.value = dateKey;
+                option.textContent = ITINERARY_DATA[dateKey].date;
+                select.appendChild(option);
+            });
+
+            // ¹w³]¿ï¨ú·í«e¦b¬İªº¤é´Á
+            const activeDateKey = getActiveDateKey();
+            if (activeDateKey) {
+                 select.value = activeDateKey;
+            }
+        }
+
+        // ===================================
+        // ·s¼W/­×§ï/§R°£ ¦æµ{¨ç¦¡
+        // ===================================
+        
+        function addItineraryItem(event) {
+            event.preventDefault();
+            
+            const dateKey = document.getElementById('new-date').value;
+            const time = document.getElementById('new-time').value.trim();
+            const title = document.getElementById('new-title').value.trim();
+            const note = document.getElementById('new-note').value.trim();
+            
+            const defaultIcon = 'fa-circle-dot'; // ·s¼Wªº¶µ¥Ø¨Ï¥Î¹w³]¹Ï¼Ğ
+            
+            if (!dateKey || !time || !title) {
+                alert('½Ğ¶ñ¼g§¹¾ã¤é´Á¡B®É¶¡©M¼ĞÃD¡I');
+                return;
+            }
+            
+            const newItem = {
+                time: time,
+                icon: defaultIcon,
+                title: title,
+                note: note
+            };
+            
+            if (ITINERARY_DATA[dateKey]) {
+                ITINERARY_DATA[dateKey].events.push(newItem);
+                
+                // ¨Ì®É¶¡±Æ§Ç
+                ITINERARY_DATA[dateKey].events.sort((a, b) => {
+                    if (a.time < b.time) return -1;
+                    if (a.time > b.time) return 1;
+                    return 0;
+                });
+                
+                localStorage.setItem('tripItinerary', JSON.stringify(ITINERARY_DATA));
+                
+                renderItinerary(dateKey);
+                
+                alert(`¤w¦¨¥\±N¡u${title}¡v·s¼W¨ì ${dateKey} ªº¦æµ{¡I`);
+                closeModal('addItineraryModal');
+            } else {
+                alert('¤é´Á¤£¦s¦b¡A½ĞÁpÃ´¶}µoªÌ³B²z®Ö¤ß¦æµ{¼Æ¾Ú¡I');
+            }
+        }
+        
+        /** ÂIÀ»¦æµ{¶µ¥Ø¡A¸ü¤J¼Æ¾Ú¨ì­×§ï Modal */
+        function editItineraryItem(dateKey, index) {
+            const item = ITINERARY_DATA[dateKey].events[index];
+            
+            document.getElementById('edit-modal-date-info').textContent = ITINERARY_DATA[dateKey].date;
+            document.getElementById('edit-date-key').value = dateKey;
+            document.getElementById('edit-item-index').value = index;
+            document.getElementById('edit-time').value = item.time;
+            document.getElementById('edit-title').value = item.title;
+            document.getElementById('edit-note').value = item.note.replace(/<br>/g, '\n').replace(/<a.*?<\/a>/, '').trim(); // ²¾°£¦a¹Ï³sµ² HTML ©M´«¦æ²Å¸¹
+
+            openModal('editItineraryModal');
+        }
+
+        /** Àx¦s­×§ï«áªº¦æµ{¶µ¥Ø */
+        function saveItineraryItem(event) {
+            event.preventDefault();
+            
+            const dateKey = document.getElementById('edit-date-key').value;
+            const index = parseInt(document.getElementById('edit-item-index').value);
+            const newTime = document.getElementById('edit-time').value.trim();
+            const newTitle = document.getElementById('edit-title').value.trim();
+            const newNote = document.getElementById('edit-note').value.trim();
+            
+            if (!newTime || !newTitle) {
+                alert('®É¶¡©M¼ĞÃD¤£¯à¬°ªÅ¡I');
+                return;
+            }
+
+            if (ITINERARY_DATA[dateKey] && ITINERARY_DATA[dateKey].events[index]) {
+                const item = ITINERARY_DATA[dateKey].events[index];
+                
+                // ÀË¬d note ¸Ì¬O§_¦³¦a¹Ï³sµ²¡A¦pªG¦³´N«O¯d
+                let noteToSave = newNote.replace(/\n/g, '<br>');
+                const mapLinkRegex = /<a.*?<\/a>/;
+                const existingMapLinkMatch = item.note.match(mapLinkRegex);
+
+                if (existingMapLinkMatch) {
+                     // ½T«O¦a¹Ï³sµ²Á`¬Oªş¥[¦b³Æµùªº«á­±
+                     const mapLink = existingMapLinkMatch[0];
+                     if (!noteToSave.includes(mapLink)) {
+                         noteToSave = `${noteToSave} ${mapLink}`;
+                     }
+                }
+
+                // §ó·s¼Æ¾Ú
+                item.time = newTime;
+                item.title = newTitle;
+                item.note = noteToSave;
+                // item.icon ¤£°µ­×§ï
+                
+                // ¨Ì®É¶¡­«·s±Æ§Ç
+                ITINERARY_DATA[dateKey].events.sort((a, b) => {
+                    if (a.time < b.time) return -1;
+                    if (a.time > b.time) return 1;
+                    return 0;
+                });
+                
+                localStorage.setItem('tripItinerary', JSON.stringify(ITINERARY_DATA));
+
+                // ­«·s´è¬V¨ÃÃö³¬
+                renderItinerary(dateKey);
+                alert(`¤w¦¨¥\§ó·s¦æµ{¡G${newTitle}¡I`);
+                closeModal('editItineraryModal');
+            } else {
+                alert('¦æµ{¼Æ¾ÚµL®Ä¡I');
+            }
+        }
+        
+        /** §R°£¦æµ{¶µ¥Ø */
+        function deleteItineraryItem(dateKey, index) {
+            if (confirm(`½T©w­n§R°£¡u${ITINERARY_DATA[dateKey].events[index].title}¡v³o­Ó¦æµ{¶Ü¡H`)) {
+                if (ITINERARY_DATA[dateKey] && ITINERARY_DATA[dateKey].events.length > index) {
+                    ITINERARY_DATA[dateKey].events.splice(index, 1);
+                    localStorage.setItem('tripItinerary', JSON.stringify(ITINERARY_DATA));
+                    
+                    renderItinerary(dateKey);
+                    alert('¦æµ{¤w§R°£¡C');
+                    closeModal('editItineraryModal');
+                }
+            }
+        }
+
+
+        /** ´è¬V¤é´Á«ö¶s */
+        function renderDateButtons() {
+            const container = document.getElementById('date-buttons-container');
+            container.innerHTML = '';
+            const dates = getDateKeys();
+            
+            dates.forEach(dateKey => {
+                const button = document.createElement('button');
+                // ªu¥Î·sªºÃC¦â©M¼Ë¦¡
+                button.className = 'tab-button px-3 py-1 text-sm font-semibold rounded-full transition duration-200';
+                button.textContent = dateKey;
+                button.setAttribute('data-date', dateKey);
+                button.onclick = () => {
+                    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    renderItinerary(dateKey);
+                };
+                container.appendChild(button);
+            });
+
+            // ¹w³]ÂIÀ»²Ä¤@­Ó¤é´Á
+            if (dates.length > 0) {
+                const firstButton = container.querySelector(`[data-date="${dates[0]}"]`);
+                if (firstButton) {
+                    firstButton.classList.add('active');
+                    renderItinerary(dates[0]);
+                }
+            }
+        }
+        
+        /** ´è¬V¦æµ{¤º®e */
+        function renderItinerary(dateKey) {
+            const container = document.getElementById('itinerary-container');
+            const data = ITINERARY_DATA[dateKey];
+
+            if (!data) {
+                container.innerHTML = `<p class="text-center text-gray-500">¬dµL ${dateKey} ªº¦æµ{¡C</p>`;
+                return;
+            }
+
+            let html = `
+                <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 text-custom-primary">
+                    <i class="fa-solid fa-calendar-day mr-2"></i> ${data.date}
+                </h2>
+                <div class="timeline-container space-y-4">
+            `;
+
+            data.events.forEach((event, index) => {
+                const noteContent = event.note ? `<p class="text-sm text-gray-600 mt-1" style="hyphens: auto; word-break: break-word;">${event.note}</p>` : '';
+                
+                // **®Ö¤ß­×§ï¡G·s¼W onclick ¨Æ¥ó**
+                html += `
+                    <div class="timeline-item relative pb-4" onclick="editItineraryItem('${dateKey}', ${index})">
+                        <div class="absolute -left-3 top-0 w-6 h-6 bg-white border-2 border-custom-primary rounded-full flex items-center justify-center">
+                            <i class="fa-solid ${event.icon} text-custom-primary text-xs"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="font-bold text-custom-secondary">${event.time}</p>
+                            <h3 class="font-semibold text-gray-800">${event.title}</h3>
+                            ${noteContent}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>
+                <div class="mt-6 p-4 bg-yellow-50 border-l-4 border-custom-secondary rounded-lg shadow-inner">
+                    <h3 class="text-lg font-bold text-custom-secondary mb-2"><i class="fa-solid fa-cookie-bite mr-1"></i> ¬ü­¹³Æµù¡G</h3>
+            `;
+            
+            if (data.food_notes && data.food_notes.length > 0) {
+                data.food_notes.forEach(note => {
+                    html += `<p class="text-sm text-gray-700 mb-1">${note}</p>`;
+                });
+            } else {
+                 html += `<p class="text-sm text-gray-700">¥»¤éµL¯S§O¬ü­¹³Æµù¡C</p>`;
+            }
+
+            html += `</div>`;
+
+            container.innerHTML = html;
+        }
+
+        // ===================================
+        // ¤Ñ®ğ­¶ÅÒ¨ç¦¡ (WEATHER Tab Functions)
+        // ===================================
+
+        // ´è¬VÁ`Äı¤Ñ®ğ¥d¤ù
+        function renderOverviewWeather() {
+            const data = OVERVIEW_WEATHER_DATA;
+            
+            // ºÖ©£
+            document.getElementById('weather-icon-fukuoka').className = `fa-solid ${data.Fukuoka.icon} text-3xl text-custom-primary mb-1`;
+            document.getElementById('weather-temp-fukuoka').textContent = `${data.Fukuoka.min}¢XC / ${data.Fukuoka.max}¢XC`;
+            document.getElementById('weather-rain-fukuoka').textContent = `­°«B²v: ${data.Fukuoka.rain}`;
+            
+            // ªø±T
+            document.getElementById('weather-icon-nagasaki').className = `fa-solid ${data.Nagasaki.icon} text-3xl text-custom-secondary mb-1`;
+            document.getElementById('weather-temp-nagasaki').textContent = `${data.Nagasaki.min}¢XC / ${data.Nagasaki.max}¢XC`;
+            document.getElementById('weather-rain-nagasaki').textContent = `­°«B²v: ${data.Nagasaki.rain}`;
+            
+            // ºµ¥»
+            document.getElementById('weather-icon-kumamoto').className = `fa-solid ${data.Kumamoto.icon} text-3xl text-custom-primary mb-1`;
+            document.getElementById('weather-temp-kumamoto').textContent = `${data.Kumamoto.min}¢XC / ${data.Kumamoto.max}¢XC`;
+            document.getElementById('weather-rain-kumamoto').textContent = `­°«B²v: ${data.Kumamoto.rain}`;
+        }
+
+
+        // ´è¬V¨C¤é¸Ô²Ó¤Ñ®ğ (¦b¡u¤Ñ®ğ¡v­¶ÅÒ¤¤)
+        function renderWeather() {
+            const container = document.getElementById('weather-content');
+            container.innerHTML = '';
+            
+            const dates = getDateKeys();
+            
+            dates.forEach(dateKey => {
+                const data = WEATHER_DATA[dateKey];
+                if (data) {
+                    const minTemp = data.min.toFixed(1);
+                    const maxTemp = data.max.toFixed(1);
+                    
+                    container.innerHTML += `
+                        <div class="flex items-center justify-between p-3 border-b last:border-b-0">
+                            <div class="flex-1">
+                                <p class="text-md font-bold text-gray-800">${dateKey} - ${data.city}</p>
+                                <p class="text-sm text-gray-600">${data.description} (­°«B²v: ${data.rain_chance})</p>
+                            </div>
+                            <div class="text-right flex items-center">
+                                <i class="fa-solid ${data.icon} text-4xl text-custom-primary mr-3"></i>
+                                <div>
+                                    <p class="text-xl font-bold text-gray-900">${maxTemp}¢XC / ${minTemp}¢XC</p>
+                                    <p class="text-xs text-gray-500">°ª·Å / §C·Å</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // ===================================
+        // °O±b­¶ÅÒ¨ç¦¡ (Expense Tracking Functions - Â²¤Æª©)
+        // ===================================
+        
+        let EXPENSES = [];
+        const EXCHANGE_RATE = 4.8; // °²³]ªº TWD/JPY ¶×²v
+        const BUDGET = 50000; // Á`¹wºâ
+        
+        function getTwdEquivalent(amount, currency) {
+            if (currency === 'JPY') {
+                return Math.round(amount / EXCHANGE_RATE);
+            }
+            return amount;
+        }
+        
+        function selectCurrency(currency) {
+            document.querySelectorAll('.active-currency').forEach(btn => btn.classList.remove('active-currency'));
+            document.querySelector(`[data-currency="${currency}"]`).classList.add('active-currency');
+            document.getElementById('expense-currency').value = currency;
+        }
+
+        function selectPayer(payer) {
+            document.querySelectorAll('.active-payer').forEach(btn => btn.classList.remove('active-payer'));
+            document.querySelector(`[data-payer="${payer}"]`).classList.add('active-payer');
+            document.getElementById('expense-payer').value = payer;
+        }
+        
+        function selectCategory(category) {
+            document.querySelectorAll('.active-category').forEach(btn => btn.classList.remove('active-category'));
+            document.querySelector(`[data-category="${category}"]`).classList.add('active-category');
+            document.getElementById('expense-category').value = category;
+        }
+        
+        function selectPayment(payment) {
+            document.querySelectorAll('.active-payment').forEach(btn => btn.classList.remove('active-payment'));
+            document.querySelector(`[data-payment="${payment}"]`).classList.add('active-payment');
+            document.getElementById('expense-payment').value = payment;
+        }
+        
+        function addExpense() {
+            const date = document.getElementById('expense-date').value || new Date().toISOString().slice(0, 10);
+            const amount = parseFloat(document.getElementById('expense-amount').value);
+            const currency = document.getElementById('expense-currency').value;
+            const payer = document.getElementById('expense-payer').value;
+            const category = document.getElementById('expense-category').value;
+            const description = document.getElementById('expense-description').value.trim();
+            const payment = document.getElementById('expense-payment').value;
+
+            if (isNaN(amount) || amount <= 0 || !category) {
+                alert('½Ğ¿é¤J¦³®Äª÷ÃB©MÃş§O¡I');
+                return;
+            }
+
+            const newExpense = {
+                id: Date.now(),
+                date: date,
+                amount: amount,
+                currency: currency,
+                payer: payer,
+                category: category,
+                description: description || 'µL»¡©ú',
+                payment: payment,
+                twd: getTwdEquivalent(amount, currency)
+            };
+- localStorage.setItem('tripExpenses', JSON.stringify(EXPENSES));
++ saveToFirebase();
+            EXPENSES.unshift(newExpense); // ·s¼W¨ì²M³æ³Ì«e­±
+            localStorage.setItem('tripExpenses', JSON.stringify(EXPENSES));
+
+            // ­«³]ªí³æ
+            document.getElementById('expense-amount').value = '';
+            document.getElementById('expense-description').value = '';
+            
+            renderExpenseTracking();
+        }
+
+        function deleteExpense(id) {
+            EXPENSES = EXPENSES.filter(e => e.id !== id);
+            localStorage.setItem('tripExpenses', JSON.stringify(EXPENSES));
+            renderExpenseTracking();
+        }
+
+        let currentFilterCategory = 'All';
+
+        function setFilterCategory(category) {
+            currentFilterCategory = category;
+            document.querySelectorAll('.active-filter').forEach(btn => btn.classList.remove('active-filter'));
+            const targetBtn = document.querySelector(`[data-filter="${category}"]`);
+            if (targetBtn) {
+                 targetBtn.classList.add('active-filter');
+            }
+           
+            renderExpenseList();
+        }
+        
+        function renderExpenseList() {
+            const listContainer = document.getElementById('expense-list');
+            const filteredExpenses = EXPENSES.filter(e => currentFilterCategory === 'All' || e.category === currentFilterCategory);
+            
+            if (filteredExpenses.length === 0) {
+                listContainer.innerHTML = `<p class="text-center text-gray-500 text-sm">
+                    ${currentFilterCategory === 'All' ? '©|µL¤ä¥X¬ö¿ı' : `¦b ${currentFilterCategory} Ãş§O¤UµL¬ö¿ı`}
+                </p>`;
+                return;
+            }
+
+            listContainer.innerHTML = filteredExpenses.map(e => `
+                <div class="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-gray-400">${e.date} / ${e.payment}</p>
+                        <p class="font-semibold text-gray-800 truncate">${e.description || e.category}</p>
+                        <p class="text-xs font-medium text-custom-secondary mt-1">
+                            ${e.category} | ${e.payer} ¤ä¥I
+                        </p>
+                    </div>
+                    <div class="text-right ml-3 flex items-center">
+                        <div class="mr-2">
+                            <p class="text-lg font-bold text-gray-900">${e.amount.toLocaleString()} ${e.currency}</p>
+                            <p class="text-xs text-gray-500">¬ù NT$ ${e.twd.toLocaleString()}</p>
+                        </div>
+                        <button onclick="deleteExpense(${e.id})" class="text-red-400 hover:text-red-600 transition duration-150 ml-2">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderExpenseTracking() {
+            // 1. ´è¬V¶×²v
+            document.getElementById('exchange-rate-display').textContent = `1 JPY ? ${EXCHANGE_RATE.toFixed(2)} TWD`;
+            
+            // 2. ­pºâÁ`µ²
+            let totalSpentTWD = 0;
+            let joshPaidTWD = 0;
+            let candicePaidTWD = 0;
+            
+            EXPENSES.forEach(e => {
+                totalSpentTWD += e.twd;
+                if (e.payer === 'Josh') {
+                    joshPaidTWD += e.twd;
+                } else if (e.payer === 'Candice') {
+                    candicePaidTWD += e.twd;
+                }
+            });
+
+            const remainingBudget = BUDGET - totalSpentTWD;
+            const sharedTotal = totalSpentTWD;
+            const halfShared = Math.round(sharedTotal / 2);
+            
+            let settlementResult = '';
+            const joshDiff = joshPaidTWD - halfShared;
+            const candiceDiff = candicePaidTWD - halfShared;
+
+            if (Math.abs(joshDiff) < 1) {
+                settlementResult = 'Âù¤è¥I¶O¥­§¡¡AµL»İµ²ºâ¡C';
+            } else if (joshDiff > 0) {
+                settlementResult = `Candice »İ¤ä¥Iµ¹ Josh $${Math.abs(joshDiff).toLocaleString()} TWD¡C`;
+            } else {
+                settlementResult = `Josh »İ¤ä¥Iµ¹ Candice $${Math.abs(candiceDiff).toLocaleString()} TWD¡C`;
+            }
+            
+            // 3. §ó·s UI
+            document.getElementById('total-budget').textContent = BUDGET.toLocaleString();
+            document.getElementById('total-spent').textContent = totalSpentTWD.toLocaleString();
+            document.getElementById('remaining-budget').textContent = remainingBudget.toLocaleString();
+            document.getElementById('josh-paid').textContent = joshPaidTWD.toLocaleString();
+            document.getElementById('candice-paid').textContent = candicePaidTWD.toLocaleString();
+            document.getElementById('settlement-result').textContent = settlementResult;
+
+            // 4. ´è¬V¿z¿ï«ö¶s (½T«O©Ò¦³Ãş§O³£¦³«ö¶s)
+            const allCategories = ['Food', 'Transport', 'Accommodation', 'Shopping', 'Other'];
+            const filterContainer = document.getElementById('category-filter-buttons');
+            filterContainer.innerHTML = `
+                <button type="button" class="block-select-btn px-2 py-1 text-xs active-filter" data-filter="All" onclick="setFilterCategory('All')">
+                    <i class="fa-solid fa-list-ul mr-1"></i> ¥ş³¡
+                </button>
+            `;
+            allCategories.forEach(category => {
+                const icon = {
+                    'Food': 'fa-utensils',
+                    'Transport': 'fa-train-subway',
+                    'Accommodation': 'fa-hotel',
+                    'Shopping': 'fa-bag-shopping',
+                    'Other': 'fa-ellipsis'
+                }[category];
+                const button = document.createElement('button');
+                button.className = `block-select-btn px-2 py-1 text-xs`;
+                button.setAttribute('data-filter', category);
+                button.onclick = () => setFilterCategory(category);
+                button.innerHTML = `<i class="fa-solid ${icon} mr-1"></i> ${category}`;
+                filterContainer.appendChild(button);
+            });
+            // ½T«O¿z¿ï¾¹ª¬ºA¥¿½T
+            setFilterCategory(currentFilterCategory); 
+
+            // 5. ´è¬V¤ä¥X¦Cªí
+            renderExpenseList();
+        }
+
+
+        // ===================================
+        // ¼¤±æ²M³æ­¶ÅÒ¨ç¦¡ (Wishlist Tab Functions)
+        // ===================================
+
+        let WISHLIST = JSON.parse(localStorage.getItem('tripWishlist')) || [];
+        
+        function addWishlistItem(event) {
+            event.preventDefault();
+            const name = document.getElementById('wishlist-name').value.trim();
+            const category = document.getElementById('wishlist-category').value;
+            const price = parseFloat(document.getElementById('wishlist-price').value);
+
+            if (!name || isNaN(price) || price <= 0 || !category) {
+                alert('½Ğ¶ñ¼g§¹¾ã¥B¦³®Äªº¶µ¥Ø¦WºÙ¡B¤ÀÃş©M»ù®æ¡I');
+                return;
+            }
+
+            const newItem = {
+                id: Date.now(),
+                name: name,
+                category: category,
+                price: price, // JPY
+                purchased: false
+            };
+
+            WISHLIST.unshift(newItem); 
+            localStorage.setItem('tripWishlist', JSON.stringify(WISHLIST));
+
+            // ­«³]ªí³æ
+            document.getElementById('wishlist-form').reset();
+            
+            renderWishlist();
+        }
+
+        function togglePurchaseStatus(id) {
+            const item = WISHLIST.find(i => i.id === id);
+            if (item) {
+                item.purchased = !item.purchased;
+                localStorage.setItem('tripWishlist', JSON.stringify(WISHLIST));
+                renderWishlist();
+            }
+        }
+
+        function deleteWishlistItem(id) {
+            WISHLIST = WISHLIST.filter(i => i.id !== id);
+            localStorage.setItem('tripWishlist', JSON.stringify(WISHLIST));
+            renderWishlist();
+        }
+
+        function renderWishlist() {
+            const listContainer = document.getElementById('wishlist-list');
+            
+            if (WISHLIST.length === 0) {
+                listContainer.innerHTML = `<p class="text-center text-gray-500 text-sm">©|µL«İÁÊ¶µ¥Ø</p>`;
+                return;
+            }
+
+            // ±N¥¼ÁÊ¶Rªº©ñ¦b«e­±
+            const sortedList = [...WISHLIST].sort((a, b) => (a.purchased === b.purchased) ? 0 : a.purchased ? 1 : -1);
+
+            listContainer.innerHTML = sortedList.map(item => {
+                const statusText = item.purchased ? '¤wÁÊ¶R' : '«İÁÊ¶R';
+                const statusClass = item.purchased ? 'purchased' : 'pending';
+                const twdEquivalent = getTwdEquivalent(item.price, 'JPY');
+                
+                return `
+                    <div class="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-semibold text-gray-800">${item.name}</p>
+                            <p class="text-xs text-gray-500 mt-1">${item.category}</p>
+                        </div>
+                        <div class="text-right ml-3 flex items-center">
+                            <div class="mr-3">
+                                <p class="text-md font-bold text-gray-900">${item.price.toLocaleString()} JPY</p>
+                                <p class="text-xs text-gray-500">¬ù NT$ ${twdEquivalent.toLocaleString()}</p>
+                            </div>
+                            <button onclick="togglePurchaseStatus(${item.id})" class="wishlist-status-btn ${statusClass} mr-2">
+                                <i class="fa-solid fa-${item.purchased ? 'check' : 'hourglass-half'} mr-1"></i> ${statusText}
+                            </button>
+                            <button onclick="deleteWishlistItem(${item.id})" class="text-red-400 hover:text-red-600 transition duration-150">
+                                <i class="fa-solid fa-trash-can text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // ===================================
+        // ¥D­n¾É¯è¨ç¦¡ (Main Navigation)
+        // ===================================
+        function switchMainNav(targetId) {
+            // ÁôÂÃ©Ò¦³¤º®e°Ï¶ô
+            document.querySelectorAll('.main-tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+
+            // Åã¥Ü¥Ø¼Ğ¤º®e°Ï¶ô
+            document.getElementById(targetId).classList.remove('hidden');
+
+            // §ó·s©³³¡¾É¯è«ö¶sªº active ª¬ºA
+            document.querySelectorAll('.bottom-nav-button').forEach(btn => {
+                if (btn.getAttribute('data-target') === targetId) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+
+        // ===================================
+        // ªì©l¤Æ
+        // ===================================
+        document.addEventListener('DOMContentLoaded', () => {
+            renderDateButtons();
+            renderOverviewWeather(); // ´è¬VÁ`Äı¤Ñ®ğ¥d¤ù
+            
+            // ªì©l¤Æ°O±b©M¼¤±æ²M³æ (¦pªG¨Ï¥ÎªÌ¤Á´«¨ì³o¨â­Ó­¶ÅÒ¤~·|§¹¥ş´è¬V)
+            renderExpenseTracking(); 
+            renderWishlist(); 
+            
+            // ½T«O­¶­±ªì©lÅã¥Ü¦æµ{­¶ÅÒ
+            switchMainNav('itinerary-tab');
+        });
+    </script>
 </body>
 </html>
