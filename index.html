@@ -4,7 +4,168 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>福岡熊本行程助手</title>
+    <!-- 引入可愛的圓體字型 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定義顏色 - 可愛活潑版 */
+        :root {
+            --custom-primary: #FF8BA7; /* Sweet Pink */
+            --custom-secondary: #4ECDC4; /* Lively Mint */
+            --custom-danger: #FF6B6B; /* Soft Coral */
+            --custom-bg: #FFFDF9; /* Creamy White */
+            --custom-text: #595959; /* Softer Dark Gray */
+        }
+
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif !important;
+            color: var(--custom-text);
+            background-color: var(--custom-bg);
+        }
+
+        /* 覆蓋 Tailwind 的預設背景 */
+        .bg-gray-50 { background-color: var(--custom-bg) !important; }
+        .bg-white { background-color: #ffffff; }
+
+        .bg-custom-primary { background-color: var(--custom-primary); }
+        .text-custom-primary { color: var(--custom-primary); }
+        .bg-custom-secondary { background-color: var(--custom-secondary); }
+        .text-custom-secondary { color: var(--custom-secondary); }
+        .border-custom-primary { border-color: var(--custom-primary); }
+        
+        /* 增加按鈕互動效果 */
+        .hover\:bg-custom-primary-dark:hover { 
+            background-color: #FF7596; 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(255, 139, 167, 0.3);
+        }
+        .hover\:text-custom-primary-dark:hover { color: #FF7596; }
+
+        /* 讓所有圓角更圓潤 */
+        .rounded-lg { border-radius: 16px !important; }
+        .rounded-xl { border-radius: 20px !important; }
+
+        /* 通用按鈕樣式 - 變得更像糖果 */
+        .tab-button {
+            padding: 8px 16px;
+            margin-right: 8px;
+            border-radius: 20px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 80px;
+            font-size: 0.9rem;
+            border: 2px solid #F0F0F0;
+            color: #7D7D7D;
+            background: white;
+            font-weight: bold;
+        }
+        .tab-button:hover {
+            border-color: #FFD1DC;
+            color: #FF8BA7;
+        }
+        .tab-button.active {
+            background-color: var(--custom-primary);
+            color: white;
+            border-color: var(--custom-primary);
+            box-shadow: 0 4px 10px rgba(255, 139, 167, 0.4);
+            transform: scale(1.05);
+        }
+
+        /* 主導航按鈕樣式 */
+        .main-nav-btn {
+            @apply flex-1 py-4 text-center transition duration-200 text-gray-500 border-b-4 border-transparent;
+        }
+        .main-nav-btn i {
+            font-size: 1.2rem;
+            margin-bottom: 2px;
+            display: inline-block;
+        }
+        .main-nav-btn.active {
+            color: var(--custom-primary);
+            border-color: var(--custom-primary);
+            font-weight: 800;
+        }
+        
+        /* 記帳選擇按鈕樣式 */
+        .block-select-btn {
+            @apply px-4 py-2 border-2 rounded-xl text-sm font-bold transition duration-200 mr-2 mb-2;
+            white-space: nowrap;
+            border-color: #f0f0f0;
+        }
+        .block-select-btn:not(.active-currency):not(.active-payer):not(.active-category):not(.active-payment):not(.active-filter) {
+            @apply bg-white text-gray-500 hover:bg-orange-50 hover:border-orange-100;
+        }
+        .active-currency, .active-payer, .active-category, .active-payment, .active-filter {
+            @apply bg-custom-primary text-white border-custom-primary shadow-md;
+            transform: scale(1.05);
+        }
+
+        /* 行程時間線連接線 - 改成虛線更可愛 */
+        .timeline-container {
+            position: relative;
+        }
+        .timeline-container::before {
+            content: '';
+            position: absolute;
+            top: 60px;
+            bottom: 30px;
+            left: 1.5rem;
+            width: 3px;
+            background-image: linear-gradient(to bottom, #FFE5EA 50%, transparent 50%);
+            background-size: 3px 15px;
+            background-repeat: repeat-y;
+            background-color: transparent;
+            z-index: 0;
+        }
+        .timeline-item {
+            padding-left: 1.5rem;
+            min-height: 20px;
+            cursor: pointer;
+        }
+        
+        /* 時間點點 */
+        .timeline-dot {
+            box-shadow: 0 0 0 3px #FFF0F3;
+        }
+
+        /* 慾望清單狀態 */
+        .wishlist-status-btn {
+            @apply px-3 py-1 rounded-full text-xs font-bold shadow-sm;
+        }
+        .wishlist-status-btn.purchased {
+            @apply bg-custom-secondary text-white;
+        }
+        .wishlist-status-btn.pending {
+            @apply bg-orange-100 text-orange-600;
+        }
+
+        /* 打包清單狀態 (新增) */
+        .packing-status-btn {
+            @apply px-2 py-1 rounded-full text-xs font-bold transition duration-150;
+        }
+        .packing-status-btn.packed {
+            @apply bg-custom-secondary text-white shadow-sm;
+        }
+        .packing-status-btn.not-packed {
+            @apply bg-pink-50 text-pink-400 hover:bg-pink-100;
+        }
+        
+        /* 輸入框樣式優化 */
+        input, select, textarea {
+            border: 2px solid #F3F4F6 !important;
+            transition: all 0.2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--custom-primary) !important;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 139, 167, 0.1);
+        }
+    </style>
     
     <script type="module">
         /* =========================
@@ -44,6 +205,7 @@
         let ITINERARY_DATA = []; // 行程數據 (用於渲染)
         let EXPENSES_DATA = []; // 記帳數據
         let WISHLIST_DATA = []; // 慾望清單數據
+        let PACKING_DATA = []; // ⭐️ 新增：打包清單數據
         let ACTIVE_DATE = ''; // 當前選中的日期 (行程頁籤)
         let ACTIVE_CURRENCY = 'TWD';
         let ACTIVE_PAYER = 'Josh';
@@ -55,6 +217,18 @@
         const EXCHANGE_RATE_JPY_TWD = 0.215; 
         const TOTAL_BUDGET_TWD = 50000;
         
+        // 類別圖標映射
+        const ICON_MAP = {
+            Food: 'fa-utensils',
+            Transport: 'fa-train-subway',
+            Accommodation: 'fa-hotel',
+            Shopping: 'fa-bag-shopping',
+            Other: 'fa-ellipsis',
+            // 新增更多類別以支援記帳編輯
+            Ticket: 'fa-ticket', 
+            Souvenir: 'fa-gift'
+        };
+
         /* =========================
           數據同步核心 (onSnapshot)
         ========================= */
@@ -110,6 +284,20 @@
             }, (error) => {
                 console.error("Error listening to wishlists: ", error);
             });
+
+            // 4. ⭐️ 新增：打包清單 (PackingList) - 按打包狀態和時間排序
+            const packingQuery = query(collection(db, "packinglist"), orderBy("packed", "asc"), orderBy("timestamp", "desc"));
+            onSnapshot(packingQuery, (snapshot) => {
+                PACKING_DATA = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                if (document.getElementById('packing-tab') && document.getElementById('packing-tab').classList.contains('hidden') === false) {
+                    window.renderPackingList();
+                }
+            }, (error) => {
+                console.error("Error listening to packinglist: ", error);
+            });
             
             // 渲染匯率 (靜態)
             document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
@@ -133,7 +321,7 @@
                 button.className = `tab-button ${isActive ? 'active' : ''}`;
                 button.innerHTML = `
                     <div class="font-bold">Day ${index + 1}</div>
-                    <div class="text-xs">${day.date.substring(5)} (${day.day_of_week})</div>
+                    <div class="text-xs font-normal">${day.date.substring(5)} (${day.day_of_week})</div>
                 `;
                 
                 button.onclick = () => {
@@ -161,29 +349,48 @@
 
             if (!currentDay || !currentDay.activities || currentDay.activities.length === 0) {
                 contentContainer.innerHTML = `
-                    <h2 class="text-xl font-bold p-4 bg-gray-100 border-b border-gray-200">${currentDay ? currentDay.city : '無資料'} - ${currentDay ? currentDay.date : '無資料'}</h2>
-                    <p class="text-center text-gray-500 mt-8">本日無行程，點擊右下角新增。</p>`;
+                    <div class="m-4 p-6 bg-white rounded-xl shadow-sm text-center border border-pink-100">
+                        <h2 class="text-xl font-bold text-gray-700 mb-2">${currentDay ? currentDay.city : '無資料'}</h2>
+                        <div class="text-custom-primary text-sm mb-4">${currentDay ? currentDay.date : '無資料'}</div>
+                        <p class="text-gray-400 mt-4 text-sm">
+                            <i class="fa-regular fa-face-smile mb-2 text-2xl block"></i>
+                            本日尚無行程，點擊右下角「+」新增。
+                        </p>
+                    </div>`;
                 return;
             }
             
             let html = `
-                <h2 class="text-xl font-bold p-4 bg-gray-100 border-b border-gray-200">${currentDay.city} - ${currentDay.date}</h2>
+                <div class="mx-4 mt-4 p-4 bg-white rounded-xl shadow-sm border border-pink-100 flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-gray-700"><i class="fa-solid fa-location-dot text-custom-secondary mr-2"></i>${currentDay.city}</h2>
+                    <span class="text-sm font-bold bg-pink-50 text-custom-primary px-3 py-1 rounded-full">${currentDay.date}</span>
+                </div>
                 <div class="timeline-container p-4">
-            `;
+                `;
 
             currentDay.activities.forEach((activity, index) => {
                 const clickHandler = `window.openEditModal('${currentDay.id}', ${index})`;
                 
+                // ⭐️ 新增：根據活動類型給予不同圖標 (可根據 title 關鍵字擴充)
+                const activityIcon = activity.title.includes('餐') ? 'fa-utensils' : 
+                                     activity.title.includes('飯店') || activity.title.includes('住宿') ? 'fa-bed' : 
+                                     activity.title.includes('機') ? 'fa-plane' : 
+                                     'fa-location-dot';
+
+                
                 html += `
-                    <div class="flex items-start mb-6" onclick="${clickHandler}">
-                        <div class="w-1/4 text-sm font-semibold text-gray-600 pt-1">${activity.time}</div>
-                        <div class="w-3/4">
-                            <div class="timeline-item relative">
-                                <span class="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-custom-primary border-2 border-white"></span>
-                                <div class="font-bold text-gray-800">${activity.title}</div>
-                                <div class="text-sm text-gray-500">${activity.location || ''}</div>
-                                ${activity.notes ? `<div class="text-xs text-gray-700 mt-1 italic">${activity.notes}</div>` : ''}
-                                ${activity.link ? `<a href="${activity.link}" target="_blank" class="text-xs font-semibold mt-1 inline-block" onclick="event.stopPropagation();"><i class="fas fa-map-marker-alt"></i> 導航</a>` : ''}
+                    <div class="flex items-start mb-6 group" onclick="${clickHandler}">
+                        <div class="w-1/4 text-sm font-bold text-gray-400 pt-1 text-center font-mono bg-gray-50 rounded-lg mr-3 py-1 self-start">${activity.time}</div>
+                        <div class="flex-1 bg-white p-3 rounded-xl shadow-sm border border-gray-100 group-hover:border-pink-200 transition-colors relative z-10">
+                            <div class="timeline-item relative !pl-0">
+                                <span class="absolute -left-[2.1rem] top-2 h-4 w-4 rounded-full bg-custom-primary border-4 border-white timeline-dot z-20"></span>
+                                <div class="font-bold text-gray-700 flex items-center mb-1">
+                                    <i class="fa-solid ${activityIcon} text-custom-primary mr-2 text-sm bg-pink-50 w-6 h-6 rounded-full flex items-center justify-center"></i>
+                                    <span>${activity.title}</span>
+                                </div>
+                                <div class="text-sm text-gray-500 ml-8 mb-1">${activity.location || ''}</div>
+                                ${activity.notes ? `<div class="text-xs text-gray-500 mt-1 ml-8 bg-gray-50 p-2 rounded-lg"><i class="fa-regular fa-comment-dots mr-1"></i>${activity.notes}</div>` : ''}
+                                ${activity.link ? `<a href="${activity.link}" target="_blank" class="text-xs font-bold text-custom-secondary mt-2 ml-8 inline-block hover:underline" onclick="event.stopPropagation();"><i class="fas fa-map-marker-alt mr-1"></i>導航</a>` : ''}
                             </div>
                         </div>
                     </div>
@@ -339,60 +546,120 @@
         }
 
         /* ===================================================
-          記帳 (EXPENSE) 相關函式
+          記帳 (EXPENSE) 相關函式 (新增編輯功能)
         =================================================== */
-/* ===================================================
-  記帳 (EXPENSE) 相關函式
-=================================================== */
-// 放在您的程式碼頂部
-let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase 賦值的 EXPENSES_DATA
+        
+        // ⭐️ 新增：切換記帳/明細頁籤
+        window.switchExpenseView = function(view) {
+            const addContainer = document.getElementById('add-expense-container');
+            const detailsContainer = document.getElementById('expense-details-container');
+            const addBtn = document.getElementById('tab-add-expense-btn');
+            const detailsBtn = document.getElementById('tab-view-details-btn');
 
-        // 選擇幣別
-        window.selectCurrency = function(currency) {
+            // 確保所有元素都存在
+            if (!addContainer || !detailsContainer || !addBtn || !detailsBtn) return; 
+
+            // 重設按鈕樣式
+            addBtn.classList.remove('active-expense-tab-btn', 'bg-custom-primary', 'text-white', 'shadow-md');
+            detailsBtn.classList.remove('active-expense-tab-btn', 'bg-custom-primary', 'text-white', 'shadow-md');
+            addBtn.classList.add('bg-white', 'text-gray-500');
+            detailsBtn.classList.add('bg-white', 'text-gray-500');
+            
+            // 確保 inactive 按鈕有 hover 效果
+            addBtn.classList.remove('hover:bg-[#FF7596]');
+            detailsBtn.classList.remove('hover:bg-[#FF7596]');
+            addBtn.classList.add('hover:bg-pink-50');
+            detailsBtn.classList.add('hover:bg-pink-50');
+
+
+            if (view === 'add') {
+                // 顯示新增表單，隱藏明細
+                addContainer.classList.remove('hidden');
+                detailsContainer.classList.add('hidden');
+                
+                // 設定按鈕樣式
+                addBtn.classList.add('active-expense-tab-btn', 'bg-custom-primary', 'text-white', 'shadow-md');
+                addBtn.classList.remove('bg-white', 'text-gray-500', 'hover:bg-pink-50');
+                addBtn.classList.add('hover:bg-[#FF7596]');
+
+            } else if (view === 'details') {
+                // 顯示明細，隱藏新增表單
+                addContainer.classList.add('hidden');
+                detailsContainer.classList.remove('hidden');
+                
+                // 設定按鈕樣式
+                detailsBtn.classList.add('active-expense-tab-btn', 'bg-custom-primary', 'text-white', 'shadow-md');
+                detailsBtn.classList.remove('bg-white', 'text-gray-500', 'hover:bg-pink-50');
+                detailsBtn.classList.add('hover:bg-[#FF7596]');
+                
+                // 呼叫渲染函式
+                window.renderExpenseTracking(); 
+            }
+        }
+
+
+        // 選擇幣別 (通用函式，用於新增和編輯)
+        window.selectCurrency = function(currency, prefix = 'expense') {
+            const currencyId = `${prefix}-currency`;
+            const containerId = `${prefix}-currency-select`;
+            
             ACTIVE_CURRENCY = currency;
-            document.querySelectorAll('#currency-select .block-select-btn').forEach(btn => {
+
+            document.querySelectorAll(`#${containerId} .block-select-btn`).forEach(btn => {
                 btn.classList.remove('active-currency');
                 if (btn.getAttribute('data-currency') === currency) {
                     btn.classList.add('active-currency');
                 }
             });
-            document.getElementById('expense-currency').value = currency;
+            document.getElementById(currencyId).value = currency;
         }
 
-        // 選擇付款人
-        window.selectPayer = function(payer) {
+        // 選擇付款人 (通用函式，用於新增和編輯)
+        window.selectPayer = function(payer, prefix = 'expense') {
+            const payerId = `${prefix}-payer`;
+            const containerId = `${prefix}-payer-select`;
+            
             ACTIVE_PAYER = payer;
-            document.querySelectorAll('#payer-select .block-select-btn').forEach(btn => {
+
+            document.querySelectorAll(`#${containerId} .block-select-btn`).forEach(btn => {
                 btn.classList.remove('active-payer');
                 if (btn.getAttribute('data-payer') === payer) {
                     btn.classList.add('active-payer');
                 }
             });
-            document.getElementById('expense-payer').value = payer;
+            document.getElementById(payerId).value = payer;
         }
         
-        // 選擇類別 (新增支出)
-        window.selectCategory = function(category) {
+        // 選擇類別 (通用函式，用於新增和編輯)
+        window.selectCategory = function(category, prefix = 'expense') {
+            const categoryId = `${prefix}-category`;
+            const containerId = `${prefix}-category-select`;
+            
             ACTIVE_CATEGORY = category;
-            document.querySelectorAll('#category-select .block-select-btn').forEach(btn => {
+
+            document.querySelectorAll(`#${containerId} .block-select-btn`).forEach(btn => {
                 btn.classList.remove('active-category');
                 if (btn.getAttribute('data-category') === category) {
                     btn.classList.add('active-category');
                 }
             });
-            document.getElementById('expense-category').value = category;
+            document.getElementById(categoryId).value = category;
         }
         
-        // 選擇支付方式
-        window.selectPayment = function(payment) {
+        // 選擇支付方式 (通用函式，用於新增和編輯)
+        window.selectPayment = function(payment, prefix = 'expense') {
+            const paymentId = `${prefix}-payment`;
+            const containerId = `${prefix}-payment-select`;
+            
             ACTIVE_PAYMENT = payment;
-            document.querySelectorAll('#payment-select .block-select-btn').forEach(btn => {
+
+            document.querySelectorAll(`#${containerId} .block-select-btn`).forEach(btn => {
                 btn.classList.remove('active-payment');
                 if (btn.getAttribute('data-payment') === payment) {
                     btn.classList.add('active-payment');
                 }
             });
-            document.getElementById('expense-payment').value = payment;
+            document.getElementById(paymentId).value = payment;
         }
 
         // 選擇類別 (篩選清單)
@@ -428,9 +695,68 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
                 alert('支出紀錄新增成功！');
                 document.getElementById('expense-amount').value = '';
                 document.getElementById('expense-description').value = '';
+                // 不重設日期，方便連續輸入
             } catch (e) {
                 console.error("Error adding expense: ", e);
                 alert('新增支出紀錄失敗。');
+            }
+        }
+
+        // ⭐️ 新增：開啟編輯支出 Modal
+        window.openEditExpenseModal = function(expenseId) {
+            const expense = EXPENSES_DATA.find(e => e.id === expenseId);
+            if (!expense) return;
+
+            document.getElementById('edit-expense-id').value = expense.id;
+            document.getElementById('edit-expense-date').value = expense.date || '';
+            document.getElementById('edit-expense-amount').value = expense.amount || '';
+            document.getElementById('edit-expense-description').value = expense.description || '';
+            
+            // 重新設定選擇器狀態 (傳入 'edit-expense' 作為 prefix)
+            window.selectCurrency(expense.currency, 'edit-expense');
+            window.selectPayer(expense.payer, 'edit-expense');
+            window.selectCategory(expense.category, 'edit-expense');
+            window.selectPayment(expense.payment, 'edit-expense');
+
+            window.openModal('editExpenseModal');
+        }
+
+        // ⭐️ 新增：儲存編輯後的支出 (Update Expense)
+        window.saveExpenseUpdate = async function(event) {
+            event.preventDefault();
+            const id = document.getElementById('edit-expense-id').value;
+            const date = document.getElementById('edit-expense-date').value;
+            const amount = parseFloat(document.getElementById('edit-expense-amount').value);
+            const description = document.getElementById('edit-expense-description').value;
+            const currency = document.getElementById('edit-expense-currency').value;
+            const payer = document.getElementById('edit-expense-payer').value;
+            const category = document.getElementById('edit-expense-category').value;
+            const payment = document.getElementById('edit-expense-payment').value;
+
+
+            if (!id || !date || isNaN(amount) || amount <= 0 || !description) {
+                alert('請檢查所有欄位是否正確填寫！');
+                return;
+            }
+
+            const updatedExpense = {
+                date: date,
+                amount: amount,
+                currency: currency,
+                payer: payer,
+                category: category,
+                payment: payment,
+                description: description,
+            };
+
+            try {
+                const docRef = doc(db, "expenses", id);
+                await updateDoc(docRef, updatedExpense);
+                alert('支出紀錄修改成功！');
+                window.closeModal('editExpenseModal');
+            } catch (e) {
+                console.error("Error updating expense: ", e);
+                alert('修改支出紀錄失敗。');
             }
         }
         
@@ -468,43 +794,57 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
             const totalSpentTWD = joshPaidTWD + candicePaidTWD;
             const remainingBudget = TOTAL_BUDGET_TWD - totalSpentTWD;
 
-            document.getElementById('total-budget').textContent = TOTAL_BUDGET_TWD.toLocaleString();
-            document.getElementById('total-spent').textContent = Math.round(totalSpentTWD).toLocaleString();
-            document.getElementById('remaining-budget').textContent = Math.round(remainingBudget).toLocaleString();
-            
-            // 結算結果
-            document.getElementById('josh-paid').textContent = Math.round(joshPaidTWD).toLocaleString();
-            document.getElementById('candice-paid').textContent = Math.round(candicePaidTWD).toLocaleString();
-
-            const diff = joshPaidTWD - candicePaidTWD;
-            const halfDiff = Math.abs(diff) / 2;
+            // 確保元素存在
+            const totalBudgetEl = document.getElementById('total-budget');
+            const totalSpentEl = document.getElementById('total-spent');
+            const remainingBudgetEl = document.getElementById('remaining-budget');
+            const joshPaidEl = document.getElementById('josh-paid');
+            const candicePaidEl = document.getElementById('candice-paid');
             const settlementElement = document.getElementById('settlement-result');
 
-            if (Math.abs(diff) < 1) { // 忽略微小差異
-                settlementElement.textContent = "無需結算。";
-                settlementElement.classList.remove('text-red-600', 'text-green-600');
-                settlementElement.classList.add('text-gray-900');
-            } else if (diff > 0) {
-                settlementElement.textContent = `Candice 需支付 Josh $ ${Math.round(halfDiff).toLocaleString()} TWD`;
-                settlementElement.classList.add('text-red-600');
-            } else {
-                settlementElement.textContent = `Josh 需支付 Candice $ ${Math.round(halfDiff).toLocaleString()} TWD`;
-                settlementElement.classList.add('text-green-600');
+            if (totalBudgetEl) totalBudgetEl.textContent = TOTAL_BUDGET_TWD.toLocaleString();
+            if (totalSpentEl) totalSpentEl.textContent = Math.round(totalSpentTWD).toLocaleString();
+            if (remainingBudgetEl) remainingBudgetEl.textContent = Math.round(remainingBudget).toLocaleString();
+            
+            // 結算結果
+            if (joshPaidEl) joshPaidEl.textContent = Math.round(joshPaidTWD).toLocaleString();
+            if (candicePaidEl) candicePaidEl.textContent = Math.round(candicePaidTWD).toLocaleString();
+
+            if (settlementElement) {
+                const diff = joshPaidTWD - candicePaidTWD;
+                const halfDiff = Math.abs(diff) / 2;
+                
+                settlementElement.classList.remove('text-red-600', 'text-green-600', 'text-gray-900', 'text-custom-secondary', 'text-custom-danger');
+
+                if (Math.abs(diff) < 1) { // 忽略微小差異
+                    settlementElement.textContent = "無需結算 (平衡)";
+                    settlementElement.classList.add('text-gray-400');
+                } else if (diff > 0) {
+                    settlementElement.textContent = `Candice 需支付 Josh $ ${Math.round(halfDiff).toLocaleString()} TWD`;
+                    settlementElement.classList.add('text-custom-danger'); // 紅色
+                } else {
+                    settlementElement.textContent = `Josh 需支付 Candice $ ${Math.round(halfDiff).toLocaleString()} TWD`;
+                    settlementElement.classList.add('text-custom-secondary'); // 綠色/藍綠色
+                }
             }
         }
         
         // 渲染記帳清單
         window.renderExpenseTracking = function() {
             const expenseList = document.getElementById('expense-list');
+            const filterContainer = document.getElementById('category-filter-buttons');
+            
+            // 安全檢查：如果元素不存在則直接退出
+            if (!expenseList || !filterContainer) return;
+
             const categories = [...new Set(EXPENSES_DATA.map(e => e.category)), 'All']; // 找出所有類別
             
             // 渲染篩選按鈕
-            const filterContainer = document.getElementById('category-filter-buttons');
             filterContainer.innerHTML = '';
             categories.forEach(cat => {
                 const isActive = cat === EXPENSE_FILTER;
                  filterContainer.innerHTML += `
-                    <button type="button" class="block-select-btn px-2 py-1 text-xs ${isActive ? 'active-filter' : ''}" onclick="window.filterExpenses('${cat}')">
+                    <button type="button" class="block-select-btn px-3 py-1 text-xs rounded-full ${isActive ? 'active-filter' : ''}" onclick="window.filterExpenses('${cat}')">
                         ${cat}
                     </button>
                 `;
@@ -515,39 +855,37 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
 
             // 渲染支出列表
             if (filteredExpenses.length === 0) {
-                expenseList.innerHTML = '<p class="text-center text-gray-500 text-sm">尚無符合篩選條件的支出紀錄</p>';
+                expenseList.innerHTML = '<p class="text-center text-gray-400 text-sm py-8"><i class="fa-solid fa-cookie-bite text-2xl mb-2 block text-gray-200"></i>尚無符合篩選條件的支出紀錄</p>';
             } else {
                 expenseList.innerHTML = filteredExpenses.map(expense => {
                     const amountTWD = expense.currency === 'JPY' 
                         ? (expense.amount * EXCHANGE_RATE_JPY_TWD).toFixed(0) 
                         : expense.amount.toFixed(0);
                         
-                    const iconMap = {
-                        Food: 'fa-utensils',
-                        Transport: 'fa-train-subway',
-                        Accommodation: 'fa-hotel',
-                        Shopping: 'fa-bag-shopping',
-                        Other: 'fa-ellipsis'
-                    };
-                    const categoryIcon = iconMap[expense.category] || 'fa-ellipsis';
+                    const categoryIcon = ICON_MAP[expense.category] || 'fa-ellipsis';
                     
                     return `
-                        <div class="p-3 border-b border-gray-100 flex justify-between items-center hover:bg-gray-50 transition duration-150">
+                        <div class="p-3 mb-2 bg-white rounded-xl shadow-sm border border-gray-100 flex justify-between items-center hover:bg-pink-50 transition duration-150 group">
                             <div class="flex items-center">
-                                <div class="w-10 h-10 rounded-full bg-custom-secondary/20 flex items-center justify-center mr-3 text-custom-secondary">
+                                <div class="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center mr-3 text-custom-primary">
                                     <i class="fa-solid ${categoryIcon}"></i>
                                 </div>
                                 <div>
-                                    <p class="font-semibold text-gray-800">${expense.description}</p>
-                                    <p class="text-xs text-gray-500">${expense.date} (${expense.payer} / ${expense.payment})</p>
+                                    <p class="font-bold text-gray-700">${expense.description}</p>
+                                    <p class="text-xs text-gray-400 font-mono">${expense.date} · <span class="bg-gray-100 px-1 rounded text-gray-500">${expense.payer}</span></p>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <p class="font-bold text-red-600">${expense.currency} ${expense.amount.toLocaleString()}</p>
-                                <p class="text-xs text-gray-600">約 $ ${amountTWD.toLocaleString()} TWD</p>
-                                <button onclick="window.deleteExpense('${expense.id}')" class="text-red-400 hover:text-red-600 text-xs mt-1">
-                                    <i class="fa-solid fa-trash-can"></i> 刪除
-                                </button>
+                                <p class="font-bold text-custom-danger">${expense.currency} ${expense.amount.toLocaleString()}</p>
+                                <p class="text-xs text-gray-400">約 $ ${amountTWD.toLocaleString()} TWD</p>
+                                <div class="flex justify-end space-x-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="window.openEditExpenseModal('${expense.id}')" class="text-custom-primary hover:text-custom-primary-dark text-xs bg-white px-2 py-0.5 rounded-md shadow-sm border border-pink-100">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </button>
+                                    <button onclick="window.deleteExpense('${expense.id}')" class="text-red-400 hover:text-red-600 text-xs bg-white px-2 py-0.5 rounded-md shadow-sm border border-red-100">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -619,26 +957,31 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
         window.renderWishlist = function() {
             const wishlistList = document.getElementById('wishlist-list');
             if (!wishlistList) return;
+            
             if (WISHLIST_DATA.length === 0) {
-                wishlistList.innerHTML = '<p class="text-center text-gray-500 text-sm">尚無待購項目</p>';
+                wishlistList.innerHTML = '<p class="text-center text-gray-400 text-sm py-8"><i class="fa-solid fa-gift text-2xl mb-2 block text-gray-200"></i>尚無待購項目</p>';
                 return;
             }
+
             wishlistList.innerHTML = WISHLIST_DATA.map(item => {
                 const statusClass = item.purchased ? 'purchased' : 'pending';
-                const statusText = item.purchased ? '✅ 已購' : '❌ 未購';
+                const statusText = item.purchased ? '已入手' : '想買!';
+                const bgClass = item.purchased ? 'bg-gray-50 opacity-75' : 'bg-white';
+                
                 return `
-                    <div class="p-3 border-b border-gray-100 flex justify-between items-center">
+                    <div class="p-3 mb-2 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center ${bgClass} transition hover:shadow-md">
                         <div>
-                            <p class="font-semibold text-gray-800">${item.name}</p>
-                            <p class="text-sm text-gray-500">${item.category}</p>
+                            <p class="font-bold text-gray-700 text-lg">${item.name}</p>
+                            <p class="text-sm text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full inline-block mt-1">${item.category}</p>
                         </div>
                         <div class="text-right">
-                            <p class="font-bold text-custom-primary">¥ ${item.price.toLocaleString()}</p>
-                            <div class="flex items-center mt-1 space-x-2">
-                                <button class="wishlist-status-btn ${statusClass}" onclick="window.toggleWishlistStatus('${item.id}', ${item.purchased})">
-                                    ${statusText}
+                            <p class="font-bold text-custom-primary text-lg">¥ ${item.price.toLocaleString()}</p>
+                            <div class="flex items-center justify-end mt-2 space-x-2">
+                                <button class="wishlist-status-btn ${statusClass}" 
+                                        onclick="window.toggleWishlistStatus('${item.id}', ${item.purchased})">
+                                    <i class="fa-solid ${item.purchased ? 'fa-check' : 'fa-heart'} mr-1"></i>${statusText}
                                 </button>
-                                <button onclick="window.deleteWishlistItem('${item.id}')" class="text-red-400 hover:text-red-600 text-xs">
+                                <button onclick="window.deleteWishlistItem('${item.id}')" class="text-gray-400 hover:text-red-500 w-8 h-8 rounded-full hover:bg-red-50 transition">
                                     <i class="fa-solid fa-trash-can"></i>
                                 </button>
                             </div>
@@ -649,473 +992,568 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
         }
 
         /* ===================================================
+          ⭐️ 新增：打包行李 (PACKING LIST) 相關函式
+        =================================================== */
+        
+        // ⭐️ 新增：渲染打包清單
+        window.renderPackingList = function() {
+            const packingListContainer = document.getElementById('packing-list-container');
+            if (!packingListContainer) return;
+
+            if (PACKING_DATA.length === 0) {
+                packingListContainer.innerHTML = '<p class="text-center text-gray-400 text-sm mt-6"><i class="fa-solid fa-suitcase text-2xl mb-2 block text-gray-200"></i>您的行李清單是空的！</p>';
+                return;
+            }
+
+            packingListContainer.innerHTML = PACKING_DATA.map(item => {
+                const isPacked = item.packed;
+                const statusClass = isPacked ? 'packed' : 'not-packed';
+                const statusIcon = isPacked ? 'fa-check-circle' : 'fa-circle';
+                const itemClass = isPacked ? 'line-through text-gray-400 italic' : 'text-gray-700 font-bold';
+                const bgClass = isPacked ? 'bg-gray-50' : 'bg-white';
+                
+                return `
+                    <div class="p-3 mb-2 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center ${bgClass} hover:bg-pink-50 transition duration-150">
+                        <div class="flex items-center flex-1 min-w-0 cursor-pointer" onclick="window.togglePackingStatus('${item.id}', ${item.packed})">
+                            <button class="packing-status-btn mr-3 text-lg">
+                                <i class="fa-solid ${statusIcon} ${isPacked ? 'text-custom-secondary' : 'text-gray-300'}"></i>
+                            </button>
+                            <div class="min-w-0">
+                                <p class="${itemClass} truncate text-lg">${item.name}</p>
+                                <p class="text-xs text-gray-400">${item.category}</p>
+                            </div>
+                        </div>
+                        <div class="text-right ml-4">
+                            <button onclick="window.deletePackingItem('${item.id}')" class="text-gray-300 hover:text-red-400 text-sm p-2">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ⭐️ 新增：新增打包項目 (Add Packing Item)
+        window.addPackingItem = async function(event) {
+            event.preventDefault();
+            const name = document.getElementById('packing-name').value;
+            const category = document.getElementById('packing-category').value;
+            
+            if (!name || !category) {
+                alert('請填寫項目名稱和類別！');
+                return;
+            }
+
+            const newItem = {
+                name: name,
+                category: category,
+                packed: false, // 預設為未打包
+                timestamp: serverTimestamp()
+            };
+
+            try {
+                await addDoc(collection(db, "packinglist"), newItem);
+                alert('打包清單新增成功！');
+                document.getElementById('packing-form').reset();
+            } catch (e) {
+                console.error("Error adding packing item: ", e);
+                alert('新增打包清單失敗。');
+            }
+        }
+
+        // ⭐️ 新增：切換打包狀態 (Update Packing Status)
+        window.togglePackingStatus = async function(id, currentStatus) {
+            try {
+                const docRef = doc(db, "packinglist", id);
+                await updateDoc(docRef, {
+                    packed: !currentStatus
+                });
+            } catch (e) {
+                console.error("Error updating packing status: ", e);
+                alert('更新狀態失敗。');
+            }
+        }
+
+        // ⭐️ 新增：刪除打包清單項目
+        window.deletePackingItem = async function(id) {
+            if (!confirm('確定要刪除這筆打包清單項目嗎？')) return;
+            try {
+                await deleteDoc(doc(db, "packinglist", id));
+            } catch (e) {
+                console.error("Error deleting packing item: ", e);
+                alert('刪除失敗。');
+            }
+        }
+        
+        /* ===================================================
           通用函式 (Modal, Navigation, Initialization)
         =================================================== */
+
         // 開啟 Modal
         window.openModal = function(id) {
-            document.getElementById(id).style.display = 'flex';
+            const modal = document.getElementById(id);
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
         }
 
         // 關閉 Modal
         window.closeModal = function(id) {
-            document.getElementById(id).style.display = 'none';
+             const modal = document.getElementById(id);
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
         }
-
+        
         // 渲染總覽天氣 (保持靜態，因為天氣查詢可能需要額外的 API key)
         window.renderOverviewWeather = function() {
             // 這個函式保持靜態渲染，可以讓用戶自行填充每日天氣
         }
-
+        
         // 渲染每日天氣 (目前為空，可自行實作)
         window.renderWeather = function() {
             const weatherContent = document.getElementById('weather-content');
-            weatherContent.innerHTML = '<p class="text-center text-gray-500 mt-8">每日詳細天氣功能待實作 (需串接第三方天氣 API)。</p>';
+            weatherContent.innerHTML = '<p class="text-center text-gray-400 mt-8"><i class="fa-solid fa-cloud-moon text-4xl mb-2 block"></i>每日詳細天氣功能待實作 (需串接第三方天氣 API)。</p>';
         }
 
         // 主要導航函式
         window.switchMainNav = function(targetId) {
+            // 隱藏所有內容區
             document.querySelectorAll('.main-tab-content').forEach(content => {
                 content.classList.add('hidden');
             });
-            document.getElementById(targetId).classList.remove('hidden');
-            document.querySelectorAll('.bottom-nav-button').forEach(btn => {
+            // 移除所有按鈕的 active 狀態
+            document.querySelectorAll('.main-nav-btn').forEach(btn => {
                 btn.classList.remove('active');
-                if (btn.getAttribute('data-target') === targetId) {
-                    btn.classList.add('active');
-                }
             });
-            // 處理初次切換時的渲染
-            if (targetId === 'expense-tab') {
-                window.renderExpenseTracking();
-            } else if (targetId === 'wishlist-tab') {
-                window.renderWishlist();
-            } else if (targetId === 'weather-tab') {
-                window.renderWeather();
+
+            // 顯示目標內容區
+            const targetContent = document.getElementById(targetId);
+            if (targetContent) {
+                targetContent.classList.remove('hidden');
+                
+                // 特殊處理：當切換到特定頁籤時呼叫渲染函式
+                if (targetId === 'expense-tab') {
+                    // 確保 Expense Tab 始終顯示明細
+                    window.switchExpenseView('details'); 
+                } else if (targetId === 'wishlist-tab') {
+                    window.renderWishlist();
+                } else if (targetId === 'packing-tab') { // ⭐️ 新增：處理打包清單渲染
+                    window.renderPackingList();
+                }
+            }
+
+            // 設置目標按鈕的 active 狀態
+            const targetButton = document.querySelector(`.main-nav-btn[data-target="${targetId}"]`);
+            if (targetButton) {
+                targetButton.classList.add('active');
             }
         }
 
-        // 網頁載入完成後啟動
+        // 初始化
         document.addEventListener('DOMContentLoaded', () => {
-            // 設定今天的日期為新增支出的預設日期
-            const today = new Date().toISOString().split('T')[0];
-            const expenseDateInput = document.getElementById('expense-date');
-            if (expenseDateInput) {
-                expenseDateInput.value = today;
-            }
-            window.renderOverviewWeather(); // 渲染靜態天氣總覽
-            window.switchMainNav('itinerary-tab'); // 確保初始顯示行程頁籤
-            startDataSync(); // 啟動 Firebase 數據同步
+            // 預設選擇第一個 tab
+            window.switchMainNav('itinerary-tab');
+            // 初始化記帳選擇器
+            window.selectCurrency(ACTIVE_CURRENCY);
+            window.selectPayer(ACTIVE_PAYER);
+            window.selectCategory(ACTIVE_CATEGORY);
+            window.selectPayment(ACTIVE_PAYMENT);
+
+            // 初始化數據同步
+            startDataSync();
         });
+
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* 自訂顏色主題 (溫暖/典雅配色) */
-        .bg-custom-primary { background-color: #008080; } /* 主色：松石綠/墨綠 */
-        .text-custom-primary { color: #008080; }
-        .bg-custom-secondary { background-color: #D65A31; } /* 副色：柔和磚紅/珊瑚紅 */
-        .text-custom-secondary { color: #D65A31; }
-
-        /* 行程頁籤的日期按鈕樣式 */
-        .tab-button {
-            /* 確保按鈕不會因為 Flex 而放大 */
-            flex-shrink: 0; 
-            /* 調整 padding 和字體大小 */
-            padding: 0.3rem 0.6rem; 
-            font-size: 0.8rem; /* 整體字體縮小 */
-            line-height: 1.2;
-            text-align: center;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            background-color: #FFF8E8; /* 替換為極淺米色 */
-            transition: background-color 0.2s, color 0.2s;
-            border: none; /* 移除邊框 */
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* 新增柔和陰影取代邊框 */
-        }
-        /* Day 1 和日期的字體大小也在 generateDateTabs 函式中控制 */
-        /* <div class="font-bold">Day ${index + 1}</div> <-- 保持這個大小
-        <div class="text-xs">${day.date.substring(5)} (${day.day_of_week})</div> <-- 保持這個大小 */
-
-        /* 行程時間軸樣式 */
-        .timeline-item {
-            border-left: 2px solid #008080; /* 使用新的主色 (松石綠) */
-            padding-left: 1rem;
-            cursor: pointer; /* **新增：讓使用者知道可以點擊** */
-            transition: background-color 0.2s;
-        }
-        .timeline-item:hover {
-            background-color: #FFFBF0; /* 替換為極淺奶油白 */
-        }
-        .timeline-container > div:last-child .timeline-item {
-            border-left: none; /* 移除最後一個項目的左邊線 */
-        }
-        .timeline-item a {
-            color: #D65A31; /* 使用新的副色 (磚紅) */
-            text-decoration: underline;
-        }
-
-        /* 底部導航欄樣式 */
-        .bottom-nav-button {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 0.5rem 0;
-            cursor: pointer;
-            transition: color 0.2s ease;
-            color: #4b5563;
-        }
-        .bottom-nav-button.active {
-            color: #008080; /* 使用新的主色 (松石綠) */
-        }
-        /* 確保底部內容不會被固定導航欄遮擋 */
-        body { padding-bottom: 70px; }
-
-        /* 記帳頁面的區塊點選按鈕樣式 */
-        .block-select-btn {
-            padding: 0.5rem;
-            text-align: center;
-            border: none; /* 移除邊框 */
-            border-radius: 0.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-            background-color: #F5F5F5; /* 輕微背景色 */
-            color: #4B5563; /* 預設文字顏色 */
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02); /* 柔和預設陰影 */
-        }
-        /* 幣別、類別、篩選 使用副色 (柔和磚紅) */
-        .block-select-btn.active-currency,
-        .block-select-btn.active-category,
-        .block-select-btn.active-filter {
-            background-color: #D65A31; /* 新副色 */
-            color: white;
-            box-shadow: 0 2px 5px rgba(214, 90, 49, 0.4); /* 突出陰影取代邊框 */
-        }
-        /* 付款人、支付方式 使用主色 (松石綠) */
-        .block-select-btn.active-payer,
-        .block-select-btn.active-payment {
-            background-color: #008080; /* 新主色 */
-            color: white;
-            box-shadow: 0 2px 5px rgba(0, 128, 128, 0.4); /* 突出陰影取代邊框 */
-        }
-
-        /* 慾望清單的已購/未購按鈕樣式 */
-        .wishlist-status-btn {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-            border-radius: 0.375rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .wishlist-status-btn.pending {
-            background-color: #fca5...
-        }
-    </style>
 </head>
-<body class="bg-gray-100 font-serif"> <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg">
+<body class="bg-gray-50 font-sans">
 
-        <div id="itinerary-tab" class="main-tab-content p-4">
-            <header class="flex justify-between items-center mb-4 sticky top-0 bg-white pt-4 pb-2 z-10 border-b border-gray-200">
-                <h1 class="text-2xl font-bold text-custom-primary">🇯🇵 福岡 & 熊本</h1>
-                <button onclick="window.openModal('addItineraryModal')" class="bg-custom-primary text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#006666] transition">
-                    <i class="fa-solid fa-plus mr-1"></i> 新增行程
-                </button>
-            </header>
+    <div class="max-w-xl mx-auto bg-white min-h-screen shadow-2xl overflow-hidden rounded-none sm:rounded-3xl sm:my-8 border border-gray-100">
 
-            <section id="weather-overview" class="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner">
-                <h2 class="text-lg font-bold text-gray-700 mb-3"><i class="fa-solid fa-cloud-sun text-custom-secondary mr-2"></i>天氣概況</h2>
-                <div class="flex justify-between text-center text-sm">
-                    <div class="w-1/5">
-                        <p class="font-semibold">Day 1</p>
-                        <i class="fa-solid fa-sun text-custom-primary text-xl"></i>
-                        <p>18°C/10°C</p>
-                    </div>
-                    <div class="w-1/5">
-                        <p class="font-semibold">Day 2</p>
-                        <i class="fa-solid fa-cloud-showers-heavy text-blue-400 text-xl"></i>
-                        <p>15°C/8°C</p>
-                    </div>
-                    <div class="w-1/5">
-                        <p class="font-semibold">Day 3</p>
-                        <i class="fa-solid fa-cloud text-gray-500 text-xl"></i>
-                        <p>16°C/9°C</p>
-                    </div>
-                    <div class="w-1/5">
-                        <p class="font-semibold">Day 4</p>
-                        <i class="fa-solid fa-wind text-custom-primary text-xl"></i>
-                        <p>17°C/11°C</p>
-                    </div>
-                    <div class="w-1/5">
-                        <p class="font-semibold">Day 5</p>
-                        <i class="fa-solid fa-umbrella text-custom-secondary text-xl"></i>
-                        <p>14°C/7°C</p>
-                    </div>
+        <header class="p-4 bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-700 flex items-center tracking-wide">
+                    <i class="fa-solid fa-plane-departure text-custom-primary mr-2 transform -rotate-12"></i> 福岡熊本之旅
+                </h1>
+                <div class="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
+                    匯率: <span id="exchange-rate-display" class="font-bold text-custom-secondary text-base">0.2150</span>
                 </div>
-            </section>
+            </div>
+        </header>
 
-            <div id="itinerary-overview-buttons" class="flex space-x-2 overflow-x-auto pb-4 sticky top-[70px] bg-white z-10 border-b border-gray-200">
-                </div>
-            
-            <section id="itinerary-container" class="mt-4">
-                </section>
-            
-            <section class="mt-8 p-4 bg-yellow-50 rounded-lg border-l-4 border-yellow-400 shadow-sm">
-                <h3 class="text-lg font-bold text-gray-700 mb-2">重要備註</h3>
-                <ul class="list-disc pl-5 text-gray-600 text-sm space-y-1">
-                    <li>請記得帶護照和電子機票。</li>
-                    <li>JR Pass 必須在Day 2開始啟用。</li>
-                    <li>飯店入住時間皆為下午 3 點。</li>
-                </ul>
-            </section>
+        <nav id="main-nav" class="flex justify-around border-b border-gray-100 text-sm sticky top-[72px] bg-white/95 backdrop-blur-sm z-10 shadow-sm">
+            <button class="main-nav-btn active" data-target="itinerary-tab" onclick="window.switchMainNav('itinerary-tab')">
+                <i class="fa-solid fa-map-location-dot"></i><br>行程
+            </button>
+            <button class="main-nav-btn" data-target="expense-tab" onclick="window.switchMainNav('expense-tab')">
+                <i class="fa-solid fa-wallet"></i><br>記帳
+            </button>
+            <button class="main-nav-btn" data-target="wishlist-tab" onclick="window.switchMainNav('wishlist-tab')">
+                <i class="fa-solid fa-gift"></i><br>清單
+            </button>
+            <button class="main-nav-btn" data-target="packing-tab" onclick="window.switchMainNav('packing-tab')">
+                <i class="fa-solid fa-suitcase"></i><br>打包
+            </button>
+            <button class="main-nav-btn" data-target="overview-tab" onclick="window.switchMainNav('overview-tab')">
+                <i class="fa-solid fa-star"></i><br>總覽
+            </button>
+        </nav>
 
-            <div class="fixed bottom-20 right-6 z-20">
-                <button onclick="window.openModal('addItineraryModal')" class="bg-custom-primary text-white p-4 rounded-full shadow-lg hover:bg-[#006666] transition z-20"> <i class="fa-solid fa-calendar-plus text-2xl"></i>
+        <main id="app-content" class="pb-24 bg-[#FFFDF9]">
+
+            <div id="itinerary-tab" class="main-tab-content">
+                <div id="date-buttons-container" class="flex p-4 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-white no-scrollbar">
+                    </div>
+                <div id="itinerary-container">
+                    </div>
+
+                <button onclick="window.openModal('addItineraryModal')" class="fixed right-6 bottom-6 w-14 h-14 rounded-full bg-custom-primary text-white shadow-xl flex items-center justify-center text-2xl hover:bg-custom-primary-dark z-20 transition transform hover:scale-110">
+                    <i class="fa-solid fa-plus"></i>
                 </button>
             </div>
-        </div>
 
-        <div id="expense-tab" class="main-tab-content p-4 hidden">
-            <header class="mb-4">
-                <h1 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-file-invoice text-[#D65A31] mr-2"></i>記帳追蹤</h1> </header>
+            <div id="expense-tab" class="main-tab-content hidden p-4">
+                <div class="flex mb-4 p-1.5 bg-gray-100 rounded-2xl">
+                    <button id="tab-add-expense-btn" class="flex-1 py-2.5 rounded-xl text-sm font-bold bg-white text-gray-500 shadow-sm transition-all" onclick="window.switchExpenseView('add')">
+                        <i class="fa-solid fa-pen mr-1"></i> 記一筆
+                    </button>
+                    <button id="tab-view-details-btn" class="flex-1 py-2.5 rounded-xl text-sm font-bold text-gray-500 hover:bg-white/50 transition-all" onclick="window.switchExpenseView('details')">
+                        <i class="fa-solid fa-list mr-1"></i> 查明細
+                    </button>
+                </div>
 
-            <section class="mb-6 p-4 bg-gray-50 rounded-lg shadow-inner border border-gray-200">
-                <h2 class="text-lg font-bold text-gray-700 mb-3"><i class="fa-solid fa-chart-line text-custom-primary mr-2"></i>預算與結算</h2>
-                <div class="grid grid-cols-3 gap-2 text-center text-sm mb-3">
-                    <div>
-                        <p class="text-gray-500">總預算 (TWD)</p>
-                        <p id="total-budget" class="font-bold text-lg text-custom-primary">50,000</p>
+                <div id="add-expense-container" class="hidden bg-white p-5 rounded-3xl shadow-sm border border-pink-100">
+                    <form onsubmit="event.preventDefault(); window.addExpense();">
+                        <label for="expense-date" class="text-sm font-bold text-gray-500 block mb-1 ml-1">日期</label>
+                        <input type="date" id="expense-date" value="2024-05-18" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-4 text-gray-700 font-bold" required>
+
+                        <label for="expense-amount" class="text-sm font-bold text-gray-500 block mb-1 ml-1">金額</label>
+                        <div class="flex mb-4">
+                            <input type="number" step="0.01" id="expense-amount" placeholder="0" class="flex-1 p-3 bg-gray-50 border-0 rounded-xl text-xl font-bold text-gray-700" required>
+                            <div id="expense-currency-select" class="flex ml-2 items-center">
+                                <button type="button" class="block-select-btn px-3 py-2 text-sm active-currency rounded-xl" data-currency="TWD" onclick="window.selectCurrency('TWD')">TWD</button>
+                                <button type="button" class="block-select-btn px-3 py-2 text-sm rounded-xl" data-currency="JPY" onclick="window.selectCurrency('JPY')">JPY</button>
+                            </div>
+                            <input type="hidden" id="expense-currency" value="TWD">
+                        </div>
+
+                        <label for="expense-description" class="text-sm font-bold text-gray-500 block mb-1 ml-1">用途/說明</label>
+                        <input type="text" id="expense-description" placeholder="例如: 一蘭拉麵" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-4 text-gray-700" required>
+
+                        <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">誰付錢?</label>
+                        <div id="expense-payer-select" class="flex mb-4">
+                            <button type="button" class="block-select-btn flex-1" data-payer="Josh" onclick="window.selectPayer('Josh')"><i class="fa-solid fa-user mr-1"></i> Josh</button>
+                            <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="window.selectPayer('Candice')"><i class="fa-solid fa-user mr-1"></i> Candice</button>
+                            <input type="hidden" id="expense-payer" value="Josh">
+                        </div>
+                        
+                        <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">類別</label>
+                        <div id="expense-category-select" class="grid grid-cols-3 gap-2 mb-4">
+                            <button type="button" class="block-select-btn w-full !mr-0" data-category="Food" onclick="window.selectCategory('Food')"><i class="fa-solid fa-utensils mr-1"></i>餐飲</button>
+                            <button type="button" class="block-select-btn w-full !mr-0" data-category="Transport" onclick="window.selectCategory('Transport')"><i class="fa-solid fa-train mr-1"></i>交通</button>
+                            <button type="button" class="block-select-btn w-full !mr-0" data-category="Accommodation" onclick="window.selectCategory('Accommodation')"><i class="fa-solid fa-bed mr-1"></i>住宿</button>
+                            <button type="button" class="block-select-btn w-full !mr-0" data-category="Shopping" onclick="window.selectCategory('Shopping')"><i class="fa-solid fa-bag-shopping mr-1"></i>購物</button>
+                            <button type="button" class="block-select-btn w-full !mr-0" data-category="Ticket" onclick="window.selectCategory('Ticket')"><i class="fa-solid fa-ticket mr-1"></i>門票</button>
+                            <button type="button" class="block-select-btn w-full !mr-0" data-category="Other" onclick="window.selectCategory('Other')"><i class="fa-solid fa-shapes mr-1"></i>其他</button>
+                            <input type="hidden" id="expense-category" value="Food">
+                        </div>
+
+                        <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">支付方式</label>
+                        <div id="expense-payment-select" class="flex mb-6">
+                            <button type="button" class="block-select-btn flex-1" data-payment="Cash" onclick="window.selectPayment('Cash')"><i class="fa-solid fa-money-bill mr-1"></i> 現金</button>
+                            <button type="button" class="block-select-btn flex-1" data-payment="Card" onclick="window.selectPayment('Card')"><i class="fa-regular fa-credit-card mr-1"></i> 信用卡</button>
+                            <input type="hidden" id="expense-payment" value="Cash">
+                        </div>
+
+                        <button type="submit" class="w-full bg-custom-secondary text-white p-4 rounded-2xl font-bold shadow-lg shadow-teal-100 hover:shadow-teal-200 transition transform hover:-translate-y-1">
+                            <i class="fa-solid fa-check mr-2"></i> 確認紀錄
+                        </button>
+                    </form>
+                </div>
+
+                <div id="expense-details-container" class="">
+                    <div class="bg-gradient-to-br from-blue-50 to-purple-50 p-5 rounded-3xl mb-6 border border-blue-100 shadow-inner">
+                        <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                            <span class="bg-white p-1.5 rounded-lg shadow-sm mr-2 text-custom-primary"><i class="fa-solid fa-calculator"></i></span> 
+                            結算小幫手
+                        </h3>
+                        <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+                            <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
+                                <p class="text-gray-400 text-xs mb-1">預算總額 (TWD)</p>
+                                <p class="font-bold text-gray-700 text-lg">$ <span id="total-budget">50,000</span></p>
+                            </div>
+                            <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
+                                <p class="text-gray-400 text-xs mb-1">已花總額 (TWD)</p>
+                                <p class="font-bold text-custom-danger text-lg">$ <span id="total-spent">0</span></p>
+                            </div>
+                            <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
+                                <p class="text-gray-400 text-xs mb-1">Josh 支付</p>
+                                <p class="font-bold text-gray-700">$ <span id="josh-paid">0</span></p>
+                            </div>
+                            <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
+                                <p class="text-gray-400 text-xs mb-1">Candice 支付</p>
+                                <p class="font-bold text-gray-700">$ <span id="candice-paid">0</span></p>
+                            </div>
+                        </div>
+                        <div class="pt-4 border-t border-blue-100/50 text-center bg-white/50 rounded-xl p-2">
+                            <p class="text-gray-400 text-xs mb-1">應付結算結果</p>
+                            <p id="settlement-result" class="text-lg font-bold text-gray-700">計算中...</p>
+                        </div>
                     </div>
-                    <div>
-                        <p class="text-gray-500">總花費 (TWD)</p>
-                        <p id="total-spent" class="font-bold text-lg text-red-600">--</p>
-                    </div>
-                    <div>
-                        <p class="text-gray-500">剩餘預算</p>
-                        <p id="remaining-budget" class="font-bold text-lg text-green-600">--</p>
-                    </div>
-                </div>
-                
-                <hr class="my-3 border-gray-200">
-                
-                <h3 class="font-bold text-md mb-2">個人總付金額:</h3>
-                <div class="flex justify-between text-sm mb-2">
-                    <p class="text-gray-600">Josh 已付:</p>
-                    <p id="josh-paid" class="font-bold text-gray-800">-- TWD</p>
-                </div>
-                <div class="flex justify-between text-sm mb-3">
-                    <p class="text-gray-600">Candice 已付:</p>
-                    <p id="candice-paid" class="font-bold text-gray-800">-- TWD</p>
-                </div>
-                
-                <div class="mb-4 p-3 bg-teal-50 border border-teal-200 rounded-lg"> <p class="text-sm font-semibold text-teal-700">即時匯率 (JPY/TWD)：<span id="exchange-rate-display">--</span></p>
-                </div>
-                
-                <p id="settlement-result" class="text-center font-bold text-lg text-gray-900"></p>
-                
-                <button onclick="window.openModal('addExpenseModal')" class="w-full bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#A64726] mt-3"> <i class="fa-solid fa-circle-plus mr-1"></i> 新增支出
-                </button>
-            </section>
-            
-            <section class="mb-6">
-                <div class="flex justify-between items-center mb-3">
-                    <h2 class="text-lg font-bold text-gray-700">支出列表</h2>
-                    <div id="category-filter-buttons" class="flex space-x-2">
+
+                    <h3 class="text-lg font-bold text-gray-700 mb-3 flex items-center px-1">
+                        <i class="fa-solid fa-receipt mr-2 text-custom-secondary"></i> 支出明細
+                    </h3>
+                    
+                    <div id="category-filter-buttons" class="flex flex-wrap gap-2 mb-4 pb-2 px-1 overflow-x-auto no-scrollbar">
+                        </div>
+                    
+                    <div id="expense-list" class="space-y-3">
                         </div>
                 </div>
-                
-                <div id="expense-list" class="border rounded-lg bg-white divide-y divide-gray-100 shadow-sm">
+            </div>
+
+            <div id="wishlist-tab" class="main-tab-content hidden p-4">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-pink-100 mb-6">
+                    <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-2 text-custom-primary"></i> 許願池
+                    </h3>
+                    
+                    <form id="wishlist-form" onsubmit="window.addWishlistItem(event)">
+                        <label for="wishlist-name" class="text-sm font-bold text-gray-500 block mb-1 ml-1">想要什麼?</label>
+                        <input type="text" id="wishlist-name" placeholder="例如: 熊本熊餅乾" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700" required>
+                        
+                        <label for="wishlist-price" class="text-sm font-bold text-gray-500 block mb-1 ml-1">大概多少錢 (JPY)</label>
+                        <input type="number" step="1" id="wishlist-price" placeholder="0" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700 font-bold" required>
+                        
+                        <label for="wishlist-category" class="text-sm font-bold text-gray-500 block mb-1 ml-1">分類</label>
+                        <div class="relative">
+                            <select id="wishlist-category" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-4 text-gray-700 appearance-none">
+                                <option value="伴手禮">🎁 伴手禮</option>
+                                <option value="電器">⚡ 電器</option>
+                                <option value="服飾">👕 服飾</option>
+                                <option value="藥妝">💊 藥妝</option>
+                                <option value="其他">✨ 其他</option>
+                            </select>
+                            <i class="fa-solid fa-chevron-down absolute right-4 top-4 text-gray-400 pointer-events-none"></i>
+                        </div>
+
+                        <button type="submit" class="w-full bg-custom-primary text-white p-3 rounded-2xl font-bold shadow-lg shadow-pink-200 hover:bg-custom-primary-dark transition">
+                            <i class="fa-solid fa-plus mr-1"></i> 加入清單
+                        </button>
+                    </form>
+                </div>
+
+                <h3 class="text-lg font-bold text-gray-700 mb-3 flex items-center px-2">
+                    <i class="fa-solid fa-heart mr-2 text-custom-danger"></i> 購物清單
+                </h3>
+                <div id="wishlist-list" class="space-y-3">
                     </div>
-            </section>
-        </div>
-
-        <div id="wishlist-tab" class="main-tab-content p-4 hidden">
-             <header class="mb-4">
-                <h1 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-tags text-[#D65A31] mr-2"></i>慾望清單</h1> </header>
+            </div>
             
-            <section class="mb-6">
-                <button onclick="window.openModal('addWishlistModal')" class="w-full bg-custom-primary text-white p-2 rounded-lg font-bold hover:bg-[#006666] mb-4"> <i class="fa-solid fa-gift mr-1"></i> 新增待購項目
-                </button>
-                
-                <h2 class="text-lg font-bold text-gray-700 mb-3">待購 & 已購項目</h2>
+            <div id="packing-tab" class="main-tab-content hidden p-4">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-blue-100 mb-6">
+                    <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                        <i class="fa-solid fa-shirt mr-2 text-custom-secondary"></i> 新增行李
+                    </h3>
+                    
+                    <form id="packing-form" onsubmit="window.addPackingItem(event)">
+                        <div class="flex gap-2 mb-3">
+                            <div class="flex-1">
+                                <label for="packing-name" class="text-sm font-bold text-gray-500 block mb-1 ml-1">物品名稱</label>
+                                <input type="text" id="packing-name" placeholder="護照" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700" required>
+                            </div>
+                            <div class="w-1/3 relative">
+                                <label for="packing-category" class="text-sm font-bold text-gray-500 block mb-1 ml-1">分類</label>
+                                <select id="packing-category" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700 appearance-none">
+                                    <option value="證件">🪪</option>
+                                    <option value="衣物">👕</option>
+                                    <option value="電子">📱</option>
+                                    <option value="藥品">💊</option>
+                                    <option value="盥洗">🚿</option>
+                                    <option value="其他">🧩</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-3 top-[34px] text-gray-400 pointer-events-none text-xs"></i>
+                            </div>
+                        </div>
 
-                <div id="wishlist-list" class="border rounded-lg bg-white divide-y divide-gray-100 shadow-sm">
+                        <button type="submit" class="w-full bg-custom-secondary text-white p-3 rounded-2xl font-bold shadow-lg shadow-teal-100 hover:bg-opacity-90 transition">
+                            <i class="fa-solid fa-plus mr-1"></i> 加入行李箱
+                        </button>
+                    </form>
+                </div>
+
+                <h3 class="text-lg font-bold text-gray-700 mb-3 flex items-center px-2">
+                    <i class="fa-solid fa-clipboard-check mr-2 text-custom-primary"></i> 檢查清單
+                </h3>
+                <div id="packing-list-container" class="space-y-2">
                     </div>
-            </section>
-        </div>
-
-        <div id="weather-tab" class="main-tab-content p-4 hidden">
-             <header class="mb-4">
-                <h1 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-umbrella text-custom-primary mr-2"></i>天氣預報</h1>
-            </header>
-            
-            <section id="weather-content" class="text-center">
-                <div class="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
-                    <p class="text-gray-500">每日詳細天氣功能待實作</p>
-                    <p class="text-xs text-gray-400 mt-2">請於 `renderWeather` 函式中串接天氣 API</p>
-                </div>
-            </section>
-        </div>
-
-    </div>
-    
-    <footer class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 shadow-md z-30">
-        <nav class="flex justify-around">
-            <div class="bottom-nav-button active" data-target="itinerary-tab" onclick="window.switchMainNav('itinerary-tab')">
-                <i class="fa-solid fa-route text-xl"></i>
-                <span class="text-xs mt-1">行程</span>
             </div>
-            <div class="bottom-nav-button" data-target="expense-tab" onclick="window.switchMainNav('expense-tab')">
-                <i class="fa-solid fa-wallet text-xl"></i>
-                <span class="text-xs mt-1">記帳</span>
-            </div>
-            <div class="bottom-nav-button" data-target="wishlist-tab" onclick="window.switchMainNav('wishlist-tab')">
-                <i class="fa-solid fa-cart-shopping text-xl"></i>
-                <span class="text-xs mt-1">待購</span>
-            </div>
-            <div class="bottom-nav-button" data-target="weather-tab" onclick="window.switchMainNav('weather-tab')">
-                <i class="fa-solid fa-cloud text-xl"></i>
-                <span class="text-xs mt-1">天氣</span>
-            </div>
-        </nav>
-    </footer>
 
-    <div id="addItineraryModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-75 hidden items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg w-11/12 max-w-sm shadow-xl">
-            <h2 class="text-2xl font-bold text-custom-primary mb-4 text-center">新增行程項目</h2>
-            <form id="add-itinerary-form" onsubmit="window.addItineraryItem(event)">
-                <label for="new-date" class="text-sm font-semibold text-gray-700 mb-1 block">日期:</label>
-                <select id="new-date" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-3 text-sm" required>
-                    </select>
-
-                <label for="new-time" class="text-sm font-semibold text-gray-700 mb-1 block">時間:</label>
-                <div class="flex items-center mb-3">
-                    <input type="text" id="new-time" placeholder="--:--" pattern="[0-2][0-9]:[0-5][0-9]" class="flex-1 p-2 border border-gray-200 shadow-inner rounded-lg text-sm mr-2" required>
-                    <i class="fa-solid fa-clock text-gray-500"></i>
+            <div id="weather-tab" class="main-tab-content hidden p-4">
+                <div class="bg-gradient-to-b from-blue-100 to-white p-8 rounded-3xl text-center shadow-inner mb-6">
+                    <i class="fa-solid fa-sun text-6xl text-yellow-400 mb-4 drop-shadow-md"></i>
+                    <h2 class="text-2xl font-bold text-gray-700 mb-2">福岡好天氣</h2>
+                    <p class="text-gray-500">氣溫舒適，適合旅遊！</p>
                 </div>
                 
-                <label for="new-title" class="text-sm font-semibold text-gray-700 mb-1 block">行程標題:</label>
-                <input type="text" id="new-title" placeholder="行程標題 (如: 晚餐)" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-3 text-sm" required>
-                
-                <label for="new-note" class="text-sm font-semibold text-gray-700 mb-1 block">備註/地點:</label>
-                <textarea id="new-note" rows="2" placeholder="備註 (如: 阿蘇赤牛丼/飯店)" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-4 text-sm"></textarea>
-                
-                <div class="flex space-x-2">
-                    <button type="button" onclick="window.closeModal('addItineraryModal')" class="flex-1 bg-gray-200 text-gray-700 p-2 rounded-lg font-bold hover:bg-gray-300">取消</button>
-                    <button type="submit" class="flex-1 bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#A64726]">儲存</button> </div>
-            </form>
-        </div>
-    </div>
+                <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center">
+                    <i class="fa-solid fa-calendar-days mr-2 text-custom-primary"></i> 每日預報
+                </h2>
+                <div id="weather-content" class="space-y-3">
+                    </div>
+            </div>
 
-    <div id="editItineraryModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-75 hidden items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg w-11/12 max-w-sm shadow-xl">
-            <h2 class="text-2xl font-bold text-custom-secondary mb-2 text-center">編輯行程項目</h2>
-            <p id="edit-modal-date-info" class="text-sm text-gray-500 mb-4 text-center"></p>
-            <form id="edit-itinerary-form" onsubmit="window.saveItineraryItem(event)">
-                <input type="hidden" id="edit-date-key">
-                <input type="hidden" id="edit-item-index">
-
-                <label for="edit-time" class="text-sm font-semibold text-gray-700 mb-1 block">時間:</label>
-                <div class="flex items-center mb-3">
-                    <input type="text" id="edit-time" placeholder="--:--" pattern="[0-2][0-9]:[0-5][0-9]" class="flex-1 p-2 border border-gray-200 shadow-inner rounded-lg text-sm mr-2" required>
-                    <i class="fa-solid fa-clock text-gray-500"></i>
+            <div id="overview-tab" class="main-tab-content hidden p-4">
+                <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center">
+                    <i class="fa-solid fa-chart-pie mr-2 text-custom-primary"></i> 旅程儀表板
+                </h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-6 bg-yellow-50 rounded-3xl shadow-sm border border-yellow-100 text-center">
+                        <i class="fa-regular fa-calendar text-2xl text-yellow-500 mb-2 block"></i>
+                        <p class="text-xs text-yellow-700 font-bold uppercase tracking-wider mb-1">Duration</p>
+                        <p class="text-2xl font-bold text-yellow-900 font-mono">7 Days</p>
+                    </div>
+                    <div class="p-6 bg-green-50 rounded-3xl shadow-sm border border-green-100 text-center">
+                        <i class="fa-solid fa-sack-dollar text-2xl text-green-500 mb-2 block"></i>
+                        <p class="text-xs text-green-700 font-bold uppercase tracking-wider mb-1">Budget</p>
+                        <p class="text-2xl font-bold text-green-900 font-mono">$50k</p>
+                    </div>
                 </div>
                 
-                <label for="edit-title" class="text-sm font-semibold text-gray-700 mb-1 block">行程標題:</label>
-                <input type="text" id="edit-title" placeholder="行程標題 (如: 晚餐)" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-3 text-sm" required>
-                
-                <label for="edit-note" class="text-sm font-semibold text-gray-700 mb-1 block">備註/地點:</label>
-                <textarea id="edit-note" rows="2" placeholder="備註 (如: 阿蘇赤牛丼/飯店)" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-4 text-sm"></textarea>
-                
-                <div class="flex space-x-2">
-                    <button type="button" onclick="window.deleteItineraryItem(document.getElementById('edit-date-key').value, parseInt(document.getElementById('edit-item-index').value))" class="flex-1 bg-red-500 text-white p-2 rounded-lg font-bold hover:bg-red-600">
-                        <i class="fa-solid fa-trash-can mr-1"></i> 刪除
+                <div class="mt-6 p-6 bg-white rounded-3xl shadow-sm border border-gray-100 text-center">
+                   <p class="text-gray-400 mb-4">更多統計圖表開發中...</p>
+                   <i class="fa-solid fa-laptop-code text-4xl text-gray-200"></i>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Modals 樣式優化 -->
+        <div id="addItineraryModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="window.closeModal('addItineraryModal')">
+            <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm transform transition-all scale-100" onclick="event.stopPropagation()">
+                <h3 class="text-xl font-bold mb-6 flex justify-between items-center text-gray-700">
+                    新增行程
+                    <button onclick="window.closeModal('addItineraryModal')" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark"></i>
                     </button>
-                    <button type="submit" class="flex-1 bg-custom-primary text-white p-2 rounded-lg font-bold hover:bg-[#006666]">儲存修改</button> </div>
-            </form>
-        </div>
-    </div>
+                </h3>
+                <form id="add-itinerary-form" onsubmit="window.addItineraryItem(event)">
+                    <label class="text-sm font-bold text-gray-500 mb-1 block ml-1">哪一天?</label>
+                    <div class="relative mb-3">
+                        <select id="new-date" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700 appearance-none font-bold" required></select>
+                        <i class="fa-solid fa-chevron-down absolute right-4 top-4 text-gray-400 pointer-events-none"></i>
+                    </div>
 
-    <div id="addExpenseModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-75 hidden items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg w-11/12 max-w-sm shadow-xl">
-            <h2 class="text-2xl font-bold text-custom-secondary mb-4 text-center">新增支出紀錄</h2>
-            
-            <div class="mb-4 space-y-3">
-                 <label class="text-sm font-semibold text-gray-700 mb-1 block">幣別:</label>
-                <div id="currency-select" class="flex space-x-2" role="group">
-                    <button type="button" class="block-select-btn flex-1 active-currency" data-currency="TWD" onclick="window.selectCurrency('TWD')">TWD (台幣)</button>
-                    <button type="button" class="block-select-btn flex-1" data-currency="JPY" onclick="window.selectCurrency('JPY')">JPY (日圓)</button>
-                </div>
-                
-                 <label class="text-sm font-semibold text-gray-700 mb-1 block">付款人:</label>
-                <div id="payer-select" class="flex space-x-2" role="group">
-                    <button type="button" class="block-select-btn flex-1 active-payer" data-payer="Josh" onclick="window.selectPayer('Josh')">Josh</button>
-                    <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="window.selectPayer('Candice')">Candice</button>
-                </div>
+                    <label class="text-sm font-bold text-gray-500 mb-1 block ml-1">幾點?</label>
+                    <div class="flex items-center mb-3">
+                        <input type="time" id="new-time" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700 font-bold text-lg text-center" required>
+                    </div>
 
-                <label class="text-sm font-semibold text-gray-700 mb-1 block">類別:</label>
-                <div id="category-select" class="flex flex-wrap gap-2" role="group">
-                    <button type="button" class="block-select-btn active-category" data-category="Food" onclick="window.selectCategory('Food')">餐飲</button>
-                    <button type="button" class="block-select-btn" data-category="Shopping" onclick="window.selectCategory('Shopping')">購物</button>
-                    <button type="button" class="block-select-btn" data-category="Transport" onclick="window.selectCategory('Transport')">交通</button>
-                    <button type="button" class="block-select-btn" data-category="Accommodation" onclick="window.selectCategory('Accommodation')">住宿</button>
-                    <button type="button" class="block-select-btn" data-category="Other" onclick="window.selectCategory('Other')">其他</button>
-                </div>
-                
-                <label class="text-sm font-semibold text-gray-700 mb-1 block">支付方式:</label>
-                <div id="payment-select" class="flex flex-wrap gap-2" role="group">
-                    <button type="button" class="block-select-btn active-payment" data-payment="Cash" onclick="window.selectPayment('Cash')">現金</button>
-                    <button type="button" class="block-select-btn" data-payment="Card" onclick="window.selectPayment('Card')">信用卡</button>
-                    <button type="button" class="block-select-btn" data-payment="Mobile" onclick="window.selectPayment('Mobile')">行動支付</button>
-                </div>
-            </div>
+                    <label class="text-sm font-bold text-gray-500 mb-1 block ml-1">做什麼?</label>
+                    <input type="text" id="new-title" placeholder="晚餐: 燒肉" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700 placeholder-gray-300" required>
 
-            <div class="space-y-3">
-                <label for="expense-date" class="text-sm font-semibold text-gray-700 mb-1 block">日期:</label>
-                <input type="date" id="expense-date" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg text-sm" required>
+                    <label class="text-sm font-bold text-gray-500 mb-1 block ml-1">備註 / 地點</label>
+                    <textarea id="new-note" rows="3" placeholder="記得訂位..." class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-6 text-gray-700 placeholder-gray-300"></textarea>
 
-                <label for="expense-amount" class="text-sm font-semibold text-gray-700 mb-1 block">金額:</label>
-                <input type="number" id="expense-amount" placeholder="0" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg text-sm" required min="1">
-                
-                <label for="expense-description" class="text-sm font-semibold text-gray-700 mb-1 block">用途/說明:</label>
-                <input type="text" id="expense-description" placeholder="例如：晚餐 - 一蘭拉麵" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-4 text-sm" required>
-            </div>
-            
-            <input type="hidden" id="expense-currency" value="TWD">
-            <input type="hidden" id="expense-payer" value="Josh">
-            <input type="hidden" id="expense-category" value="Food">
-            <input type="hidden" id="expense-payment" value="Cash">
-            
-            <div class="flex space-x-2 mt-4">
-                <button type="button" onclick="window.closeModal('addExpenseModal')" class="flex-1 bg-gray-200 text-gray-700 p-2 rounded-lg font-bold hover:bg-gray-300">取消</button>
-                <button type="button" onclick="window.addExpense()" class="flex-1 bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#A64726]">儲存紀錄</button>
+                    <button type="submit" class="w-full bg-custom-primary text-white p-3 rounded-2xl font-bold shadow-lg shadow-pink-200 hover:bg-custom-primary-dark transition">
+                        <i class="fa-solid fa-check mr-1"></i> 完成
+                    </button>
+                </form>
             </div>
         </div>
-    </div>
 
-    <div id="addWishlistModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-75 hidden items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg w-11/12 max-w-sm shadow-xl">
-            <h2 class="text-2xl font-bold text-custom-primary mb-4 text-center">新增待購項目</h2>
-            <form id="wishlist-form" onsubmit="window.addWishlistItem(event)">
-                <label for="wishlist-name" class="text-sm font-semibold text-gray-700 mb-1 block">項目名稱:</label>
-                <input type="text" id="wishlist-name" placeholder="例如：限定版模型" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-3 text-sm" required>
-                
-                <label for="wishlist-price" class="text-sm font-semibold text-gray-700 mb-1 block">預估價格 (JPY):</label>
-                <input type="number" id="wishlist-price" placeholder="0" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-3 text-sm" required min="1">
-                
-                <label for="wishlist-category" class="text-sm font-semibold text-gray-700 mb-1 block">分類:</label>
-                <select id="wishlist-category" class="w-full p-2 border border-gray-200 shadow-inner rounded-lg mb-4 text-sm" required>
-                    <option value="Shopping">購物</option>
-                    <option value="Food">餐飲</option>
-                    <option value="Souvenir">紀念品</option>
-                    <option value="Other">其他</option>
-                </select>
-                
-                <div class="flex space-x-2">
-                    <button type="button" onclick="window.closeModal('addWishlistModal')" class="flex-1 bg-gray-200 text-gray-700 p-2 rounded-lg font-bold hover:bg-gray-300">取消</button>
-                    <button type="submit" class="flex-1 bg-custom-primary text-white p-2 rounded-lg font-bold hover:bg-[#006666]">新增</button>
-                </div>
-            </form>
+        <div id="editItineraryModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="window.closeModal('editItineraryModal')">
+            <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm" onclick="event.stopPropagation()">
+                <h3 class="text-xl font-bold mb-2 flex justify-between items-center text-gray-700">
+                    編輯行程
+                    <button onclick="window.closeModal('editItineraryModal')" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </h3>
+                <p id="edit-modal-date-info" class="text-sm text-custom-primary font-bold mb-6 bg-pink-50 inline-block px-3 py-1 rounded-lg"></p>
+                <form id="edit-itinerary-form" onsubmit="window.saveItineraryItem(event)">
+                    <input type="hidden" id="edit-date-key">
+                    <input type="hidden" id="edit-item-index">
+
+                    <label class="text-sm font-bold text-gray-500 mb-1 block ml-1">時間</label>
+                    <input type="time" id="edit-time" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700 font-bold" required>
+
+                    <label class="text-sm font-bold text-gray-500 mb-1 block ml-1">標題</label>
+                    <input type="text" id="edit-title" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700" required>
+
+                    <label class="text-sm font-bold text-gray-500 mb-1 block ml-1">備註</label>
+                    <textarea id="edit-note" rows="3" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-6 text-gray-700"></textarea>
+
+                    <div class="flex space-x-3">
+                        <button type="button" onclick="window.deleteItineraryItem(document.getElementById('edit-date-key').value, parseInt(document.getElementById('edit-item-index').value))" class="flex-1 bg-white text-red-400 border-2 border-red-100 p-3 rounded-2xl font-bold hover:bg-red-50 transition">
+                            <i class="fa-solid fa-trash-can mr-1"></i> 刪除
+                        </button>
+                        <button type="submit" class="flex-[2] bg-custom-primary text-white p-3 rounded-2xl font-bold shadow-lg shadow-pink-200 hover:bg-custom-primary-dark transition">
+                            <i class="fa-solid fa-check mr-1"></i> 儲存
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
+        
+        <div id="editExpenseModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="window.closeModal('editExpenseModal')">
+            <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm" onclick="event.stopPropagation()">
+                <h3 class="text-xl font-bold mb-4 flex justify-between items-center text-custom-primary">
+                    <span class="flex items-center"><i class="fa-solid fa-pen-to-square mr-2"></i> 編輯支出</span>
+                    <button onclick="window.closeModal('editExpenseModal')" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </h3>
+                <form onsubmit="window.saveExpenseUpdate(event)">
+                    <input type="hidden" id="edit-expense-id">
+                    
+                    <label class="text-sm font-bold text-gray-500 block mb-1 ml-1">日期</label>
+                    <input type="date" id="edit-expense-date" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700 font-bold" required>
+
+                    <label class="text-sm font-bold text-gray-500 block mb-1 ml-1">金額</label>
+                    <div class="flex mb-3">
+                        <input type="number" step="0.01" id="edit-expense-amount" class="flex-1 p-3 bg-gray-50 border-0 rounded-xl text-gray-700 font-bold" required>
+                        <div id="edit-expense-currency-select" class="flex ml-2 items-center">
+                            <button type="button" class="block-select-btn px-3 py-2 text-sm rounded-xl" data-currency="TWD" onclick="window.selectCurrency('TWD', 'edit-expense')">TWD</button>
+                            <button type="button" class="block-select-btn px-3 py-2 text-sm rounded-xl" data-currency="JPY" onclick="window.selectCurrency('JPY', 'edit-expense')">JPY</button>
+                        </div>
+                        <input type="hidden" id="edit-expense-currency" value="TWD">
+                    </div>
+
+                    <label class="text-sm font-bold text-gray-500 block mb-1 ml-1">說明</label>
+                    <input type="text" id="edit-expense-description" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700" required>
+
+                    <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">付款人</label>
+                    <div id="edit-expense-payer-select" class="flex mb-3">
+                        <button type="button" class="block-select-btn flex-1" data-payer="Josh" onclick="window.selectPayer('Josh', 'edit-expense')">Josh</button>
+                        <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="window.selectPayer('Candice', 'edit-expense')">Candice</button>
+                        <input type="hidden" id="edit-expense-payer" value="Josh">
+                    </div>
+                    
+                    <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">類別</label>
+                    <div id="edit-expense-category-select" class="grid grid-cols-3 gap-2 mb-3">
+                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Food" onclick="window.selectCategory('Food', 'edit-expense')">餐飲</button>
+                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Transport" onclick="window.selectCategory('Transport', 'edit-expense')">交通</button>
+                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Accommodation" onclick="window.selectCategory('Accommodation', 'edit-expense')">住宿</button>
+                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Shopping" onclick="window.selectCategory('Shopping', 'edit-expense')">購物</button>
+                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Ticket" onclick="window.selectCategory('Ticket', 'edit-expense')">門票</button>
+                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Other" onclick="window.selectCategory('Other', 'edit-expense')">其他</button>
+                        <input type="hidden" id="edit-expense-category" value="Food">
+                    </div>
+
+                    <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">方式</label>
+                    <div id="edit-expense-payment-select" class="flex mb-6">
+                        <button type="button" class="block-select-btn flex-1" data-payment="Cash" onclick="window.selectPayment('Cash', 'edit-expense')">現金</button>
+                        <button type="button" class="block-select-btn flex-1" data-payment="Card" onclick="window.selectPayment('Card', 'edit-expense')">信用卡</button>
+                        <input type="hidden" id="edit-expense-payment" value="Cash">
+                    </div>
+
+                    <button type="submit" class="w-full bg-custom-primary text-white p-3 rounded-2xl font-bold shadow-lg shadow-pink-200 hover:bg-custom-primary-dark transition">
+                        <i class="fa-solid fa-check mr-1"></i> 儲存
+                    </button>
+                </form>
+            </div>
+        </div>
+
     </div>
 
 </body>
