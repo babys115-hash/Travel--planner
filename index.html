@@ -66,7 +66,13 @@ window.switchExpenseView = function(view) {
         detailsBtn.classList.add('active-expense-tab-btn');
         
         // ⚠️ 確保切換到明細時數據是最新狀態
-        window.renderExpenseTracking(); 
+       console.log('--- A. 準備呼叫 renderExpenseTracking() ---'); 
+    
+    // ⭐️ 在這裡加入偵錯點
+    window.renderExpenseTracking(); 
+    
+    console.log('--- B. renderExpenseTracking() 呼叫完畢 ---');
+}
     }
 }
 
