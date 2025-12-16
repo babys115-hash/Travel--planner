@@ -171,6 +171,11 @@
         /* =========================
           Firebase 初始化 (使用 ES Modules)
         ========================= */
+import { 
+    // ... 其他您可能用到的函式 (e.g., collection, query, orderBy, getDocs, addDoc, updateDoc, deleteDoc)
+    doc,        // ⭐️ 確保有引入 doc
+    onSnapshot  // ⭐️ 確保有引入 onSnapshot
+} from "firebase/firestore";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
         import {
             getFirestore,
@@ -271,7 +276,7 @@ window.saveBudget = async function() {
         let ACTIVE_CATEGORY = 'Food';
         let ACTIVE_PAYMENT = 'Cash';
         let EXPENSE_FILTER = 'All';
-        
+        window.TOTAL_BUDGET = 0;
         // 匯率與預算 (靜態資料或未來可從 Firestore 載入)
         const EXCHANGE_RATE_JPY_TWD = 0.215; 
         const TOTAL_BUDGET_TWD = 50000;
