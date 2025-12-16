@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>福岡熊本行程規劃（雲端同步）</title>
+<style>
+
+    body {
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+
+      margin: 20px;
+
+    }
+
+    input, button {
+
+      padding: 6px;
+
+      margin: 4px 0;
+
+    }
+
+    .item {
+
+      border-bottom: 1px solid #ddd;
+
+      padding: 6px 0;
+
+    }
+</style>
+<!-- 🔥 Firebase SDK（一定要 type="module"） -->
+<script type="module">
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+
+    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // ✅ 你的 Firebase 設定
+
+    const firebaseConfig = {
+
+      apiKey: "AIzaSyBRjYjvwvCNTRHdI8vH8n3GPabzSnSDbvI",
+
+      authDomain: "jp-b0e03.firebaseapp.com",
+
+      projectId: "jp-b0e03",
+
+      storageBucket: "jp-b0e03.firebasestorage.app",
+
+      messagingSenderId: "689610031212",
+
+      appId: "1:689610031212:web:f63f2efe61d4ad562bd849"
+
+    };
+
+    const app = initializeApp(firebaseConfig);
+
+    const db = getFirestore(app);
+
+    // 🌍 給下面一般 JS 使用
+
+    window.db = db;
+
+    window.fbDoc = doc;
+
+    window.fbGetDoc = getDoc;
+
+    window.fbSetDoc = setDoc;
+
+    window.fbOnSnapshot = onSnapshot;
+</script>
+</head>
+<body>
+<h2>🇯🇵 福岡 / 熊本 行程規劃（雲端同步）</h2>
+<input id="dateInput" placeholder="日期（例：Day 1）">
+<input id="textInput" placeholder="行程內容">
+<button onclick="addItem()">新增</button>
+<div id="list"></div>
+<script>
+
+    /* ===============================
+
+       🔹 資料區
+
+    =============================== */
+
+    let ITINERARY_DATA = {};
+
+    const DOC_REF = fbDoc(db, "travelPlanner", "fukuoka_kumamoto");
+
+    /* ===============================
+
+       🔹 Firebase 讀取
+
+    =============================== */
+
+    async function loadFromFirebase() {
+
+      const snap = await fbGetDoc(DOC_REF);
+
+      if (snap.exists()) {
+
+        ITINERARY_DATA = snap.data().itinerary || {};
+
+      }
+
+      render();
+
+    }
+
+    /* ===============================
+
+       🔹 Firebase 儲存
+
+    =============================== */
+
+    async function saveToFirebase() {
+
+      await fbSetDoc(DOC_REF, {
+
+        itinerary: ITINERARY_DATA
+
+      });
+
+    }
+
+    /* ===============================
+
+       🔹 即時同步（跨裝置）
+
+    =============================== */
+
+    fbOnSnapshot(DOC_REF, (snap) => {
+
+      if (snap.exists()) {
+
+        ITINERARY_DATA = snap.data().itinerary || {};
+
+        render();
+
+      }
+
+    });
+
+    /* ===============================
+
+       🔹 新增行程
+
+    =============================== */
+
+    function addItem() {
+
+      const date = document.getElementById("dateInput").value;
+
+      const text = document.getElementById("textInput").value;
+
+      if (!date || !text) return;
+
+      if (!ITINERARY_DATA[date]) {
+
+        ITINERARY_DATA[date] = [];
+
+      }
+
+      ITINERARY_DATA[date].push(text);
+
+      document.getElementById("textInput").value = "";
+
+      saveToFirebase();
+
+      render();
+
+    }
+
+    /* ===============================
+
+       🔹 顯示畫面
+
+    =============================== */
+
+    function render() {
+
+      const list = document.getElementById("list");
+
+      list.innerHTML = "";
+
+      for (const date in ITINERARY_DATA) {
+
+        const h3 = document.createElement("h3");
+
+        h3.textContent = date;
+
+        list.appendChild(h3);
+
+        ITINERARY_DATA[date].forEach(item => {
+
+          const div = document.createElement("div");
+
+          div.className = "item";
+
+          div.textContent = "• " + item;
+
+          list.appendChild(div);
+
+        });
+
+      }
+
+    }
+
+    window.addEventListener("load", loadFromFirebase);
+</script>
+</body>
+</html>
+ 
