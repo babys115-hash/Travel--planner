@@ -345,7 +345,7 @@
   記帳 (EXPENSE) 相關函式
 =================================================== */
 // 放在您的程式碼頂部
-let EXPENSES_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase 賦值的 EXPENSES_DATA
+let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase 賦值的 EXPENSES_DATA
 
         // 選擇幣別
         window.selectCurrency = function(currency) {
@@ -511,7 +511,7 @@ let EXPENSES_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase 
             });
             
             // 篩選數據
-            const filteredExpenses = EXPENSE_DATA.filter(e => EXPENSE_FILTER === 'All' || e.category === EXPENSE_FILTER);
+            const filteredExpenses = EXPENSES_DATA.filter(e => EXPENSE_FILTER === 'All' || e.category === EXPENSE_FILTER);
 
             // 渲染支出列表
             if (filteredExpenses.length === 0) {
