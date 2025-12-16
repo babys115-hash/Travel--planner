@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>福岡熊本行程助手</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script type="module">
+        /* =========================
+          Firebase 初始化 (使用 ES Modules)
+        ========================= */
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+        import {
+            getFirestore,
+            collection,
+            doc,
+            setDoc, // 用於覆寫整個文件 (例如新增行程天數時)
+            addDoc, // 用於新增文件 (例如記帳和慾望清單)
+            updateDoc, // 用於更新現有文件 (例如修改行程內容)
+            deleteDoc,
+            onSnapshot,
+            query,
+            orderBy,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+        
+        // 🚨 請確認這是您的真實配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyBRjYjvwvCNTRHdI8vH8n3GPabzSnSDbvI",
+            authDomain: "jp-b0e03.firebaseapp.com",
+            projectId: "jp-b0e03",
+            storageBucket: "jp-b0e03.firebasestorage.app", // 建議加入
+            messagingSenderId: "689610031212", // 建議加入
+            appId: "1:689610031212:web:f63f2efe61d4ad562bd849", // 建議加入
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        /* =========================
+          全域變數與資料狀態
+        ========================= */
+        let ITINERARY_DATA = []; // 行程數據 (用於渲染)
+        let EXPENSES_DATA = []; // 記帳數據
+        let WISHLIST_DATA = []; // 慾望清單數據
+        let ACTIVE_DATE = ''; // 當前選中的日期 (行程頁籤)
+        let ACTIVE_CURRENCY = 'TWD';
+        let ACTIVE_PAYER = 'Josh';
+        let ACTIVE_CATEGORY = 'Food';
+        let ACTIVE_PAYMENT = 'Cash';
+        let EXPENSE_FILTER = 'All';
+        
+        // 匯率與預算 (靜態資料或未來可從 Firestore 載入)
+        const EXCHANGE_RATE_JPY_TWD = 0.215; 
+        const TOTAL_BUDGET_TWD = 50000;
+        
+        /* =========================
+          數據同步核心 (onSnapshot)
+        ========================= */
+        function startDataSync() {
+            // 1. 行程數據 (Itineraries) - 按日期排序
+            const itineraryQuery = query(collection(db, "itineraries"), orderBy("date", "asc"));
+            onSnapshot(itineraryQuery, (snapshot) => {
+                ITINERARY_DATA = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    // 確保 activities 是一個陣列，並按時間排序
+                    activities: Array.isArray(doc.data().activities) ? 
+                                doc.data().activities.sort((a, b) => a.time.localeCompare(b.time)) : []
+                }));
+
+                if (ITINERARY_DATA.length > 0) {
+                    if (!ACTIVE_DATE) {
+                        ACTIVE_DATE = ITINERARY_DATA[0].id; // 使用 id 作為日期鍵
+                    }
+                    window.generateDateTabs();
+                    window.renderItinerary();
+                    window.populateItineraryModalDates();
+                } else {
+                    document.getElementById('itinerary-container').innerHTML = '<p class="text-center text-gray-500 mt-8">請在 Firebase Console 中新增行程數據。</p>';
+                }
+            }, (error) => {
+                console.error("Error listening to itineraries: ", error);
+            });
+            
+            // 2. 記帳數據 (Expenses) - 按日期排序
+            const expenseQuery = query(collection(db, "expenses"), orderBy("date", "desc"), orderBy("timestamp", "desc"));
+            onSnapshot(expenseQuery, (snapshot) => {
+                EXPENSES_DATA = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                window.renderExpenseTracking(); // 數據更新時重新渲染記帳頁
+            }, (error) => {
+                console.error("Error listening to expenses: ", error);
+            });
+            
+            // 3. 慾望清單 (Wishlist) - 按購買狀態和時間排序
+            const wishlistQuery = query(collection(db, "wishlists"), orderBy("purchased", "asc"), orderBy("timestamp", "desc"));
+            onSnapshot(wishlistQuery, (snapshot) => {
+                WISHLIST_DATA = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                // 只有在 wishlist 頁籤被選中時才強制渲染，避免不必要的開銷
+                if (document.getElementById('wishlist-tab').classList.contains('hidden') === false) {
+                     window.renderWishlist(); 
+                }
+            }, (error) => {
+                console.error("Error listening to wishlists: ", error);
+            });
+            
+            // 渲染匯率 (靜態)
+            document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
+        }
+
+        /* ===================================================
+          行程 (ITINERARY) 相關函式
+        =================================================== */
+
+        // 渲染日期按鈕
+        window.generateDateTabs = function() {
+            const tabContainer = document.getElementById('date-buttons-container');
+            if (!tabContainer) return;
+            tabContainer.innerHTML = ''; 
+
+            ITINERARY_DATA.forEach((day, index) => {
+                const isActive = day.id === ACTIVE_DATE;
+                const button = document.createElement('button');
+                
+                // 確保使用 HTML 中定義的 CSS class
+                button.className = `tab-button ${isActive ? 'active' : ''}`;
+                button.innerHTML = `
+                    <div class="font-bold">Day ${index + 1}</div>
+                    <div class="text-xs">${day.date.substring(5)} (${day.day_of_week})</div>
+                `;
+                
+                button.onclick = () => {
+                    window.setActiveDate(day.id);
+                };
+                
+                tabContainer.appendChild(button);
+            });
+        }
+        
+        // 切換當前選中日期
+        window.setActiveDate = function(dateId) {
+            ACTIVE_DATE = dateId;
+            window.generateDateTabs(); 
+            window.renderItinerary();  
+        }
+
+        // 渲染行程內容
+        window.renderItinerary = function() {
+            const contentContainer = document.getElementById('itinerary-container'); 
+            if (!contentContainer) return;
+            contentContainer.innerHTML = ''; 
+
+            const currentDay = ITINERARY_DATA.find(day => day.id === ACTIVE_DATE);
+
+            if (!currentDay || !currentDay.activities || currentDay.activities.length === 0) {
+                contentContainer.innerHTML = `
+                    <h2 class="text-xl font-bold p-4 bg-gray-100 border-b border-gray-200">${currentDay ? currentDay.city : '無資料'} - ${currentDay ? currentDay.date : '無資料'}</h2>
+                    <p class="text-center text-gray-500 mt-8">本日無行程，點擊右下角新增。</p>`;
+                return;
+            }
+            
+            let html = `
+                <h2 class="text-xl font-bold p-4 bg-gray-100 border-b border-gray-200">${currentDay.city} - ${currentDay.date}</h2>
+                <div class="timeline-container p-4">
+            `;
+
+            currentDay.activities.forEach((activity, index) => {
+                const clickHandler = `window.openEditModal('${currentDay.id}', ${index})`;
+                
+                html += `
+                    <div class="flex items-start mb-6" onclick="${clickHandler}">
+                        <div class="w-1/4 text-sm font-semibold text-gray-600 pt-1">${activity.time}</div>
+                        <div class="w-3/4">
+                            <div class="timeline-item relative">
+                                <span class="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-custom-primary border-2 border-white"></span>
+                                <div class="font-bold text-gray-800">${activity.title}</div>
+                                <div class="text-sm text-gray-500">${activity.location || ''}</div>
+                                ${activity.notes ? `<div class="text-xs text-gray-700 mt-1 italic">${activity.notes}</div>` : ''}
+                                ${activity.link ? `<a href="${activity.link}" target="_blank" class="text-xs font-semibold mt-1 inline-block" onclick="event.stopPropagation();"><i class="fas fa-map-marker-alt"></i> 導航</a>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            contentContainer.innerHTML = html;
+        }
+        
+        // 填充新增行程 Modal 中的日期選項
+        window.populateItineraryModalDates = function() {
+            const select = document.getElementById('new-date');
+            if (!select) return;
+            select.innerHTML = ''; 
+            
+            ITINERARY_DATA.forEach(day => {
+                const option = document.createElement('option');
+                option.value = day.id;
+                option.textContent = `${day.date.substring(5)} (${day.day_of_week}) - ${day.city}`;
+                if (day.id === ACTIVE_DATE) {
+                    option.selected = true; 
+                }
+                select.appendChild(option);
+            });
+        }
+        
+        // 新增行程項目 (Add)
+        window.addItineraryItem = async function(event) {
+            event.preventDefault();
+            const dateId = document.getElementById('new-date').value;
+            const time = document.getElementById('new-time').value;
+            const title = document.getElementById('new-title').value;
+            const note = document.getElementById('new-note').value;
+            
+            if (!dateId || !time || !title) return;
+
+            const newActivity = {
+                time: time,
+                title: title,
+                location: note, // 假設備註/地點
+                notes: '', 
+                link: ''
+            };
+
+            try {
+                const dayDocRef = doc(db, 'itineraries', dateId);
+                const currentDay = ITINERARY_DATA.find(d => d.id === dateId);
+                
+                if (currentDay) {
+                     // 複製並加入新活動
+                    const updatedActivities = [...(currentDay.activities || []), newActivity];
+
+                    // 根據時間排序 (可選，但強烈建議)
+                    updatedActivities.sort((a, b) => a.time.localeCompare(b.time));
+                    
+                    await updateDoc(dayDocRef, {
+                        activities: updatedActivities
+                    });
+                } else {
+                    // 如果文件不存在，可以選擇創建一個新的日期文件 (這裡為了簡化，假設文件已存在)
+                    alert('找不到對應日期文件，請先在 Firestore 新增文件。');
+                    return;
+                }
+
+
+                window.closeModal('addItineraryModal');
+                document.getElementById('add-itinerary-form').reset(); 
+                alert('行程新增成功！');
+
+            } catch (e) {
+                console.error("Error adding itinerary item: ", e);
+                alert('新增行程失敗。');
+            }
+        }
+
+        // 開啟編輯 Modal
+        window.openEditModal = function(dateId, index) {
+            const currentDay = ITINERARY_DATA.find(day => day.id === dateId);
+            if (!currentDay || !currentDay.activities || !currentDay.activities[index]) return;
+
+            const activity = currentDay.activities[index];
+            const dayIndex = ITINERARY_DATA.indexOf(currentDay);
+
+            document.getElementById('edit-modal-date-info').textContent = `${currentDay.city} - ${currentDay.date} (Day ${dayIndex + 1})`;
+            
+            document.getElementById('edit-date-key').value = dateId;
+            document.getElementById('edit-item-index').value = index;
+            document.getElementById('edit-time').value = activity.time || '';
+            document.getElementById('edit-title').value = activity.title || '';
+            document.getElementById('edit-note').value = activity.location || activity.notes || ''; 
+
+            window.openModal('editItineraryModal');
+        }
+
+        // 儲存修改 (Update)
+        window.saveItineraryItem = async function(event) {
+            event.preventDefault();
+            const dateId = document.getElementById('edit-date-key').value;
+            const index = parseInt(document.getElementById('edit-item-index').value);
+            const time = document.getElementById('edit-time').value;
+            const title = document.getElementById('edit-title').value;
+            const note = document.getElementById('edit-note').value;
+
+            if (!dateId || index === undefined || !time || !title) return;
+
+            const currentDay = ITINERARY_DATA.find(day => day.id === dateId);
+            if (!currentDay) return;
+
+            const updatedActivities = [...currentDay.activities];
+            
+            updatedActivities[index] = {
+                ...updatedActivities[index], 
+                time: time,
+                title: title,
+                location: note, 
+                notes: '',
+            };
+            
+            updatedActivities.sort((a, b) => a.time.localeCompare(b.time));
+
+            try {
+                await updateDoc(doc(db, 'itineraries', dateId), {
+                    activities: updatedActivities
+                });
+                window.closeModal('editItineraryModal');
+                alert('行程修改成功！');
+            } catch (e) {
+                console.error("Error updating document: ", e);
+                alert('行程修改失敗。');
+            }
+        }
+        
+        // 刪除行程項目 (Delete)
+        window.deleteItineraryItem = async function(dateId, index) {
+            if (!confirm('您確定要刪除這個行程項目嗎？')) return;
+
+            const currentDay = ITINERARY_DATA.find(day => day.id === dateId);
+            if (!currentDay) return;
+
+            const updatedActivities = currentDay.activities.filter((_, i) => i !== index);
+
+            try {
+                await updateDoc(doc(db, 'itineraries', dateId), {
+                    activities: updatedActivities
+                });
+                window.closeModal('editItineraryModal');
+                alert('行程刪除成功！');
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+                alert('行程刪除失敗。');
+            }
+        }
+
+        /* ===================================================
+          記帳 (EXPENSE) 相關函式
+        =================================================== */
+/* ===================================================
+  記帳 (EXPENSE) 相關函式
+=================================================== */
+// 放在您的程式碼頂部
+let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase 賦值的 EXPENSES_DATA
+
+        // 選擇幣別
+        window.selectCurrency = function(currency) {
+            ACTIVE_CURRENCY = currency;
+            document.querySelectorAll('#currency-select .block-select-btn').forEach(btn => {
+                btn.classList.remove('active-currency');
+                if (btn.getAttribute('data-currency') === currency) {
+                    btn.classList.add('active-currency');
+                }
+            });
+            document.getElementById('expense-currency').value = currency;
+        }
+
+        // 選擇付款人
+        window.selectPayer = function(payer) {
+            ACTIVE_PAYER = payer;
+            document.querySelectorAll('#payer-select .block-select-btn').forEach(btn => {
+                btn.classList.remove('active-payer');
+                if (btn.getAttribute('data-payer') === payer) {
+                    btn.classList.add('active-payer');
+                }
+            });
+            document.getElementById('expense-payer').value = payer;
+        }
+        
+        // 選擇類別 (新增支出)
+        window.selectCategory = function(category) {
+            ACTIVE_CATEGORY = category;
+            document.querySelectorAll('#category-select .block-select-btn').forEach(btn => {
+                btn.classList.remove('active-category');
+                if (btn.getAttribute('data-category') === category) {
+                    btn.classList.add('active-category');
+                }
+            });
+            document.getElementById('expense-category').value = category;
+        }
+        
+        // 選擇支付方式
+        window.selectPayment = function(payment) {
+            ACTIVE_PAYMENT = payment;
+            document.querySelectorAll('#payment-select .block-select-btn').forEach(btn => {
+                btn.classList.remove('active-payment');
+                if (btn.getAttribute('data-payment') === payment) {
+                    btn.classList.add('active-payment');
+                }
+            });
+            document.getElementById('expense-payment').value = payment;
+        }
+
+        // 選擇類別 (篩選清單)
+        window.filterExpenses = function(category) {
+            EXPENSE_FILTER = category;
+            window.renderExpenseTracking(); // 重新渲染列表
+        }
+
+        // 新增支出 (Add Expense)
+        window.addExpense = async function() {
+            const date = document.getElementById('expense-date').value;
+            const amount = parseFloat(document.getElementById('expense-amount').value);
+            const description = document.getElementById('expense-description').value;
+
+            if (!date || isNaN(amount) || amount <= 0 || !description) {
+                alert('請檢查日期、金額和用途是否正確填寫！');
+                return;
+            }
+
+            const newExpense = {
+                date: date,
+                amount: amount,
+                currency: ACTIVE_CURRENCY,
+                payer: ACTIVE_PAYER,
+                category: ACTIVE_CATEGORY,
+                payment: ACTIVE_PAYMENT,
+                description: description,
+                timestamp: serverTimestamp() // 使用 Firestore 服務器時間戳
+            };
+
+            try {
+                await addDoc(collection(db, "expenses"), newExpense);
+                alert('支出紀錄新增成功！');
+                document.getElementById('expense-amount').value = '';
+                document.getElementById('expense-description').value = '';
+            } catch (e) {
+                console.error("Error adding expense: ", e);
+                alert('新增支出紀錄失敗。');
+            }
+        }
+        
+        // 刪除支出
+        window.deleteExpense = async function(id) {
+            if (!confirm('確定要刪除這筆支出嗎？')) return;
+            try {
+                await deleteDoc(doc(db, "expenses", id));
+                alert('支出紀錄已刪除。');
+            } catch (e) {
+                console.error("Error deleting expense: ", e);
+                alert('刪除失敗。');
+            }
+        }
+
+        // 計算並更新結算摘要
+        window.updateSettlementSummary = function() {
+            let joshPaidTWD = 0;
+            let candicePaidTWD = 0;
+            
+            EXPENSES_DATA.forEach(expense => {
+                let amountTWD = expense.amount;
+                if (expense.currency === 'JPY') {
+                    amountTWD = expense.amount * EXCHANGE_RATE_JPY_TWD;
+                }
+                
+                if (expense.payer === 'Josh') {
+                    joshPaidTWD += amountTWD;
+                } else if (expense.payer === 'Candice') {
+                    candicePaidTWD += amountTWD;
+                }
+            });
+
+            // 總支出與預算
+            const totalSpentTWD = joshPaidTWD + candicePaidTWD;
+            const remainingBudget = TOTAL_BUDGET_TWD - totalSpentTWD;
+
+            document.getElementById('total-budget').textContent = TOTAL_BUDGET_TWD.toLocaleString();
+            document.getElementById('total-spent').textContent = Math.round(totalSpentTWD).toLocaleString();
+            document.getElementById('remaining-budget').textContent = Math.round(remainingBudget).toLocaleString();
+            
+            // 結算結果
+            document.getElementById('josh-paid').textContent = Math.round(joshPaidTWD).toLocaleString();
+            document.getElementById('candice-paid').textContent = Math.round(candicePaidTWD).toLocaleString();
+
+            const diff = joshPaidTWD - candicePaidTWD;
+            const halfDiff = Math.abs(diff) / 2;
+            const settlementElement = document.getElementById('settlement-result');
+
+            if (Math.abs(diff) < 1) { // 忽略微小差異
+                settlementElement.textContent = "無需結算。";
+                settlementElement.classList.remove('text-red-600', 'text-green-600');
+                settlementElement.classList.add('text-gray-900');
+            } else if (diff > 0) {
+                settlementElement.textContent = `Candice 需支付 Josh $ ${Math.round(halfDiff).toLocaleString()} TWD`;
+                settlementElement.classList.add('text-red-600');
+            } else {
+                settlementElement.textContent = `Josh 需支付 Candice $ ${Math.round(halfDiff).toLocaleString()} TWD`;
+                settlementElement.classList.add('text-green-600');
+            }
+        }
+        
+        // 渲染記帳清單
+        window.renderExpenseTracking = function() {
+            const expenseList = document.getElementById('expense-list');
+            const categories = [...new Set(EXPENSES_DATA.map(e => e.category)), 'All']; // 找出所有類別
+            
+            // 渲染篩選按鈕
+            const filterContainer = document.getElementById('category-filter-buttons');
+            filterContainer.innerHTML = '';
+            categories.forEach(cat => {
+                const isActive = cat === EXPENSE_FILTER;
+                 filterContainer.innerHTML += `
+                    <button type="button" class="block-select-btn px-2 py-1 text-xs ${isActive ? 'active-filter' : ''}" onclick="window.filterExpenses('${cat}')">
+                        ${cat}
+                    </button>
+                `;
+            });
+            
+            // 篩選數據
+            const filteredExpenses = EXPENSES_DATA.filter(e => EXPENSE_FILTER === 'All' || e.category === EXPENSE_FILTER);
+
+            // 渲染支出列表
+            if (filteredExpenses.length === 0) {
+                expenseList.innerHTML = '<p class="text-center text-gray-500 text-sm">尚無符合篩選條件的支出紀錄</p>';
+            } else {
+                expenseList.innerHTML = filteredExpenses.map(expense => {
+                    const amountTWD = expense.currency === 'JPY' 
+                        ? (expense.amount * EXCHANGE_RATE_JPY_TWD).toFixed(0) 
+                        : expense.amount.toFixed(0);
+                        
+                    const iconMap = {
+                        Food: 'fa-utensils',
+                        Transport: 'fa-train-subway',
+                        Accommodation: 'fa-hotel',
+                        Shopping: 'fa-bag-shopping',
+                        Other: 'fa-ellipsis'
+                    };
+                    const categoryIcon = iconMap[expense.category] || 'fa-ellipsis';
+                    
+                    return `
+                        <div class="p-3 border-b border-gray-100 flex justify-between items-center hover:bg-gray-50 transition duration-150">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-custom-secondary/20 flex items-center justify-center mr-3 text-custom-secondary">
+                                    <i class="fa-solid ${categoryIcon}"></i>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-gray-800">${expense.description}</p>
+                                    <p class="text-xs text-gray-500">${expense.date} (${expense.payer} / ${expense.payment})</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold text-red-600">${expense.currency} ${expense.amount.toLocaleString()}</p>
+                                <p class="text-xs text-gray-600">約 $ ${amountTWD.toLocaleString()} TWD</p>
+                                <button onclick="window.deleteExpense('${expense.id}')" class="text-red-400 hover:text-red-600 text-xs mt-1">
+                                    <i class="fa-solid fa-trash-can"></i> 刪除
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            window.updateSettlementSummary();
+        }
+
+        /* ===================================================
+          慾望清單 (WISHLIST) 相關函式
+        =================================================== */
+        
+        // 新增慾望清單項目 (Add)
+        window.addWishlistItem = async function(event) {
+            event.preventDefault();
+            const name = document.getElementById('wishlist-name').value;
+            const price = parseFloat(document.getElementById('wishlist-price').value);
+            const category = document.getElementById('wishlist-category').value;
+            
+            if (!name || isNaN(price) || price <= 0 || !category) {
+                alert('請填寫完整項目名稱、價格和分類！');
+                return;
+            }
+
+            const newItem = {
+                name: name,
+                price: price,
+                category: category,
+                purchased: false, // 預設為未購買
+                timestamp: serverTimestamp()
+            };
+
+            try {
+                await addDoc(collection(db, "wishlists"), newItem);
+                alert('慾望清單新增成功！');
+                document.getElementById('wishlist-form').reset();
+            } catch (e) {
+                console.error("Error adding wishlist item: ", e);
+                alert('新增慾望清單失敗。');
+            }
+        }
+        
+        // 切換購買狀態 (Update)
+        window.toggleWishlistStatus = async function(id, currentStatus) {
+            try {
+                const docRef = doc(db, "wishlists", id);
+                await updateDoc(docRef, {
+                    purchased: !currentStatus
+                });
+            } catch (e) {
+                console.error("Error updating wishlist status: ", e);
+                alert('更新狀態失敗。');
+            }
+        }
+        
+        // 刪除慾望清單項目
+        window.deleteWishlistItem = async function(id) {
+            if (!confirm('確定要刪除這筆慾望清單嗎？')) return;
+            try {
+                await deleteDoc(doc(db, "wishlists", id));
+            } catch (e) {
+                console.error("Error deleting wishlist item: ", e);
+                alert('刪除失敗。');
+            }
+        }
+
+        // 渲染慾望清單
+        window.renderWishlist = function() {
+            const wishlistList = document.getElementById('wishlist-list');
+            if (!wishlistList) return;
+            
+            if (WISHLIST_DATA.length === 0) {
+                wishlistList.innerHTML = '<p class="text-center text-gray-500 text-sm">尚無待購項目</p>';
+                return;
+            }
+
+            wishlistList.innerHTML = WISHLIST_DATA.map(item => {
+                const statusClass = item.purchased ? 'purchased' : 'pending';
+                const statusText = item.purchased ? '✅ 已購' : '❌ 未購';
+                
+                return `
+                    <div class="p-3 border-b border-gray-100 flex justify-between items-center">
+                        <div>
+                            <p class="font-semibold text-gray-800">${item.name}</p>
+                            <p class="text-sm text-gray-500">${item.category}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-custom-primary">¥ ${item.price.toLocaleString()}</p>
+                            <div class="flex items-center mt-1 space-x-2">
+                                <button class="wishlist-status-btn ${statusClass}" 
+                                        onclick="window.toggleWishlistStatus('${item.id}', ${item.purchased})">
+                                    ${statusText}
+                                </button>
+                                <button onclick="window.deleteWishlistItem('${item.id}')" class="text-red-400 hover:text-red-600 text-xs">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        /* ===================================================
+          通用函式 (Modal, Navigation, Initialization)
+        =================================================== */
+
+        // 開啟 Modal
+        window.openModal = function(id) {
+            document.getElementById(id).style.display = 'flex';
+        }
+
+        // 關閉 Modal
+        window.closeModal = function(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+        
+        // 渲染總覽天氣 (保持靜態，因為天氣查詢可能需要額外的 API key)
+        window.renderOverviewWeather = function() {
+            // 這個函式保持靜態渲染，可以讓用戶自行填充每日天氣
+        }
+        
+        // 渲染每日天氣 (目前為空，可自行實作)
+        window.renderWeather = function() {
+            const weatherContent = document.getElementById('weather-content');
+            weatherContent.innerHTML = '<p class="text-center text-gray-500 mt-8">每日詳細天氣功能待實作 (需串接第三方天氣 API)。</p>';
+        }
+
+        // 主要導航函式
+        window.switchMainNav = function(targetId) {
+            document.querySelectorAll('.main-tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+
+            document.getElementById(targetId).classList.remove('hidden');
+
+            document.querySelectorAll('.bottom-nav-button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-target') === targetId) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // 處理初次切換時的渲染
+            if (targetId === 'expense-tab') {
+                window.renderExpenseTracking();
+            } else if (targetId === 'wishlist-tab') {
+                window.renderWishlist();
+            } else if (targetId === 'weather-tab') {
+                window.renderWeather();
+            }
+        }
+
+
+        // 網頁載入完成後啟動
+        document.addEventListener('DOMContentLoaded', () => {
+            // 設定今天的日期為新增支出的預設日期
+            const today = new Date().toISOString().split('T')[0];
+            const expenseDateInput = document.getElementById('expense-date');
+            if (expenseDateInput) {
+                 expenseDateInput.value = today;
+            }
+            
+            window.renderOverviewWeather(); // 渲染靜態天氣總覽
+            window.switchMainNav('itinerary-tab'); // 確保初始顯示行程頁籤
+            startDataSync(); // 啟動 Firebase 數據同步
+        });
+        
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script> 
+
+    <style>
+        /* 自訂顏色主題 (清新/現代感配色) */
+        .bg-custom-primary { background-color: #4A90E2; } /* 主色：深天空藍 */
+        .text-custom-primary { color: #4A90E2; }
+        .bg-custom-secondary { background-color: #F5A623; } /* 副色：暖金橘 */
+        .text-custom-secondary { color: #F5A623; }
+        
+        /* 行程頁籤的日期按鈕樣式 */
+        .tab-button {
+    /* 確保按鈕不會因為 Flex 而放大 */
+    flex-shrink: 0; 
+    /* 調整 padding 和字體大小 */
+    padding: 0.3rem 0.6rem; 
+    font-size: 0.8rem; /* 整體字體縮小 */
+    line-height: 1.2;
+    text-align: center;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    background-color: #f7f7f7;
+    transition: background-color 0.2s, color 0.2s;
+    border: 1px solid #e0e0e0;
+}
+
+/* Day 1 和日期的字體大小也在 generateDateTabs 函式中控制 */
+/* <div class="font-bold">Day ${index + 1}</div>  <-- 保持這個大小
+    <div class="text-xs">${day.date.substring(5)} (${day.day_of_week})</div> <-- 保持這個大小
+*/
+        /* 行程時間軸樣式 */
+        .timeline-item {
+            border-left: 2px solid #4A90E2; /* 使用新的主色 */
+            padding-left: 1rem;
+            cursor: pointer; /* **新增：讓使用者知道可以點擊** */
+            transition: background-color 0.2s;
+        }
+        .timeline-item:hover {
+            background-color: #f0f8ff; /* 點擊時有淺色提示 */
+        }
+        .timeline-container > div:last-child .timeline-item {
+            border-left: none; /* 移除最後一個項目的左邊線 */
+        }
+        .timeline-item a {
+            color: #F5A623; /* 使用新的副色 */
+            text-decoration: underline;
+        }
+        
+        /* 底部導航欄樣式 */
+        .bottom-nav-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 0;
+            cursor: pointer;
+            transition: color 0.2s ease;
+            color: #4b5563; 
+        }
+        .bottom-nav-button.active {
+            color: #4A90E2; /* 使用新的主色 */
+        }
+        
+        /* 確保底部內容不會被固定導航欄遮擋 */
+        body {
+            padding-bottom: 70px; 
+        }
+
+        /* 記帳頁面的區塊點選按鈕樣式 */
+        .block-select-btn {
+            padding: 0.5rem;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap; 
+        }
+        /* 幣別、類別、篩選 使用副色 (暖金橘) */
+        .block-select-btn.active-currency,
+        .block-select-btn.active-category,
+        .block-select-btn.active-filter {
+            background-color: #F5A623;
+            color: white;
+            border-color: #F5A623;
+        }
+        /* 付款人、支付方式 使用主色 (天空藍) */
+        .block-select-btn.active-payer,
+        .block-select-btn.active-payment {
+            background-color: #4A90E2;
+            color: white;
+            border-color: #4A90E2;
+        }
+        
+        /* 慾望清單的已購/未購按鈕樣式 */
+        .wishlist-status-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .wishlist-status-btn.pending {
+            background-color: #fca5a5; /* 淺紅 */
+            color: #7f1d1d; /* 深紅文字 */
+        }
+        .wishlist-status-btn.purchased {
+            background-color: #a7f3d0; /* 淺綠 */
+            color: #065f46; /* 深綠文字 */
+        }
+
+        /* Modal 樣式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none; /* 預設隱藏 */
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            max-width: 90%;
+            width: 400px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        /* 行程日期按鈕的容器樣式 (配合圖片) */
+        #itinerary-overview-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+        }
+        #itinerary-overview-buttons .tab-button {
+            border-radius: 9999px; /* 圓角膠囊形 */
+            background-color: #E8F3FF; /* 淺藍白背景 */
+            color: #4A90E2; /* 藍色文字 */
+            padding: 0.4rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s, color 0.2s;
+            border-bottom: none !important; /* 移除原本的底線 */
+        }
+        #itinerary-overview-buttons .tab-button.active {
+            background-color: #4A90E2; /* 主色 */
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <header class="bg-custom-primary text-white shadow-md p-4 sticky top-0 z-20">
+        <h1 class="text-2xl font-bold text-center">Josh&Candice北九州聖誕跨年之旅 (12/26 - 12/31)</h1>
+    </header>
+
+    <div id="main-content" class="p-4 max-w-md mx-auto">
+        
+        <div id="itinerary-tab" class="main-tab-content">
+            
+            <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fa-solid fa-cloud-sun text-custom-primary mr-2"></i> 行程天氣總覽 (tenki.jp)
+                </h2>
+
+                <div class="flex justify-around items-stretch mb-4 space-x-2">
+                    <div class="flex-1 text-center p-3 border rounded-lg bg-gray-50 shadow-sm">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">福岡 (26日)</p>
+                        <i id="weather-icon-fukuoka" class="fa-solid fa-cloud-sun-rain text-3xl text-custom-primary mb-1"></i>
+                        <p id="weather-temp-fukuoka" class="text-lg font-bold text-gray-800">8°C / 13°C</p>
+                        <p id="weather-rain-fukuoka" class="text-xs text-red-500 mt-1">降雨率: 20%</p>
+                    </div>
+
+                    <div class="flex-1 text-center p-3 border rounded-lg bg-gray-50 shadow-sm">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">長崎 (27-28日)</p>
+                        <i id="weather-icon-nagasaki" class="fa-solid fa-sun text-3xl text-custom-secondary mb-1"></i> 
+                        <p id="weather-temp-nagasaki" class="text-lg font-bold text-gray-800">5°C / 10°C</p>
+                        <p id="weather-rain-nagasaki" class="text-xs text-gray-500 mt-1">降雨率: 0%</p>
+                    </div>
+
+                    <div class="flex-1 text-center p-3 border rounded-lg bg-gray-50 shadow-sm">
+                        <p class="text-sm font-semibold text-gray-700 mb-1">熊本 (29-31日)</p>
+                        <i id="weather-icon-kumamoto" class="fa-solid fa-cloud-showers-heavy text-3xl text-custom-primary mb-1"></i>
+                        <p id="weather-temp-kumamoto" class="text-lg font-bold text-gray-800">3°C / 9°C</p>
+                        <p id="weather-rain-kumamoto" class="text-xs text-red-500 mt-1">降雨率: 40%</p>
+                    </div>
+                </div>
+
+                <a href="https://www.tenki.jp/" target="_blank" class="w-full block text-center bg-gray-200 text-gray-700 p-2 rounded-lg font-semibold hover:bg-gray-300 transition duration-200">
+                    點擊查看 tenki.jp 詳細預報
+                </a>
+            </div>
+            
+            <div id="itinerary-overview-buttons" class="bg-white p-4 rounded-lg shadow-md sticky top-[72px] z-10">
+                <h3 class="font-bold text-gray-800 mb-2">📅 行程總覽</h3>
+                <div id="date-buttons-container" class="p-2 flex gap-1 overflow-x-auto whitespace-nowrap border-b border-gray-200">
+    </div>
+            </div>
+
+            <div id="itinerary-container" class="bg-white p-4 rounded-lg shadow-md mt-4 min-h-[300px]">
+                <p class="text-center text-gray-500">正在載入行程數據...</p>
+            </div>
+            
+            <button onclick="window.openModal('addItineraryModal')" class="fixed right-4 bottom-20 bg-custom-primary text-white p-4 rounded-full shadow-lg hover:bg-[#3A7AD0] transition z-20">
+                <i class="fa-solid fa-circle-plus text-2xl"></i>
+            </button>
+            
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg shadow-inner">
+                <h3 class="text-lg font-bold text-custom-secondary mb-2">💡 備註：</h3>
+                <p class="text-sm text-gray-600">行程點擊後即可進行修改或刪除。飯店名稱已加上 <a href="#" onclick="return false;" class="text-custom-secondary underline">Google Maps 連結</a>。</p>
+            </div>
+        </div>
+        
+
+        <div id="expense-tab" class="main-tab-content hidden">
+            <div id="expense-tracking-container" class="bg-white p-4 rounded-lg shadow-md mt-4">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
+                    <i class="fa-solid fa-calculator text-[#F5A623] mr-2"></i> 💸 旅費記帳中心
+                </h3>
+        
+                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p class="text-sm font-semibold text-blue-700">即時匯率 (JPY/TWD)：<span id="exchange-rate-display">--</span></p>
+                </div>
+        
+                <div class="p-4 bg-gray-50 rounded-lg mb-4 shadow-inner">
+                    <h4 class="font-semibold mb-3 text-custom-primary">新增支出</h4>
+                    
+                    <input type="date" id="expense-date" class="w-full p-2 border rounded-lg mb-3 text-sm">
+                    
+                    <input type="number" id="expense-amount" placeholder="金額" class="w-full p-2 border rounded-lg mb-3 text-sm" min="0">
+                    
+                    <h5 class="text-sm font-semibold mb-2">付款幣別:</h5>
+                    <div id="currency-select" class="flex space-x-2 mb-3">
+                        <button type="button" class="block-select-btn flex-1 active-currency" data-currency="TWD" onclick="window.selectCurrency('TWD')">
+                            <i class="fa-solid fa-money-bill-wave mr-1"></i> 台幣 (TWD)
+                        </button>
+                        <button type="button" class="block-select-btn flex-1" data-currency="JPY" onclick="window.selectCurrency('JPY')">
+                            <i class="fa-solid fa-yen-sign mr-1"></i> 日圓 (JPY)
+                        </button>
+                        <input type="hidden" id="expense-currency" value="TWD">
+                    </div>
+                    
+                    <h5 class="text-sm font-semibold mb-2">付款人:</h5>
+                    <div id="payer-select" class="flex space-x-2 mb-3">
+                        <button type="button" class="block-select-btn flex-1 active-payer" data-payer="Josh" onclick="window.selectPayer('Josh')">
+                            <i class="fa-solid fa-person-military-pointing mr-1"></i> Josh
+                        </button>
+                        <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="window.selectPayer('Candice')">
+                            <i class="fa-solid fa-person-dress mr-1"></i> Candice
+                        </button>
+                        <input type="hidden" id="expense-payer" value="Josh">
+                    </div>
+
+                    <h5 class="text-sm font-semibold mb-2">支出類別:</h5>
+                    <div id="category-select" class="flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs active-category" data-category="Food" onclick="window.selectCategory('Food')">
+                            <i class="fa-solid fa-utensils mr-1"></i> 餐飲
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Transport" onclick="window.selectCategory('Transport')">
+                            <i class="fa-solid fa-train-subway mr-1"></i> 交通
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Accommodation" onclick="window.selectCategory('Accommodation')">
+                            <i class="fa-solid fa-hotel mr-1"></i> 住宿
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Shopping" onclick="window.selectCategory('Shopping')">
+                            <i class="fa-solid fa-bag-shopping mr-1"></i> 購物
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Other" onclick="window.selectCategory('Other')">
+                            <i class="fa-solid fa-ellipsis mr-1"></i> 其他
+                        </button>
+                        <input type="hidden" id="expense-category" value="Food"> 
+                    </div>
+                    
+                    <h5 class="text-sm font-semibold mb-2">支付方式:</h5>
+                    <div id="payment-select" class="flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs active-payment" data-payment="Cash" onclick="window.selectPayment('Cash')">
+                            <i class="fa-solid fa-money-bill-1-wave mr-1"></i> 現金
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-payment="CreditCard" onclick="window.selectPayment('CreditCard')">
+                            <i class="fa-solid fa-credit-card mr-1"></i> 信用卡
+                        </button>
+                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-payment="PayPay" onclick="window.selectPayment('PayPay')">
+                            <i class="fa-solid fa-mobile-screen mr-1"></i> PayPay
+                        </button>
+                        <input type="hidden" id="expense-payment" value="Cash"> 
+                    </div>
+
+                    <input type="text" id="expense-description" placeholder="用途/說明" class="w-full p-2 border rounded-lg mb-3 text-sm">
+                    
+                    <button onclick="window.addExpense()" class="w-full bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#db8f1f]">
+                        <i class="fa-solid fa-circle-plus mr-1"></i> 確認新增
+                    </button>
+                </div>
+        
+                <div id="expense-summary" class="mb-4 p-4 bg-custom-primary text-white rounded-lg shadow-md">
+                    <h4 class="font-semibold mb-2">總支出概況</h4>
+                    <p class="text-sm">總預算 (TWD): $ <span id="total-budget">50,000</span></p>
+                    <p class="text-sm">累積總支出 (TWD): $ <span id="total-spent">0</span></p>
+                    <p class="text-lg font-bold mt-2">剩餘預算: $ <span id="remaining-budget">50,000</span></p>
+                </div>
+                
+                <div id="settlement-summary" class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg shadow-md">
+                    <h4 class="font-semibold mb-2 text-gray-800 flex items-center"><i class="fa-solid fa-handshake-angle mr-2 text-yellow-600"></i> 分攤結算概況 (TWD)</h4>
+                    <p class="text-sm text-gray-700">Josh 已支付: $ <span id="josh-paid">0</span></p>
+                    <p class="text-sm text-gray-700 mb-2">Candice 已支付: $ <span id="candice-paid">0</span></p>
+                    <p class="text-md font-bold text-gray-900 border-t pt-2 mt-2">
+                        <span id="settlement-result">無需結算。</span>
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="font-semibold mb-2 text-gray-700 flex items-center"><i class="fa-solid fa-filter mr-2"></i> 依類別篩選清單:</h4>
+                    <div id="category-filter-buttons" class="flex flex-wrap gap-2 text-sm">
+                        </div>
+                </div>
+        
+                <h4 class="font-semibold mb-3 text-gray-700 border-b pb-2">支出明細</h4>
+                <div id="expense-list" class="space-y-2">
+                    <p class="text-center text-gray-500 text-sm">尚無支出紀錄</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="weather-tab" class="main-tab-content hidden">
+            <div id="weather-container" class="bg-white p-4 rounded-lg shadow-md mt-4">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
+                    <i class="fa-solid fa-temperature-three-quarters text-[#4A90E2] mr-2"></i> ❄️ 每日天氣預報 (tenki.jp 歷史數據)
+                </h3>
+                <div id="weather-content" class="space-y-4">
+                    <p class="text-center text-gray-500">正在載入天氣資訊...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="wishlist-tab" class="main-tab-content hidden">
+             <div class="bg-white p-4 rounded-lg shadow-md mt-4">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
+                    <i class="fa-solid fa-heart text-[#F5A623] mr-2"></i> ✨ 慾望清單
+                </h3>
+                
+                <div class="p-4 bg-gray-50 rounded-lg mb-4 shadow-inner">
+                    <h4 class="font-semibold mb-3 text-custom-primary">新增購買目標</h4>
+                    <form id="wishlist-form" onsubmit="window.addWishlistItem(event)">
+                        
+                        <label for="wishlist-category" class="text-sm font-semibold text-gray-700 mb-1 block">項目分類:</label>
+                        <select id="wishlist-category" name="wishlist-category" class="w-full p-2 border rounded-lg mb-3 text-sm bg-white" required>
+                            <option value="" disabled selected>-- 請選擇分類 --</option>
+                            <option value="3C">3C</option>
+                            <option value="Beauty">美妝</option>
+                            <option value="Daily">日用品</option>
+                            <option value="Toy">玩具</option>
+                            <option value="Clothes">衣物</option>
+                            <option value="Souvenir">伴手禮/食物</option>
+                            <option value="Other">其他</option>
+                        </select>
+                        
+                        <label for="wishlist-name" class="text-sm font-semibold text-gray-700 mb-1 block">項目名稱/描述:</label>
+                        <input type="text" id="wishlist-name" name="wishlist-name" placeholder="例如：Dyson 吹風機" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+
+                        <label for="wishlist-price" class="text-sm font-semibold text-gray-700 mb-1 block">預計價格 (JPY):</label>
+                        <input type="number" id="wishlist-price" name="wishlist-price" placeholder="請輸入預計價格 (日圓)" min="0" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+                        
+                        <button type="submit" class="w-full bg-custom-primary text-white p-2 rounded-lg font-bold hover:bg-[#3A7AD0]">
+                            <i class="fa-solid fa-cart-plus mr-1"></i> 加入清單
+                        </button>
+                    </form>
+                </div>
+                
+                <h4 class="font-semibold mb-3 text-gray-700 border-b pb-2">待購清單</h4>
+                <div id="wishlist-list" class="space-y-3">
+                    <p class="text-center text-gray-500 text-sm">尚無待購項目</p>
+                </div>
+
+             </div>
+        </div>
+        
+    </div>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-xl z-30">
+        <div class="flex justify-around max-w-md mx-auto">
+            
+            <button class="bottom-nav-button active" data-target="itinerary-tab" onclick="window.switchMainNav('itinerary-tab')">
+                <i class="fa-solid fa-map-location-dot text-2xl mb-1"></i>
+                <span class="text-xs">行程</span>
+            </button>
+
+            <button class="bottom-nav-button" data-target="expense-tab" onclick="window.switchMainNav('expense-tab')">
+                <i class="fa-solid fa-calculator text-2xl mb-1"></i>
+                <span class="text-xs">記帳</span>
+            </button>
+            
+            <button class="bottom-nav-button" data-target="weather-tab" onclick="window.switchMainNav('weather-tab')">
+                <i class="fa-solid fa-cloud-sun-rain text-2xl mb-1"></i>
+                <span class="text-xs">天氣</span>
+            </button>
+            
+            <button class="bottom-nav-button" data-target="wishlist-tab" onclick="window.switchMainNav('wishlist-tab')">
+                <i class="fa-solid fa-heart text-2xl mb-1"></i>
+                <span class="text-xs">慾望清單</span>
+            </button>
+
+        </div>
+    </nav>
+    
+    <div id="addItineraryModal" class="modal-overlay">
+        <div class="modal-content">
+            
+            <div class="text-center mb-4">
+                <div class="text-custom-primary font-bold text-lg mb-2 flex items-center justify-center">
+                    <i class="fa-solid fa-circle-plus mr-2"></i> 新增行程項目
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 border-b pb-2">新增行程細節</h3>
+            </div>
+            <button onclick="window.closeModal('addItineraryModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+            
+            <form id="add-itinerary-form" onsubmit="window.addItineraryItem(event)">
+                
+                <label for="new-date" class="text-sm font-semibold text-gray-700 mb-1 block">選擇日期:</label>
+                <select id="new-date" class="w-full p-2 border rounded-lg mb-3 text-sm bg-white" required>
+                    </select>
+                
+                <label for="new-time" class="text-sm font-semibold text-gray-700 mb-1 block">時間:</label>
+                <div class="flex items-center mb-3">
+                    <input type="text" id="new-time" placeholder="--:--" pattern="[0-2][0-9]:[0-5][0-9]" class="flex-1 p-2 border rounded-lg text-sm mr-2" required>
+                    <i class="fa-solid fa-clock text-gray-500"></i>
+                </div>
+                
+                <label for="new-title" class="text-sm font-semibold text-gray-700 mb-1 block">行程標題:</label>
+                <input type="text" id="new-title" placeholder="行程標題 (如: 晚餐)" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+                
+                <label for="new-note" class="text-sm font-semibold text-gray-700 mb-1 block">備註/地點:</label>
+                <textarea id="new-note" rows="2" placeholder="備註 (如: 阿蘇赤牛丼/飯店)" class="w-full p-2 border rounded-lg mb-4 text-sm"></textarea>
+                
+                <button type="submit" class="w-full bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#db8f1f]">
+                    確認新增
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="editItineraryModal" class="modal-overlay">
+        <div class="modal-content">
+            
+            <div class="text-center mb-4">
+                <div class="text-custom-secondary font-bold text-lg mb-2 flex items-center justify-center">
+                    <i class="fa-solid fa-pen-to-square mr-2"></i> 修改行程項目
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 border-b pb-2" id="edit-modal-date-info"></h3>
+            </div>
+            <button onclick="window.closeModal('editItineraryModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+            
+            <form id="edit-itinerary-form" onsubmit="window.saveItineraryItem(event)">
+                <input type="hidden" id="edit-date-key" name="dateKey">
+                <input type="hidden" id="edit-item-index" name="itemIndex">
+
+                <label for="edit-time" class="text-sm font-semibold text-gray-700 mb-1 block">時間:</label>
+                <div class="flex items-center mb-3">
+                    <input type="text" id="edit-time" placeholder="--:--" pattern="[0-2][0-9]:[0-5][0-9]" class="flex-1 p-2 border rounded-lg text-sm mr-2" required>
+                    <i class="fa-solid fa-clock text-gray-500"></i>
+                </div>
+                
+                <label for="edit-title" class="text-sm font-semibold text-gray-700 mb-1 block">行程標題:</label>
+                <input type="text" id="edit-title" placeholder="行程標題 (如: 晚餐)" class="w-full p-2 border rounded-lg mb-3 text-sm" required>
+                
+                <label for="edit-note" class="text-sm font-semibold text-gray-700 mb-1 block">備註/地點:</label>
+                <textarea id="edit-note" rows="2" placeholder="備註 (如: 阿蘇赤牛丼/飯店)" class="w-full p-2 border rounded-lg mb-4 text-sm"></textarea>
+                
+                <div class="flex space-x-2">
+                    <button type="button" onclick="window.deleteItineraryItem(document.getElementById('edit-date-key').value, parseInt(document.getElementById('edit-item-index').value))" class="flex-1 bg-red-500 text-white p-2 rounded-lg font-bold hover:bg-red-600">
+                        <i class="fa-solid fa-trash-can mr-1"></i> 刪除
+                    </button>
+                    <button type="submit" class="flex-1 bg-custom-primary text-white p-2 rounded-lg font-bold hover:bg-[#3A7AD0]">
+                        <i class="fa-solid fa-save mr-1"></i> 儲存修改
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
