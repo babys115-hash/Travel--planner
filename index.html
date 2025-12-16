@@ -370,41 +370,7 @@
 
             currentDay.activities.forEach((activity, index) => {
                 const clickHandler = `window.openEditModal('${currentDay.id}', ${index})`;
-                <div class="bg-white p-4 rounded-3xl shadow-lg mb-6 border-2 border-pink-100">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fa-solid fa-cloud-sun-rain text-custom-primary mr-2"></i> 行程天氣總覽 (tenki.jp)
-                </h2>
-
-                <div class="flex justify-around items-stretch mb-4 space-x-2 flex-wrap sm:flex-nowrap">
-                    <!-- 福岡 -->
-                    <div class="flex-1 min-w-[100px] text-center p-3 border border-pink-200 rounded-2xl bg-pink-50 shadow-sm mb-3 sm:mb-0">
-                        <p class="text-sm font-semibold text-gray-700 mb-1">福岡 (26日)</p>
-                        <i id="weather-icon-fukuoka" class="fa-solid fa-cloud-sun-rain text-3xl text-custom-primary mb-1"></i>
-                        <p id="weather-temp-fukuoka" class="text-lg font-bold text-gray-800">8°C / 13°C</p>
-                        <p id="weather-rain-fukuoka" class="text-xs text-red-500 mt-1">降雨率: 20%</p>
-                    </div>
-
-                    <!-- 長崎 -->
-                    <div class="flex-1 min-w-[100px] text-center p-3 border border-pink-200 rounded-2xl bg-pink-50 shadow-sm mb-3 sm:mb-0">
-                        <p class="text-sm font-semibold text-gray-700 mb-1">長崎 (27-28日)</p>
-                        <i id="weather-icon-nagasaki" class="fa-solid fa-sun text-3xl text-orange-400 mb-1"></i> 
-                        <p id="weather-temp-nagasaki" class="text-lg font-bold text-gray-800">5°C / 10°C</p>
-                        <p id="weather-rain-nagasaki" class="text-xs text-gray-500 mt-1">降雨率: 0%</p>
-                    </div>
-
-                    <!-- 熊本 -->
-                    <div class="flex-1 min-w-[100px] text-center p-3 border border-pink-200 rounded-2xl bg-pink-50 shadow-sm">
-                        <p class="text-sm font-semibold text-gray-700 mb-1">熊本 (29-31日)</p>
-                        <i id="weather-icon-kumamoto" class="fa-solid fa-cloud-showers-heavy text-3xl text-custom-secondary mb-1"></i>
-                        <p id="weather-temp-kumamoto" class="text-lg font-bold text-gray-800">3°C / 9°C</p>
-                        <p id="weather-rain-kumamoto" class="text-xs text-red-500 mt-1">降雨率: 40%</p>
-                    </div>
-                </div>
-
-                <a href="https://www.tenki.jp/" target="_blank" class="w-full block text-center bg-gray-100 text-gray-700 p-3 rounded-2xl font-semibold hover:bg-gray-200 transition duration-200 text-sm">
-                    <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> 點擊查看 tenki.jp 詳細預報
-                </a>
-            </div>
+                
                 // ⭐️ 新增：根據活動類型給予不同圖標 (可根據 title 關鍵字擴充)
                 const activityIcon = activity.title.includes('餐') ? 'fa-utensils' : 
                                      activity.title.includes('飯店') || activity.title.includes('住宿') ? 'fa-bed' : 
