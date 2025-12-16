@@ -341,11 +341,55 @@
         /* ===================================================
           記帳 (EXPENSE) 相關函式
         =================================================== */
-/* ===================================================
-  記帳 (EXPENSE) 相關函式
-=================================================== */
-// 放在您的程式碼頂部
-let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase 賦值的 EXPENSES_DATA
+        
+        // ⭐️ 新增：切換記帳/明細頁籤
+        window.switchExpenseView = function(view) {
+            const addContainer = document.getElementById('add-expense-container');
+            const detailsContainer = document.getElementById('expense-details-container');
+            const addBtn = document.getElementById('tab-add-expense-btn');
+            const detailsBtn = document.getElementById('tab-view-details-btn');
+
+            // 確保所有元素都存在
+            if (!addContainer || !detailsContainer || !addBtn || !detailsBtn) return; 
+
+            // 重設按鈕樣式
+            addBtn.classList.remove('active-expense-tab-btn', 'bg-custom-primary', 'text-white');
+            detailsBtn.classList.remove('active-expense-tab-btn', 'bg-custom-primary', 'text-white');
+            addBtn.classList.add('bg-white', 'text-gray-700');
+            detailsBtn.classList.add('bg-white', 'text-gray-700');
+            
+            // 確保 inactive 按鈕有 hover 效果
+            addBtn.classList.remove('hover:bg-[#3A7AD0]');
+            detailsBtn.classList.remove('hover:bg-gray-100');
+            addBtn.classList.add('hover:bg-gray-100');
+            detailsBtn.classList.add('hover:bg-gray-100');
+
+
+            if (view === 'add') {
+                // 顯示新增表單，隱藏明細
+                addContainer.classList.remove('hidden');
+                detailsContainer.classList.add('hidden');
+                
+                // 設定按鈕樣式
+                addBtn.classList.add('active-expense-tab-btn', 'bg-custom-primary', 'text-white');
+                addBtn.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+                addBtn.classList.add('hover:bg-[#3A7AD0]');
+
+            } else if (view === 'details') {
+                // 顯示明細，隱藏新增表單
+                addContainer.classList.add('hidden');
+                detailsContainer.classList.remove('hidden');
+                
+                // 設定按鈕樣式
+                detailsBtn.classList.add('active-expense-tab-btn', 'bg-custom-primary', 'text-white');
+                detailsBtn.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+                detailsBtn.classList.add('hover:bg-[#3A7AD0]');
+                
+                // 呼叫渲染函式
+                window.renderExpenseTracking(); 
+            }
+        }
+
 
         // 選擇幣別
         window.selectCurrency = function(currency) {
@@ -468,38 +512,52 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
             const totalSpentTWD = joshPaidTWD + candicePaidTWD;
             const remainingBudget = TOTAL_BUDGET_TWD - totalSpentTWD;
 
-            document.getElementById('total-budget').textContent = TOTAL_BUDGET_TWD.toLocaleString();
-            document.getElementById('total-spent').textContent = Math.round(totalSpentTWD).toLocaleString();
-            document.getElementById('remaining-budget').textContent = Math.round(remainingBudget).toLocaleString();
-            
-            // 結算結果
-            document.getElementById('josh-paid').textContent = Math.round(joshPaidTWD).toLocaleString();
-            document.getElementById('candice-paid').textContent = Math.round(candicePaidTWD).toLocaleString();
-
-            const diff = joshPaidTWD - candicePaidTWD;
-            const halfDiff = Math.abs(diff) / 2;
+            // 確保元素存在
+            const totalBudgetEl = document.getElementById('total-budget');
+            const totalSpentEl = document.getElementById('total-spent');
+            const remainingBudgetEl = document.getElementById('remaining-budget');
+            const joshPaidEl = document.getElementById('josh-paid');
+            const candicePaidEl = document.getElementById('candice-paid');
             const settlementElement = document.getElementById('settlement-result');
 
-            if (Math.abs(diff) < 1) { // 忽略微小差異
-                settlementElement.textContent = "無需結算。";
-                settlementElement.classList.remove('text-red-600', 'text-green-600');
-                settlementElement.classList.add('text-gray-900');
-            } else if (diff > 0) {
-                settlementElement.textContent = `Candice 需支付 Josh $ ${Math.round(halfDiff).toLocaleString()} TWD`;
-                settlementElement.classList.add('text-red-600');
-            } else {
-                settlementElement.textContent = `Josh 需支付 Candice $ ${Math.round(halfDiff).toLocaleString()} TWD`;
-                settlementElement.classList.add('text-green-600');
+            if (totalBudgetEl) totalBudgetEl.textContent = TOTAL_BUDGET_TWD.toLocaleString();
+            if (totalSpentEl) totalSpentEl.textContent = Math.round(totalSpentTWD).toLocaleString();
+            if (remainingBudgetEl) remainingBudgetEl.textContent = Math.round(remainingBudget).toLocaleString();
+            
+            // 結算結果
+            if (joshPaidEl) joshPaidEl.textContent = Math.round(joshPaidTWD).toLocaleString();
+            if (candicePaidEl) candicePaidEl.textContent = Math.round(candicePaidTWD).toLocaleString();
+
+            if (settlementElement) {
+                const diff = joshPaidTWD - candicePaidTWD;
+                const halfDiff = Math.abs(diff) / 2;
+                
+                settlementElement.classList.remove('text-red-600', 'text-green-600', 'text-gray-900');
+
+                if (Math.abs(diff) < 1) { // 忽略微小差異
+                    settlementElement.textContent = "無需結算。";
+                    settlementElement.classList.add('text-gray-900');
+                } else if (diff > 0) {
+                    settlementElement.textContent = `Candice 需支付 Josh $ ${Math.round(halfDiff).toLocaleString()} TWD`;
+                    settlementElement.classList.add('text-red-600');
+                } else {
+                    settlementElement.textContent = `Josh 需支付 Candice $ ${Math.round(halfDiff).toLocaleString()} TWD`;
+                    settlementElement.classList.add('text-green-600');
+                }
             }
         }
         
         // 渲染記帳清單
         window.renderExpenseTracking = function() {
             const expenseList = document.getElementById('expense-list');
+            const filterContainer = document.getElementById('category-filter-buttons');
+            
+            // 安全檢查：如果元素不存在則直接退出
+            if (!expenseList || !filterContainer) return;
+
             const categories = [...new Set(EXPENSES_DATA.map(e => e.category)), 'All']; // 找出所有類別
             
             // 渲染篩選按鈕
-            const filterContainer = document.getElementById('category-filter-buttons');
             filterContainer.innerHTML = '';
             categories.forEach(cat => {
                 const isActive = cat === EXPENSE_FILTER;
@@ -694,9 +752,11 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
             
             // 處理初次切換時的渲染
             if (targetId === 'expense-tab') {
-                window.renderExpenseTracking();
+                // 進入 expense-tab 時，預設顯示 'add' 頁面
+                window.switchExpenseView('add'); 
+                window.renderExpenseTracking(); // 確保資料先載入，即使明細頁隱藏
             } else if (targetId === 'wishlist-tab') {
-                window.renderWishlist();
+                window.renderWishlist(); 
             } else if (targetId === 'weather-tab') {
                 window.renderWeather();
             }
@@ -744,10 +804,29 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
     border: 1px solid #e0e0e0;
 }
 
-/* Day 1 和日期的字體大小也在 generateDateTabs 函式中控制 */
-/* <div class="font-bold">Day ${index + 1}</div>  <-- 保持這個大小
-    <div class="text-xs">${day.date.substring(5)} (${day.day_of_week})</div> <-- 保持這個大小
-*/
+/* ⭐️ 新增：記帳/明細 頁籤切換按鈕的樣式修正 */
+#tab-add-expense-btn, #tab-view-details-btn {
+    border: 1px solid #4A90E2; /* 統一邊框顏色為藍色 */
+    border-radius: 0; 
+    transition: all 0.2s;
+}
+#tab-add-expense-btn {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+    border-right: none; /* 移除中間的邊線 */
+}
+#tab-view-details-btn {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+/* 確保非 active 時的樣式符合設計 */
+#tab-add-expense-btn:not(.active-expense-tab-btn), 
+#tab-view-details-btn:not(.active-expense-tab-btn) {
+    background-color: white !important;
+    color: #4b5563 !important; /* 灰色文字 */
+}
+
+
         /* 行程時間軸樣式 */
         .timeline-item {
             border-left: 2px solid #4A90E2; /* 使用新的主色 */
@@ -888,7 +967,7 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
             
             <div class="bg-white p-4 rounded-lg shadow-md mb-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fa-solid fa-cloud-sun text-custom-primary mr-2"></i> 行程天氣總覽 (tenki.jp)
+                    <i class="fa-solid fa-cloud-sun-rain text-custom-primary mr-2"></i> 行程天氣總覽 (tenki.jp)
                 </h2>
 
                 <div class="flex justify-around items-stretch mb-4 space-x-2">
@@ -939,116 +1018,134 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
             </div>
         </div>
         
-
         <div id="expense-tab" class="main-tab-content hidden">
-            <div id="expense-tracking-container" class="bg-white p-4 rounded-lg shadow-md mt-4">
+            
+            <div class="flex justify-center mb-4">
+                <button id="tab-add-expense-btn" 
+                        class="px-4 py-2 text-white font-semibold bg-custom-primary hover:bg-[#3A7AD0] transition active-expense-tab-btn"
+                        onclick="window.switchExpenseView('add')">
+                    <i class="fas fa-pen-to-square"></i> 記帳
+                </button>
+                <button id="tab-view-details-btn" 
+                        class="px-4 py-2 text-gray-700 font-semibold bg-white hover:bg-gray-100 transition"
+                        onclick="window.switchExpenseView('details')">
+                    <i class="fas fa-list"></i> 明細
+                </button>
+            </div>
+            
+            <div id="expense-tracking-container" class="bg-white p-4 rounded-lg shadow-md">
                 <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
                     <i class="fa-solid fa-calculator text-[#F5A623] mr-2"></i> 💸 旅費記帳中心
                 </h3>
         
-                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p class="text-sm font-semibold text-blue-700">即時匯率 (JPY/TWD)：<span id="exchange-rate-display">--</span></p>
-                </div>
-        
-                <div class="p-4 bg-gray-50 rounded-lg mb-4 shadow-inner">
-                    <h4 class="font-semibold mb-3 text-custom-primary">新增支出</h4>
+                <div id="add-expense-container">
                     
-                    <input type="date" id="expense-date" class="w-full p-2 border rounded-lg mb-3 text-sm">
-                    
-                    <input type="number" id="expense-amount" placeholder="金額" class="w-full p-2 border rounded-lg mb-3 text-sm" min="0">
-                    
-                    <h5 class="text-sm font-semibold mb-2">付款幣別:</h5>
-                    <div id="currency-select" class="flex space-x-2 mb-3">
-                        <button type="button" class="block-select-btn flex-1 active-currency" data-currency="TWD" onclick="window.selectCurrency('TWD')">
-                            <i class="fa-solid fa-money-bill-wave mr-1"></i> 台幣 (TWD)
-                        </button>
-                        <button type="button" class="block-select-btn flex-1" data-currency="JPY" onclick="window.selectCurrency('JPY')">
-                            <i class="fa-solid fa-yen-sign mr-1"></i> 日圓 (JPY)
-                        </button>
-                        <input type="hidden" id="expense-currency" value="TWD">
+                    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p class="text-sm font-semibold text-blue-700">即時匯率 (JPY/TWD)：<span id="exchange-rate-display">--</span></p>
                     </div>
-                    
-                    <h5 class="text-sm font-semibold mb-2">付款人:</h5>
-                    <div id="payer-select" class="flex space-x-2 mb-3">
-                        <button type="button" class="block-select-btn flex-1 active-payer" data-payer="Josh" onclick="window.selectPayer('Josh')">
-                            <i class="fa-solid fa-person-military-pointing mr-1"></i> Josh
-                        </button>
-                        <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="window.selectPayer('Candice')">
-                            <i class="fa-solid fa-person-dress mr-1"></i> Candice
-                        </button>
-                        <input type="hidden" id="expense-payer" value="Josh">
-                    </div>
+            
+                    <div class="p-4 bg-gray-50 rounded-lg mb-4 shadow-inner">
+                        <h4 class="font-semibold mb-3 text-custom-primary">新增支出</h4>
+                        
+                        <input type="date" id="expense-date" class="w-full p-2 border rounded-lg mb-3 text-sm">
+                        
+                        <input type="number" id="expense-amount" placeholder="金額" class="w-full p-2 border rounded-lg mb-3 text-sm" min="0">
+                        
+                        <h5 class="text-sm font-semibold mb-2">付款幣別:</h5>
+                        <div id="currency-select" class="flex space-x-2 mb-3">
+                            <button type="button" class="block-select-btn flex-1 active-currency" data-currency="TWD" onclick="window.selectCurrency('TWD')">
+                                <i class="fa-solid fa-money-bill-wave mr-1"></i> 台幣 (TWD)
+                            </button>
+                            <button type="button" class="block-select-btn flex-1" data-currency="JPY" onclick="window.selectCurrency('JPY')">
+                                <i class="fa-solid fa-yen-sign mr-1"></i> 日圓 (JPY)
+                            </button>
+                            <input type="hidden" id="expense-currency" value="TWD">
+                        </div>
+                        
+                        <h5 class="text-sm font-semibold mb-2">付款人:</h5>
+                        <div id="payer-select" class="flex space-x-2 mb-3">
+                            <button type="button" class="block-select-btn flex-1 active-payer" data-payer="Josh" onclick="window.selectPayer('Josh')">
+                                <i class="fa-solid fa-person-military-pointing mr-1"></i> Josh
+                            </button>
+                            <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="window.selectPayer('Candice')">
+                                <i class="fa-solid fa-person-dress mr-1"></i> Candice
+                            </button>
+                            <input type="hidden" id="expense-payer" value="Josh">
+                        </div>
 
-                    <h5 class="text-sm font-semibold mb-2">支出類別:</h5>
-                    <div id="category-select" class="flex flex-wrap gap-2 mb-3">
-                        <button type="button" class="block-select-btn px-2 py-1 text-xs active-category" data-category="Food" onclick="window.selectCategory('Food')">
-                            <i class="fa-solid fa-utensils mr-1"></i> 餐飲
-                        </button>
-                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Transport" onclick="window.selectCategory('Transport')">
-                            <i class="fa-solid fa-train-subway mr-1"></i> 交通
-                        </button>
-                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Accommodation" onclick="window.selectCategory('Accommodation')">
-                            <i class="fa-solid fa-hotel mr-1"></i> 住宿
-                        </button>
-                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Shopping" onclick="window.selectCategory('Shopping')">
-                            <i class="fa-solid fa-bag-shopping mr-1"></i> 購物
-                        </button>
-                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Other" onclick="window.selectCategory('Other')">
-                            <i class="fa-solid fa-ellipsis mr-1"></i> 其他
-                        </button>
-                        <input type="hidden" id="expense-category" value="Food"> 
-                    </div>
-                    
-                    <h5 class="text-sm font-semibold mb-2">支付方式:</h5>
-                    <div id="payment-select" class="flex flex-wrap gap-2 mb-3">
-                        <button type="button" class="block-select-btn px-2 py-1 text-xs active-payment" data-payment="Cash" onclick="window.selectPayment('Cash')">
-                            <i class="fa-solid fa-money-bill-1-wave mr-1"></i> 現金
-                        </button>
-                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-payment="CreditCard" onclick="window.selectPayment('CreditCard')">
-                            <i class="fa-solid fa-credit-card mr-1"></i> 信用卡
-                        </button>
-                        <button type="button" class="block-select-btn px-2 py-1 text-xs" data-payment="PayPay" onclick="window.selectPayment('PayPay')">
-                            <i class="fa-solid fa-mobile-screen mr-1"></i> PayPay
-                        </button>
-                        <input type="hidden" id="expense-payment" value="Cash"> 
-                    </div>
+                        <h5 class="text-sm font-semibold mb-2">支出類別:</h5>
+                        <div id="category-select" class="flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="block-select-btn px-2 py-1 text-xs active-category" data-category="Food" onclick="window.selectCategory('Food')">
+                                <i class="fa-solid fa-utensils mr-1"></i> 餐飲
+                            </button>
+                            <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Transport" onclick="window.selectCategory('Transport')">
+                                <i class="fa-solid fa-train-subway mr-1"></i> 交通
+                            </button>
+                            <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Accommodation" onclick="window.selectCategory('Accommodation')">
+                                <i class="fa-solid fa-hotel mr-1"></i> 住宿
+                            </button>
+                            <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Shopping" onclick="window.selectCategory('Shopping')">
+                                <i class="fa-solid fa-bag-shopping mr-1"></i> 購物
+                            </button>
+                            <button type="button" class="block-select-btn px-2 py-1 text-xs" data-category="Other" onclick="window.selectCategory('Other')">
+                                <i class="fa-solid fa-ellipsis mr-1"></i> 其他
+                            </button>
+                            <input type="hidden" id="expense-category" value="Food"> 
+                        </div>
+                        
+                        <h5 class="text-sm font-semibold mb-2">支付方式:</h5>
+                        <div id="payment-select" class="flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="block-select-btn px-2 py-1 text-xs active-payment" data-payment="Cash" onclick="window.selectPayment('Cash')">
+                                <i class="fa-solid fa-money-bill-1-wave mr-1"></i> 現金
+                            </button>
+                            <button type="button" class="block-select-btn px-2 py-1 text-xs" data-payment="CreditCard" onclick="window.selectPayment('CreditCard')">
+                                <i class="fa-solid fa-credit-card mr-1"></i> 信用卡
+                            </button>
+                            <button type="button" class="block-select-btn px-2 py-1 text-xs" data-payment="PayPay" onclick="window.selectPayment('PayPay')">
+                                <i class="fa-solid fa-mobile-screen mr-1"></i> PayPay
+                            </button>
+                            <input type="hidden" id="expense-payment" value="Cash"> 
+                        </div>
 
-                    <input type="text" id="expense-description" placeholder="用途/說明" class="w-full p-2 border rounded-lg mb-3 text-sm">
-                    
-                    <button onclick="window.addExpense()" class="w-full bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#db8f1f]">
-                        <i class="fa-solid fa-circle-plus mr-1"></i> 確認新增
-                    </button>
-                </div>
-        
-                <div id="expense-summary" class="mb-4 p-4 bg-custom-primary text-white rounded-lg shadow-md">
-                    <h4 class="font-semibold mb-2">總支出概況</h4>
-                    <p class="text-sm">總預算 (TWD): $ <span id="total-budget">50,000</span></p>
-                    <p class="text-sm">累積總支出 (TWD): $ <span id="total-spent">0</span></p>
-                    <p class="text-lg font-bold mt-2">剩餘預算: $ <span id="remaining-budget">50,000</span></p>
+                        <input type="text" id="expense-description" placeholder="用途/說明" class="w-full p-2 border rounded-lg mb-3 text-sm">
+                        
+                        <button onclick="window.addExpense()" class="w-full bg-custom-secondary text-white p-2 rounded-lg font-bold hover:bg-[#db8f1f]">
+                            <i class="fa-solid fa-circle-plus mr-1"></i> 確認新增
+                        </button>
+                    </div>
                 </div>
                 
-                <div id="settlement-summary" class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg shadow-md">
-                    <h4 class="font-semibold mb-2 text-gray-800 flex items-center"><i class="fa-solid fa-handshake-angle mr-2 text-yellow-600"></i> 分攤結算概況 (TWD)</h4>
-                    <p class="text-sm text-gray-700">Josh 已支付: $ <span id="josh-paid">0</span></p>
-                    <p class="text-sm text-gray-700 mb-2">Candice 已支付: $ <span id="candice-paid">0</span></p>
-                    <p class="text-md font-bold text-gray-900 border-t pt-2 mt-2">
-                        <span id="settlement-result">無需結算。</span>
-                    </p>
-                </div>
+                <div id="expense-details-container" class="hidden">
 
-                <div class="mb-4">
-                    <h4 class="font-semibold mb-2 text-gray-700 flex items-center"><i class="fa-solid fa-filter mr-2"></i> 依類別篩選清單:</h4>
-                    <div id="category-filter-buttons" class="flex flex-wrap gap-2 text-sm">
-                        </div>
+                    <div id="expense-summary" class="mb-4 p-4 bg-custom-primary text-white rounded-lg shadow-md">
+                        <h4 class="font-semibold mb-2">總支出概況</h4>
+                        <p class="text-sm">總預算 (TWD): $ <span id="total-budget">50,000</span></p>
+                        <p class="text-sm">累積總支出 (TWD): $ <span id="total-spent">0</span></p>
+                        <p class="text-lg font-bold mt-2">剩餘預算: $ <span id="remaining-budget">50,000</span></p>
+                    </div>
+                    
+                    <div id="settlement-summary" class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg shadow-md">
+                        <h4 class="font-semibold mb-2 text-gray-800 flex items-center"><i class="fa-solid fa-handshake-angle mr-2 text-yellow-600"></i> 分攤結算概況 (TWD)</h4>
+                        <p class="text-sm text-gray-700">Josh 已支付: $ <span id="josh-paid">0</span></p>
+                        <p class="text-sm text-gray-700 mb-2">Candice 已支付: $ <span id="candice-paid">0</span></p>
+                        <p class="text-md font-bold text-gray-900 border-t pt-2 mt-2">
+                            <span id="settlement-result">無需結算。</span>
+                        </p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h4 class="font-semibold mb-2 text-gray-700 flex items-center"><i class="fa-solid fa-filter mr-2"></i> 依類別篩選清單:</h4>
+                        <div id="category-filter-buttons" class="flex flex-wrap gap-2 text-sm">
+                            </div>
+                    </div>
+            
+                    <h4 class="font-semibold mb-3 text-gray-700 border-b pb-2">支出明細</h4>
+                    <div id="expense-list" class="space-y-2">
+                        <p class="text-center text-gray-500 text-sm">尚無支出紀錄</p>
+                    </div>
                 </div>
-        
-                <h4 class="font-semibold mb-3 text-gray-700 border-b pb-2">支出明細</h4>
-                <div id="expense-list" class="space-y-2">
-                    <p class="text-center text-gray-500 text-sm">尚無支出紀錄</p>
                 </div>
-            </div>
         </div>
-
         <div id="weather-tab" class="main-tab-content hidden">
             <div id="weather-container" class="bg-white p-4 rounded-lg shadow-md mt-4">
                 <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
