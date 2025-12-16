@@ -328,6 +328,29 @@ window.saveBudget = async function() {
             }, (error) => {
                 console.error("Error listening to expenses: ", error);
             });
+// ⭐️ 2. 獲取並監聽旅行資訊/預算 (Trip Info / Budget)
+    const tripDocRef = doc(db, "trips", "currentTrip");
+    onSnapshot(tripDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const budget = data.totalBudget || 0; // 如果 totalBudget 不存在，預設為 0
+            
+            // 將從 Firebase 讀取到的最新預算渲染到 HTML 元素
+            document.getElementById('total-budget').innerText = budget.toLocaleString();
+
+            // 存儲預算到全域變數 (如果需要計算支出百分比)
+            window.TOTAL_BUDGET = budget; 
+            
+            // 重新渲染支出概況，以便更新預算百分比
+            window.renderExpenseTracking(); 
+        } else {
+            console.warn("Trip info document 'currentTrip' not found. Budget set to 0.");
+            document.getElementById('total-budget').innerText = "0";
+            window.TOTAL_BUDGET = 0;
+        }
+    }, (error) => {
+        console.error("Error listening to trip info: ", error);
+    });
             
             // 3. 慾望清單 (Wishlist) - 按購買狀態和時間排序
             const wishlistQuery = query(collection(db, "wishlists"), orderBy("purchased", "asc"), orderBy("timestamp", "desc"));
