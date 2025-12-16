@@ -171,11 +171,6 @@
         /* =========================
           Firebase 初始化 (使用 ES Modules)
         ========================= */
-import { 
-    // ... 其他您可能用到的函式 (e.g., collection, query, orderBy, getDocs, addDoc, updateDoc, deleteDoc)
-    doc,        // ⭐️ 確保有引入 doc
-    onSnapshot  // ⭐️ 確保有引入 onSnapshot
-} from "firebase/firestore";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
         import {
             getFirestore,
