@@ -37,7 +37,38 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+/* ===================================================
+  新增：記帳/明細 切換函式
+=================================================== */
 
+window.switchExpenseView = function(view) {
+    const addContainer = document.getElementById('add-expense-container');
+    const detailsContainer = document.getElementById('expense-details-container');
+    const addBtn = document.getElementById('tab-add-expense-btn');
+    const detailsBtn = document.getElementById('tab-view-details-btn');
+
+    if (!addContainer || !detailsContainer || !addBtn || !detailsBtn) return;
+    
+    // 處理容器顯示/隱藏
+    if (view === 'add') {
+        addContainer.classList.remove('hidden');
+        detailsContainer.classList.add('hidden');
+        
+        // 處理按鈕樣式
+        addBtn.classList.add('active-expense-tab-btn');
+        detailsBtn.classList.remove('active-expense-tab-btn');
+    } else if (view === 'details') {
+        addContainer.classList.add('hidden');
+        detailsContainer.classList.remove('hidden');
+        
+        // 處理按鈕樣式
+        addBtn.classList.remove('active-expense-tab-btn');
+        detailsBtn.classList.add('active-expense-tab-btn');
+        
+        // ⚠️ 確保切換到明細時數據是最新狀態
+        window.renderExpenseTracking(); 
+    }
+}
         /* =========================
           全域變數與資料狀態
         ========================= */
@@ -726,7 +757,15 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
         .text-custom-primary { color: #4A90E2; }
         .bg-custom-secondary { background-color: #F5A623; } /* 副色：暖金橘 */
         .text-custom-secondary { color: #F5A623; }
-        
+        /* 記帳/明細 切換按鈕的樣式 */
+.active-expense-tab-btn {
+    background-color: #4A90E2; /* 使用您的主色 */
+    color: white;
+}
+.active-expense-tab-btn:hover {
+    background-color: #4A90E2; /* 懸停時保持主色 */
+    color: white;
+}
         /* 行程頁籤的日期按鈕樣式 */
         .tab-button {
     /* 確保按鈕不會因為 Flex 而放大 */
@@ -940,6 +979,29 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
         
 
         <div id="expense-tab" class="main-tab-content hidden">
+<div class="flex p-4 justify-center">
+    <div class="inline-flex rounded-lg shadow-sm border border-gray-300">
+        <button id="tab-add-expense-btn" 
+                class="px-4 py-2 font-semibold rounded-l-lg transition border-r border-gray-300 active-expense-tab-btn"
+                onclick="window.switchExpenseView('add')">
+            <i class="fas fa-pencil"></i> 記帳
+        </button>
+        <button id="tab-view-details-btn" 
+                class="px-4 py-2 text-gray-700 font-semibold rounded-r-lg bg-white hover:bg-gray-100 transition"
+                onclick="window.switchExpenseView('details')">
+            <i class="fas fa-list"></i> 明細
+        </button>
+    </div>
+</div>
+<div id="add-expense-container">
+    <div class="p-4 flex justify-center">
+        <button onclick="window.addExpense()" class="w-full max-w-sm py-3 rounded-xl bg-custom-secondary text-white font-bold hover:bg-custom-secondary/90 transition duration-150">
+            確認新增
+        </button>
+    </div>
+</div>
+<div id="expense-details-container" class="hidden"> 
+    </div>
             <div id="expense-tracking-container" class="bg-white p-4 rounded-lg shadow-md mt-4">
                 <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
                     <i class="fa-solid fa-calculator text-[#F5A623] mr-2"></i> 💸 旅費記帳中心
