@@ -512,7 +512,6 @@ let EXPENSESf_DATA = []; // ⭐️ 這裡是重複定義，會覆蓋掉 Firebase
             
             // 篩選數據
             const filteredExpenses = EXPENSES_DATA.filter(e => EXPENSE_FILTER === 'All' || e.category === EXPENSE_FILTER);
-
             // 渲染支出列表
             if (filteredExpenses.length === 0) {
                 expenseList.innerHTML = '<p class="text-center text-gray-500 text-sm">尚無符合篩選條件的支出紀錄</p>';
