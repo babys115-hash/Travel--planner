@@ -345,19 +345,7 @@
 let EXPENSE_DATA = [];
         // 放在您的程式碼頂部
 const EXCHANGE_RATE_JPY_TWD = 0.21; // 假設日幣兌台幣匯率為 0.21
-// 尋找類似這樣的程式碼區塊 (負責讀取 expenses 集合)
-onSnapshot(query(collection(db, "expenses"), orderBy("date", "desc")), (querySnapshot) => {
-    
-    // ⭐️ 這裡就是賦值的關鍵程式碼 ⭐️
-    // 將所有文件數據轉換為陣列，並存入 EXPENSE_DATA
-    EXPENSE_DATA = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-    }));
-    
-    // 成功賦值後，呼叫渲染函式
-    renderExpenseTracking(); 
-});
+
         // 選擇幣別
         window.selectCurrency = function(currency) {
             ACTIVE_CURRENCY = currency;
