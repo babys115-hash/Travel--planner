@@ -201,41 +201,7 @@
             orderBy,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-      
-  //加入匯率
-async function fetchRealTimeExchangeRate() {
-    try {
-        // 從 API 獲取日圓對台幣的匯率
-        const response = await fetch(`https://v6.exchangerate-api.com/v6/${YOUR_API_KEY}/pair/JPY/TWD`);
-        const data = await response.json();
         
-        if (data.result === "success") {
-            // 1. 更新全域變數
-            EXCHANGE_RATE_JPY_TWD = data.conversion_rate;
-            console.log(`即時匯率更新成功: 1 JPY = ${EXCHANGE_RATE_JPY_TWD} TWD`);
-
-            // 2. 【新增這段】更新 HTML 上的顯示文字
-            const rateDisplay = document.getElementById('exchange-rate-display');
-            if (rateDisplay) {
-                // toFixed(4) 會顯示到小數點後四位，例如 0.2115
-                rateDisplay.innerText = EXCHANGE_RATE_JPY_TWD.toFixed(4);
-            }
-            
-            // 3. 匯率更新後，重新計算一次結算畫面
-            if (typeof updateSettlementSummary === "function") {
-                updateSettlementSummary();
-            }
-        }
-    } catch (error) {
-        console.error("無法取得即時匯率，使用預設值:", error);
-        // 失敗時也可以讓畫面顯示預設值
-        const rateDisplay = document.getElementById('exchange-rate-display');
-        if (rateDisplay) rateDisplay.innerText = "0.2150";
-    }
-}
-
-
-
         // 🚨 請確認這是您的真實配置
         const firebaseConfig = {
             apiKey: "AIzaSyBRjYjvwvCNTRHdI8vH8n3GPabzSnSDbvI",
@@ -322,7 +288,9 @@ window.saveBudget = async function() {
         let ACTIVE_PAYMENT = 'Cash';
         let EXPENSE_FILTER = 'All';
         
-                
+        // 匯率與預算 (靜態資料或未來可從 Firestore 載入)
+        const EXCHANGE_RATE_JPY_TWD = 0.215; 
+        
         
         // 類別圖標映射
         const ICON_MAP = {
@@ -433,12 +401,6 @@ window.saveBudget = async function() {
             document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
         }
 
-	// 3. 在網頁載入時執行 (放在 startDataSync 或 window.onload 中)
-	// 修改原本的 startDataSync
-	function startDataSync() {
-   	 fetchRealTimeExchangeRate(); // 加入這一行
-    	// ... 原本的監聽程式碼 ...
-	
         /* ===================================================
           行程 (ITINERARY) 相關函式
         =================================================== */
