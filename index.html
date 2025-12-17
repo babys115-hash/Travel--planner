@@ -231,8 +231,8 @@ window.cancelBudgetEdit = function() {
 
 // 3. 儲存預算並更新 Firebase (假設 trip info 儲存在 trips 集合的 'currentTrip' 文件中)
 window.saveBudget = async function() {
-    const newBudgetString = document.getElementById('budget-input').value;
-    const newBudget = parseFloat(newBudgetString);
+    const inputElement = document.getElementById('budget-input');
+    const newBudget = parseFloat(inputElement.value);
 
     if (isNaN(newBudget) || newBudget < 0) {
         alert("請輸入有效的預算金額。");
@@ -240,24 +240,20 @@ window.saveBudget = async function() {
     }
 
     try {
-        // 假設您的 trip info 儲存在一個固定的文件 ID 下
         const tripDocRef = doc(db, "trips", "currentTrip"); 
         
-        // 更新 Firebase
-        await updateDoc(tripDocRef, {
+        // ⭐️ 使用 setDoc 確保即使文件不存在也能建立，且不覆蓋其他欄位
+        await setDoc(tripDocRef, {
             totalBudget: newBudget 
-        });
+        }, { merge: true });
 
-        // 更新成功後，刷新顯示和狀態
-        document.getElementById('total-budget').innerText = newBudget.toLocaleString(); // 格式化顯示
+        // 成功後隱藏編輯框，等待 onSnapshot 自動更新 UI
         window.cancelBudgetEdit();
-        
-        // 假設您有一個函式來渲染記帳概況，需要重新調用
-        // window.renderExpenseSummary(); 
+        console.log("預算已成功更新至 Firebase");
 
     } catch (error) {
         console.error("更新預算失敗: ", error);
-        alert("更新預算失敗，請檢查網路連線。");
+        alert("更新預算失敗，請確認 Firebase 設定。");
     }
 };
 
@@ -1399,10 +1395,9 @@ window.saveBudget = async function() {
                         </h3>
                         <div class="grid grid-cols-2 gap-3 text-sm mb-4">
                             <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
-                                <div id="budget-display-container">
+                                   
     
-    
-   <div id="budget-display-container">
+   <<div id="budget-display-container">
     <p class="text-gray-400 text-xs mb-1">預算總額 (TWD)</p>
     
     <p id="budget-display" class="font-bold text-gray-700 text-lg flex items-center cursor-pointer group" onclick="window.enableBudgetEdit()">
@@ -1414,26 +1409,16 @@ window.saveBudget = async function() {
         <span class="font-bold text-gray-700 text-lg">$</span>
         <input type="number" id="budget-input" class="w-28 border-b-2 border-custom-primary focus:outline-none text-gray-700 text-lg font-bold p-0 bg-transparent" placeholder="輸入金額">
         
-        <button onclick="window.saveBudget()" class="text-white bg-custom-primary w-7 h-7 rounded-full flex items-center justify-center shadow-sm hover:scale-110 transition-transform">
+        <button onclick="window.saveBudget()" class="text-white bg-custom-primary w-7 h-7 rounded-full flex items-center justify-center shadow-sm">
             <i class="fa-solid fa-check text-xs"></i>
         </button>
-        <button onclick="window.cancelBudgetEdit()" class="text-gray-400 w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors">
+        <button onclick="window.cancelBudgetEdit()" class="text-gray-400 w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100">
             <i class="fa-solid fa-xmark text-xs"></i>
         </button>
     </div>
 </div>
 
-    <div id="budget-edit-form" class="hidden flex items-center space-x-2">
-        <span class="font-bold text-gray-700 text-lg">$</span>
-        <input type="number" id="budget-input" value="50000" class="w-24 border-b border-gray-400 focus:outline-none focus:border-custom-primary text-gray-700 text-lg font-bold p-1">
-        <button onclick="window.saveBudget()" class="text-white bg-custom-primary p-1 rounded-md text-sm hover:bg-custom-primary/90">
-            <i class="fa-solid fa-check"></i>
-        </button>
-        <button onclick="window.cancelBudgetEdit()" class="text-gray-500 p-1 rounded-md text-sm hover:text-gray-700">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
-    </div>
-</div>
+    
                             </div>
                             <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
                                 <p class="text-gray-400 text-xs mb-1">已花總額 (TWD)</p>
