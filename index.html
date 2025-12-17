@@ -974,110 +974,81 @@ async function updateLiveExchangeRate() {
     const expenseList = document.getElementById('expense-list');
     const filterContainer = document.getElementById('category-filter-buttons');
     
-    // 安全檢查：如果元素不存在則直接退出
     if (!expenseList || !filterContainer) return;
 
-    // 1. 找出所有類別，並將 'All' 放在最前面
-    // 修正點：只宣告一次 categories
-    const categories = ['All', ...new Set(EXPENSES_DATA.map(e => e.category))];
+    // 1. 處理篩選按鈕 (只宣告一次 categories)
+    const uniqueCategories = [...new Set(EXPENSES_DATA.map(e => e.category))];
+    const allCategories = ['All', ...uniqueCategories];
     
-    // 2. 渲染篩選按鈕
-    filterContainer.innerHTML = categories.map(cat => {
+    filterContainer.innerHTML = allCategories.map(cat => {
         const isActive = cat === EXPENSE_FILTER;
         return `
-            <button type="button" 
-                    class="block-select-btn px-3 py-1 text-xs rounded-full ${isActive ? 'active-filter' : ''}" 
+            <button type="button" class="block-select-btn px-3 py-1 text-xs rounded-full ${isActive ? 'active-filter' : ''}" 
                     onclick="window.filterExpenses('${cat}')">
                 ${cat === 'All' ? '全部' : cat}
             </button>
         `;
     }).join('');
 
-// 2. 渲染明細清單
-    const filteredData = EXPENSE_FILTER === 'All' 
-        ? EXPENSES_DATA 
-        : EXPENSES_DATA.filter(e => e.category === EXPENSE_FILTER);
+    // 2. 篩選數據
+    const filteredExpenses = EXPENSES_DATA.filter(e => EXPENSE_FILTER === 'All' || e.category === EXPENSE_FILTER);
 
-    if (filteredData.length === 0) {
-        expenseList.innerHTML = '<p class="text-center text-gray-400 py-10 text-sm">沒有相關紀錄</p>';
-        return;
+    // 3. 渲染清單
+    if (filteredExpenses.length === 0) {
+        expenseList.innerHTML = `
+            <p class="text-center text-gray-400 text-sm py-10">
+                <i class="fa-solid fa-cookie-bite text-2xl mb-2 block text-gray-200"></i>
+                尚無符合條件的支出紀錄
+            </p>`;
+    } else {
+        expenseList.innerHTML = filteredExpenses.map(expense => {
+            // 計算台幣金額
+            const amountTWD = expense.currency === 'JPY' 
+                ? (expense.amount * EXCHANGE_RATE_JPY_TWD).toFixed(0) 
+                : expense.amount.toFixed(0);
+            
+            // 取得對應圖示 (ICON_MAP)
+            const categoryIcon = (typeof ICON_MAP !== 'undefined' && ICON_MAP[expense.category]) || 'fa-ellipsis';
+            
+            return `
+                <div class="expense-item-row p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center transition-all cursor-pointer" 
+                     onclick="this.classList.toggle('active')">
+                    
+                    <div class="flex items-center min-w-0 flex-1">
+                        <div class="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center mr-3 text-custom-primary flex-shrink-0">
+                            <i class="fa-solid ${categoryIcon}"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="font-bold text-gray-700 truncate text-base">${expense.description}</p>
+                            <p class="text-xs text-gray-400 font-mono">${expense.date} · <span class="bg-gray-100 px-1 rounded text-gray-500">${expense.payer}</span></p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center">
+                        <div class="text-right">
+                            <p class="font-bold text-custom-danger text-base">${expense.currency} ${expense.amount.toLocaleString()}</p>
+                            <p class="text-[10px] text-gray-400">約 $ ${Number(amountTWD).toLocaleString()} TWD</p>
+                        </div>
+
+                        <div class="expense-actions flex gap-2 ml-2">
+                            <button onclick="event.stopPropagation(); window.editExpense('${expense.id}')" 
+                                    class="w-8 h-8 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center hover:bg-blue-100">
+                                <i class="fa-solid fa-pen text-[10px]"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); window.deleteExpense('${expense.id}')" 
+                                    class="w-8 h-8 bg-red-50 text-red-500 rounded-full flex items-center justify-center hover:bg-red-100">
+                                <i class="fa-solid fa-trash-can text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
-    expenseList.innerHTML = filteredData.map(exp => `
-        <div class="expense-item-row p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center transition-all cursor-pointer" 
-             onclick="this.classList.toggle('active')">
-            
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                    <span class="font-bold text-gray-700 text-base truncate">${exp.description}</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-400">${exp.category}</span>
-                </div>
-                <p class="text-[11px] text-gray-400 mt-1">${exp.date} · ${exp.payer}付</p>
-            </div>
-
-            <div class="flex items-center">
-                <div class="text-right">
-                    <p class="font-bold text-custom-danger text-base">${exp.currency} ${Number(exp.amount).toLocaleString()}</p>
-                </div>
-
-                <div class="expense-actions">
-                    <button onclick="event.stopPropagation(); window.editExpense('${exp.id}')" 
-                            class="w-8 h-8 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center hover:bg-blue-100 transition-colors">
-                        <i class="fa-solid fa-pen text-[10px]"></i>
-                    </button>
-                    <button onclick="event.stopPropagation(); window.deleteExpense('${exp.id}')" 
-                            class="w-8 h-8 bg-red-50 text-red-500 rounded-full flex items-center justify-center hover:bg-red-100 transition-colors">
-                        <i class="fa-solid fa-trash-can text-[10px]"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `).join('');
+    // 更新結算摘要
+    if (window.updateSettlementSummary) window.updateSettlementSummary();
 };
-            
-            // 篩選數據
-            const filteredExpenses = EXPENSES_DATA.filter(e => EXPENSE_FILTER === 'All' || e.category === EXPENSE_FILTER);
-
-            // 渲染支出列表
-            if (filteredExpenses.length === 0) {
-                expenseList.innerHTML = '<p class="text-center text-gray-400 text-sm py-8"><i class="fa-solid fa-cookie-bite text-2xl mb-2 block text-gray-200"></i>尚無符合篩選條件的支出紀錄</p>';
-            } else {
-                expenseList.innerHTML = filteredExpenses.map(expense => {
-                    const amountTWD = expense.currency === 'JPY' 
-                        ? (expense.amount * EXCHANGE_RATE_JPY_TWD).toFixed(0) 
-                        : expense.amount.toFixed(0);
-                        
-                    const categoryIcon = ICON_MAP[expense.category] || 'fa-ellipsis';
-                    
-                    return `
-                        <div class="p-3 mb-2 bg-white rounded-xl shadow-sm border border-gray-100 flex justify-between items-center hover:bg-pink-50 transition duration-150 group">
-                            <div class="flex items-center">
-                                <div class="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center mr-3 text-custom-primary">
-                                    <i class="fa-solid ${categoryIcon}"></i>
-                                </div>
-                                <div>
-                                    <p class="font-bold text-gray-700">${expense.description}</p>
-                                    <p class="text-xs text-gray-400 font-mono">${expense.date} · <span class="bg-gray-100 px-1 rounded text-gray-500">${expense.payer}</span></p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <p class="font-bold text-custom-danger">${expense.currency} ${expense.amount.toLocaleString()}</p>
-                                <p class="text-xs text-gray-400">約 $ ${amountTWD.toLocaleString()} TWD</p>
-                                <div class="flex justify-end space-x-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onclick="window.openEditExpenseModal('${expense.id}')" class="text-custom-primary hover:text-custom-primary-dark text-xs bg-white px-2 py-0.5 rounded-md shadow-sm border border-pink-100">
-                                        <i class="fa-solid fa-pen"></i>
-                                    </button>
-                                    <button onclick="window.deleteExpense('${expense.id}')" class="text-red-400 hover:text-red-600 text-xs bg-white px-2 py-0.5 rounded-md shadow-sm border border-red-100">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-            
-            window.updateSettlementSummary();
         
 
         /* ===================================================
