@@ -290,7 +290,7 @@ window.saveBudget = async function() {
         
         // 匯率與預算 (靜態資料或未來可從 Firestore 載入)
         const EXCHANGE_RATE_JPY_TWD = 0.215; 
-        const TOTAL_BUDGET_TWD = 50000;
+        
         
         // 類別圖標映射
         const ICON_MAP = {
@@ -890,7 +890,7 @@ window.saveBudget = async function() {
 
             // 總支出與預算
             const totalSpentTWD = joshPaidTWD + candicePaidTWD;
-            const remainingBudget = TOTAL_BUDGET_TWD - totalSpentTWD;
+            const remainingBudget = window.TOTAL_BUDGET - totalSpentTWD;
 
             // 確保元素存在
             const totalBudgetEl = document.getElementById('total-budget');
@@ -1259,7 +1259,11 @@ window.saveBudget = async function() {
             // 初始化數據同步
             startDataSync();
         });
-
+const today = new Date().toISOString().split('T')[0];
+const dateInput = document.getElementById('expense-date');
+if (dateInput) {
+    dateInput.value = today;
+}
     </script>
 </head>
 <body class="bg-gray-50 font-sans">
@@ -1691,6 +1695,7 @@ window.saveBudget = async function() {
 <div id="edit-expense-payment-select" class="flex gap-2 mb-6">
     <button type="button" class="block-select-btn flex-1" data-payment="Cash" onclick="window.selectPayment('Cash', 'edit-expense')">現金</button>
     <button type="button" class="block-select-btn flex-1" data-payment="Card" onclick="window.selectPayment('Card', 'edit-expense')">信用卡</button>
+<button type="button" class="block-select-btn flex-1" data-payment="Paypay" onclick="window.selectPayment('Paypay', 'expense')">Paypay</button>
 </div>
                   
 
