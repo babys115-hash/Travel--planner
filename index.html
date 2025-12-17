@@ -206,15 +206,20 @@
 window.enableBudgetEdit = function() {
     const display = document.getElementById('budget-display');
     const form = document.getElementById('budget-edit-form');
-    const budgetValue = document.getElementById('total-budget').innerText.replace(/,/g, ''); // 移除千位分隔符
-    
+    const input = document.getElementById('budget-input');
+    const totalBudgetSpan = document.getElementById('total-budget');
+
+// 取得目前顯示的數字 (移除千分位逗號)
+    const currentVal = totalBudgetSpan.innerText.replace(/,/g, '');
+
     // 隱藏顯示區塊，顯示編輯表單
     display.classList.add('hidden');
     form.classList.remove('hidden');
     
     // 將當前值賦予 input 並聚焦
-    const input = document.getElementById('budget-input');
-    input.value = budgetValue;
+    if(currentVal !== '---') {
+        input.value = currentVal;
+    }
     input.focus();
 };
 
