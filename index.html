@@ -1397,9 +1397,26 @@ window.saveBudget = async function() {
                                 <div id="budget-display-container">
     <p class="text-gray-400 text-xs mb-1">預算總額 (TWD)</p>
     
-    <p id="budget-display" class="font-bold text-gray-700 text-lg flex items-center cursor-pointer" onclick="window.enableBudgetEdit()">
-        $ <span id="total-budget">50,000</span> <i class="fa-solid fa-pen-to-square ml-2 text-custom-primary text-sm"></i>
+   <div id="budget-display-container">
+    <p class="text-gray-400 text-xs mb-1">預算總額 (TWD)</p>
+    
+    <p id="budget-display" class="font-bold text-gray-700 text-lg flex items-center cursor-pointer group" onclick="window.enableBudgetEdit()">
+        $ <span id="total-budget" class="ml-1">---</span> 
+        <i class="fa-solid fa-pen-to-square ml-2 text-gray-300 group-hover:text-custom-primary text-sm transition-colors"></i>
     </p>
+
+    <div id="budget-edit-form" class="hidden flex items-center space-x-2 mt-1">
+        <span class="font-bold text-gray-700 text-lg">$</span>
+        <input type="number" id="budget-input" class="w-28 border-b-2 border-custom-primary focus:outline-none text-gray-700 text-lg font-bold p-0 bg-transparent" placeholder="輸入金額">
+        
+        <button onclick="window.saveBudget()" class="text-white bg-custom-primary w-7 h-7 rounded-full flex items-center justify-center shadow-sm hover:scale-110 transition-transform">
+            <i class="fa-solid fa-check text-xs"></i>
+        </button>
+        <button onclick="window.cancelBudgetEdit()" class="text-gray-400 w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors">
+            <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+    </div>
+</div>
 
     <div id="budget-edit-form" class="hidden flex items-center space-x-2">
         <span class="font-bold text-gray-700 text-lg">$</span>
