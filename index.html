@@ -182,7 +182,22 @@
             box-shadow: 0 0 0 3px rgba(255, 139, 167, 0.1);
         }
     </style>
-    
+    /* 隱藏操作容器，並加入過渡動畫 */
+.expense-actions {
+    overflow: hidden;
+    transition: all 0.3s ease;
+    width: 0;
+    opacity: 0;
+    display: flex;
+    gap: 8px;
+}
+
+/* 當父容器被加上 active 類別時顯示 */
+.expense-item.active .expense-actions {
+    width: 80px; /* 根據圖標寬度調整 */
+    opacity: 1;
+    margin-left: 10px;
+}
     <script type="module">
         /* =========================
           Firebase 初始化 (使用 ES Modules)
@@ -982,15 +997,58 @@ async function updateLiveExchangeRate() {
             const categories = [...new Set(EXPENSES_DATA.map(e => e.category)), 'All']; // 找出所有類別
             
             // 渲染篩選按鈕
-            filterContainer.innerHTML = '';
-            categories.forEach(cat => {
-                const isActive = cat === EXPENSE_FILTER;
-                 filterContainer.innerHTML += `
-                    <button type="button" class="block-select-btn px-3 py-1 text-xs rounded-full ${isActive ? 'active-filter' : ''}" onclick="window.filterExpenses('${cat}')">
-                        ${cat}
+           const categories = ['All', ...new Set(EXPENSES_DATA.map(e => e.category))];
+    filterContainer.innerHTML = categories.map(cat => {
+        const isActive = cat === EXPENSE_FILTER;
+        return `
+            <button type="button" class="block-select-btn px-3 py-1 text-xs rounded-full ${isActive ? 'active-filter' : ''}" 
+                    onclick="window.filterExpenses('${cat}')">
+                ${cat === 'All' ? '全部' : cat}
+            </button>
+        `;
+    }).join('');
+
+// 2. 渲染明細清單
+    const filteredData = EXPENSE_FILTER === 'All' 
+        ? EXPENSES_DATA 
+        : EXPENSES_DATA.filter(e => e.category === EXPENSE_FILTER);
+
+    if (filteredData.length === 0) {
+        expenseList.innerHTML = '<p class="text-center text-gray-400 py-10 text-sm">沒有相關紀錄</p>';
+        return;
+    }
+
+    expenseList.innerHTML = filteredData.map(exp => `
+        <div class="expense-item-row p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center transition-all cursor-pointer" 
+             onclick="this.classList.toggle('active')">
+            
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-700 text-base truncate">${exp.description}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-400">${exp.category}</span>
+                </div>
+                <p class="text-[11px] text-gray-400 mt-1">${exp.date} · ${exp.payer}付</p>
+            </div>
+
+            <div class="flex items-center">
+                <div class="text-right">
+                    <p class="font-bold text-custom-danger text-base">${exp.currency} ${Number(exp.amount).toLocaleString()}</p>
+                </div>
+
+                <div class="expense-actions">
+                    <button onclick="event.stopPropagation(); window.editExpense('${exp.id}')" 
+                            class="w-8 h-8 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center hover:bg-blue-100 transition-colors">
+                        <i class="fa-solid fa-pen text-[10px]"></i>
                     </button>
-                `;
-            });
+                    <button onclick="event.stopPropagation(); window.deleteExpense('${exp.id}')" 
+                            class="w-8 h-8 bg-red-50 text-red-500 rounded-full flex items-center justify-center hover:bg-red-100 transition-colors">
+                        <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+};
             
             // 篩選數據
             const filteredExpenses = EXPENSES_DATA.filter(e => EXPENSE_FILTER === 'All' || e.category === EXPENSE_FILTER);
