@@ -1671,30 +1671,28 @@ window.saveBudget = async function() {
                     <label class="text-sm font-bold text-gray-500 block mb-1 ml-1">說明</label>
                     <input type="text" id="edit-expense-description" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700" required>
 
-                    <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">付款人</label>
-                    <div id="edit-expense-payer-select" class="flex mb-3">
-                        <button type="button" class="block-select-btn flex-1" data-payer="Josh" onclick="window.selectPayer('Josh', 'edit-expense')">Josh</button>
-                        <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="window.selectPayer('Candice', 'edit-expense')">Candice</button>
-                        <input type="hidden" id="edit-expense-payer" value="Josh">
-                    </div>
-                    
-                    <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">類別</label>
-                    <div id="edit-expense-category-select" class="grid grid-cols-3 gap-2 mb-3">
-                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Food" onclick="window.selectCategory('Food', 'edit-expense')">餐飲</button>
-                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Transport" onclick="window.selectCategory('Transport', 'edit-expense')">交通</button>
-                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Accommodation" onclick="window.selectCategory('Accommodation', 'edit-expense')">住宿</button>
-                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Shopping" onclick="window.selectCategory('Shopping', 'edit-expense')">購物</button>
-                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Ticket" onclick="window.selectCategory('Ticket', 'edit-expense')">門票</button>
-                        <button type="button" class="block-select-btn w-full !mr-0" data-category="Other" onclick="window.selectCategory('Other', 'edit-expense')">其他</button>
-                        <input type="hidden" id="edit-expense-category" value="Food">
-                    </div>
+                   <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">付款人</label>
+<div id="edit-expense-payer-select" class="flex gap-2 mb-3">
+    <button type="button" class="block-select-btn flex-1" data-payer="Josh" onclick="window.selectPayer('Josh', 'edit-expense')">Josh</button>
+    <button type="button" class="block-select-btn flex-1" data-payer="Candice" onclick="window.selectPayer('Candice', 'edit-expense')">Candice</button>
+</div>
 
-                    <label class="text-sm font-bold text-gray-500 block mb-2 ml-1">方式</label>
-                    <div id="edit-expense-payment-select" class="flex mb-6">
-                        <button type="button" class="block-select-btn flex-1" data-payment="Cash" onclick="window.selectPayment('Cash', 'edit-expense')">現金</button>
-                        <button type="button" class="block-select-btn flex-1" data-payment="Card" onclick="window.selectPayment('Card', 'edit-expense')">信用卡</button>
-                        <input type="hidden" id="edit-expense-payment" value="Cash">
-                    </div>
+<label class="text-sm font-bold text-gray-500 block mb-2 ml-1">類別</label>
+<div id="edit-expense-category-select" class="grid grid-cols-3 gap-2 mb-3">
+    <button type="button" class="block-select-btn" data-category="Food" onclick="window.selectCategory('Food', 'edit-expense')">餐飲</button>
+    <button type="button" class="block-select-btn" data-category="Transport" onclick="window.selectCategory('Transport', 'edit-expense')">交通</button>
+    <button type="button" class="block-select-btn" data-category="Accommodation" onclick="window.selectCategory('Accommodation', 'edit-expense')">住宿</button>
+    <button type="button" class="block-select-btn" data-category="Shopping" onclick="window.selectCategory('Shopping', 'edit-expense')">購物</button>
+    <button type="button" class="block-select-btn" data-category="Ticket" onclick="window.selectCategory('Ticket', 'edit-expense')">門票</button>
+    <button type="button" class="block-select-btn" data-category="Other" onclick="window.selectCategory('Other', 'edit-expense')">其他</button>
+</div>
+
+<label class="text-sm font-bold text-gray-500 block mb-2 ml-1">方式</label>
+<div id="edit-expense-payment-select" class="flex gap-2 mb-6">
+    <button type="button" class="block-select-btn flex-1" data-payment="Cash" onclick="window.selectPayment('Cash', 'edit-expense')">現金</button>
+    <button type="button" class="block-select-btn flex-1" data-payment="Card" onclick="window.selectPayment('Card', 'edit-expense')">信用卡</button>
+</div>
+                  
 
                     <button type="submit" class="w-full bg-custom-primary text-white p-3 rounded-2xl font-bold shadow-lg shadow-pink-200 hover:bg-custom-primary-dark transition">
                         <i class="fa-solid fa-check mr-1"></i> 儲存
