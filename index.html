@@ -91,25 +91,30 @@
             font-weight: 800;
         }
         
-       /* 記帳選擇按鈕樣式 */
+      /* 1. 基礎樣式：圓圓的框 + 閒置時灰色框 */
 .block-select-btn {
-    @apply px-4 py-2 border-2 rounded-xl text-sm font-bold transition duration-200 mr-2 mb-2;
+    /* 使用 rounded-full 達成膠囊狀圓角 */
+    @apply px-4 py-1 border-2 rounded-2xl text-sm font-bold transition-all duration-200 mr-2 mb-2 bg-white;
+    
+    /* 閒置時的顏色設定 */
+    border-color: #D1D5DB; /* 較明顯的灰色邊框 */
+    color: #6B7280;        /* 灰色文字 */
     white-space: nowrap;
-    border-color: #f0f0f0; /* 未選中時的淺灰色外框 */
 }
 
-/* 未選中時的滑鼠懸停效果 */
-.block-select-btn:not(.active-currency):not(.active-payer):not(.active-category):not(.active-payment):not(.active-filter) {
-    @apply bg-white text-gray-500 hover:bg-pink-50 hover:border-pink-100;
+/* 2. 閒置時滑鼠懸停效果 (微粉紅提示) */
+.block-select-btn:not(.active-currency):not(.active-payer):not(.active-category):not(.active-payment):not(.active-filter):hover {
+    border-color: #FF748D;
+    @apply bg-pink-50 text-pink-500;
 }
 
-/* ⭐️ 核心修改：選取時粉紅色填滿且有粉紅外框 */
+/* 3. 選取狀態：粉紅色填滿 + 粉紅色外框 */
 .active-currency, .active-payer, .active-category, .active-payment, .active-filter {
-    background-color: #FF748D !important; /* 粉紅色填滿 */
-    border-color: #FF748D !important;     /* 粉紅色外框 */
-    color: white !important;              /* 文字保持白色 */
+    background-color: #FF748D !important; /* 粉紅填滿 */
+    border-color: #FF748D !important;     /* 粉紅外框 */
+    color: white !important;              /* 選中時文字變白色 */
     @apply shadow-md;
-    transform: scale(1.05);               /* 保持微放大效果 */
+    transform: scale(1.05);               /* 選中時稍微放大增加質感 */
 }
 
         /* 行程時間線連接線 - 改成虛線更可愛 */
