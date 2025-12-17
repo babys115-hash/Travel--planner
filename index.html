@@ -182,23 +182,7 @@
             box-shadow: 0 0 0 3px rgba(255, 139, 167, 0.1);
         }
     </style>
-    /* 隱藏操作容器，並加入過渡動畫 */
-.expense-actions {
-    overflow: hidden;
-    transition: all 0.3s ease;
-    width: 0;
-    opacity: 0;
-    display: flex;
-    gap: 8px;
-}
-
-/* 當父容器被加上 active 類別時顯示 */
-.expense-item.active .expense-actions {
-    width: 80px; /* 根據圖標寬度調整 */
-    opacity: 1;
-    margin-left: 10px;
-}
-    <script type="module">
+      <script type="module">
         /* =========================
           Firebase 初始化 (使用 ES Modules)
         ========================= */
