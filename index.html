@@ -1562,12 +1562,12 @@ if (dateInput) {
                             <div class="w-1/3 relative">
                                 <label for="packing-category" class="text-sm font-bold text-gray-500 block mb-1 ml-1">分類</label>
                                 <select id="packing-category" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700 appearance-none">
-                                    <option value="證件">🪪</option>
-                                    <option value="衣物">👕</option>
-                                    <option value="電子">📱</option>
-                                    <option value="藥品">💊</option>
-                                    <option value="盥洗">🚿</option>
-                                    <option value="其他">🧩</option>
+                                    <option value="證件">🪪證件</option>
+                                    <option value="衣物">👕衣物</option>
+                                    <option value="電子">📱3C</option>
+                                    <option value="藥品">💊藥品</option>
+                                    <option value="盥洗">🚿盥洗</option>
+                                    <option value="其他">🧩其他</option>
                                 </select>
                                 <i class="fa-solid fa-chevron-down absolute right-3 top-[34px] text-gray-400 pointer-events-none text-xs"></i>
                             </div>
@@ -1671,6 +1671,7 @@ if (dateInput) {
                 <form id="edit-itinerary-form" onsubmit="window.saveItineraryItem(event)">
                     <input type="hidden" id="edit-date-key">
                     <input type="hidden" id="edit-item-index">
+		<input type="hidden" id="edit-expense-payer" value="Josh">
 
                     <label class="text-sm font-bold text-gray-500 mb-1 block ml-1">時間</label>
                     <input type="time" id="edit-time" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700 font-bold" required>
