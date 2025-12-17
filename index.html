@@ -900,7 +900,7 @@ window.saveBudget = async function() {
             const candicePaidEl = document.getElementById('candice-paid');
             const settlementElement = document.getElementById('settlement-result');
 
-            if (totalBudgetEl) totalBudgetEl.textContent = TOTAL_BUDGET_TWD.toLocaleString();
+            if (totalBudgetEl) totalBudgetEl.textContent = TOTAL_BUDGET .toLocaleString();
             if (totalSpentEl) totalSpentEl.textContent = Math.round(totalSpentTWD).toLocaleString();
             if (remainingBudgetEl) remainingBudgetEl.textContent = Math.round(remainingBudget).toLocaleString();
             
