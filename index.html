@@ -91,19 +91,26 @@
             font-weight: 800;
         }
         
-        /* 記帳選擇按鈕樣式 */
-        .block-select-btn {
-            @apply px-4 py-2 border-2 rounded-xl text-sm font-bold transition duration-200 mr-2 mb-2;
-            white-space: nowrap;
-            border-color: #f0f0f0;
-        }
-        .block-select-btn:not(.active-currency):not(.active-payer):not(.active-category):not(.active-payment):not(.active-filter) {
-            @apply bg-white text-gray-500 hover:bg-orange-50 hover:border-orange-100;
-        }
-        .active-currency, .active-payer, .active-category, .active-payment, .active-filter {
-            @apply bg-custom-primary text-white border-custom-primary shadow-md;
-            transform: scale(1.05);
-        }
+       /* 記帳選擇按鈕樣式 */
+.block-select-btn {
+    @apply px-4 py-2 border-2 rounded-xl text-sm font-bold transition duration-200 mr-2 mb-2;
+    white-space: nowrap;
+    border-color: #f0f0f0; /* 未選中時的淺灰色外框 */
+}
+
+/* 未選中時的滑鼠懸停效果 */
+.block-select-btn:not(.active-currency):not(.active-payer):not(.active-category):not(.active-payment):not(.active-filter) {
+    @apply bg-white text-gray-500 hover:bg-pink-50 hover:border-pink-100;
+}
+
+/* ⭐️ 核心修改：選取時粉紅色填滿且有粉紅外框 */
+.active-currency, .active-payer, .active-category, .active-payment, .active-filter {
+    background-color: #FF748D !important; /* 粉紅色填滿 */
+    border-color: #FF748D !important;     /* 粉紅色外框 */
+    color: white !important;              /* 文字保持白色 */
+    @apply shadow-md;
+    transform: scale(1.05);               /* 保持微放大效果 */
+}
 
         /* 行程時間線連接線 - 改成虛線更可愛 */
         .timeline-container {
@@ -1394,7 +1401,7 @@ window.saveBudget = async function() {
                         </h3>
                         <div class="grid grid-cols-2 gap-3 text-sm mb-4">
                             <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
-                                <div id="budget-display-container">a
+                                <div id="budget-display-container">
     <p class="text-gray-400 text-xs mb-1">預算總額 (TWD)</p>
     
     <p id="budget-display" class="font-bold text-gray-700 text-lg flex items-center cursor-pointer" onclick="window.enableBudgetEdit()">
