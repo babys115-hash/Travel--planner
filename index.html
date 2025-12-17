@@ -206,20 +206,15 @@
 window.enableBudgetEdit = function() {
     const display = document.getElementById('budget-display');
     const form = document.getElementById('budget-edit-form');
-    const input = document.getElementById('budget-input');
-    const totalBudgetSpan = document.getElementById('total-budget');
-
-// 取得目前顯示的數字 (移除千分位逗號)
-    const currentVal = totalBudgetSpan.innerText.replace(/,/g, '');
-
+    const budgetValue = document.getElementById('total-budget').innerText.replace(/,/g, ''); // 移除千位分隔符
+    
     // 隱藏顯示區塊，顯示編輯表單
     display.classList.add('hidden');
     form.classList.remove('hidden');
     
     // 將當前值賦予 input 並聚焦
-    if(currentVal !== '---') {
-        input.value = currentVal;
-    }
+    const input = document.getElementById('budget-input');
+    input.value = budgetValue;
     input.focus();
 };
 
@@ -231,8 +226,8 @@ window.cancelBudgetEdit = function() {
 
 // 3. 儲存預算並更新 Firebase (假設 trip info 儲存在 trips 集合的 'currentTrip' 文件中)
 window.saveBudget = async function() {
-    const inputElement = document.getElementById('budget-input');
-    const newBudget = parseFloat(inputElement.value);
+    const newBudgetString = document.getElementById('budget-input').value;
+    const newBudget = parseFloat(newBudgetString);
 
     if (isNaN(newBudget) || newBudget < 0) {
         alert("請輸入有效的預算金額。");
@@ -240,20 +235,24 @@ window.saveBudget = async function() {
     }
 
     try {
+        // 假設您的 trip info 儲存在一個固定的文件 ID 下
         const tripDocRef = doc(db, "trips", "currentTrip"); 
         
-        // ⭐️ 使用 setDoc 確保即使文件不存在也能建立，且不覆蓋其他欄位
-        await setDoc(tripDocRef, {
+        // 更新 Firebase
+        await updateDoc(tripDocRef, {
             totalBudget: newBudget 
-        }, { merge: true });
+        });
 
-        // 成功後隱藏編輯框，等待 onSnapshot 自動更新 UI
+        // 更新成功後，刷新顯示和狀態
+        document.getElementById('total-budget').innerText = newBudget.toLocaleString(); // 格式化顯示
         window.cancelBudgetEdit();
-        console.log("預算已成功更新至 Firebase");
+        
+        // 假設您有一個函式來渲染記帳概況，需要重新調用
+        // window.renderExpenseSummary(); 
 
     } catch (error) {
         console.error("更新預算失敗: ", error);
-        alert("更新預算失敗，請確認 Firebase 設定。");
+        alert("更新預算失敗，請檢查網路連線。");
     }
 };
 
@@ -340,7 +339,7 @@ window.saveBudget = async function() {
             document.getElementById('total-budget').innerText = budget.toLocaleString();
 
             // 存儲預算到全域變數 (如果需要計算支出百分比)
-            window.TOTAL_BUDGET = budget; 
+            window.TOTAL_BUDGET = budget;
             
             // 重新渲染支出概況，以便更新預算百分比
             window.renderExpenseTracking(); 
@@ -1395,30 +1394,24 @@ window.saveBudget = async function() {
                         </h3>
                         <div class="grid grid-cols-2 gap-3 text-sm mb-4">
                             <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
-                                   
-    
-   <<div id="budget-display-container">
+                                <div id="budget-display-container">a
     <p class="text-gray-400 text-xs mb-1">預算總額 (TWD)</p>
     
-    <p id="budget-display" class="font-bold text-gray-700 text-lg flex items-center cursor-pointer group" onclick="window.enableBudgetEdit()">
-        $ <span id="total-budget" class="ml-1">---</span> 
-        <i class="fa-solid fa-pen-to-square ml-2 text-gray-300 group-hover:text-custom-primary text-sm transition-colors"></i>
+    <p id="budget-display" class="font-bold text-gray-700 text-lg flex items-center cursor-pointer" onclick="window.enableBudgetEdit()">
+        $ <span id="total-budget">50,000</span> <i class="fa-solid fa-pen-to-square ml-2 text-custom-primary text-sm"></i>
     </p>
 
-    <div id="budget-edit-form" class="hidden flex items-center space-x-2 mt-1">
+    <div id="budget-edit-form" class="hidden flex items-center space-x-2">
         <span class="font-bold text-gray-700 text-lg">$</span>
-        <input type="number" id="budget-input" class="w-28 border-b-2 border-custom-primary focus:outline-none text-gray-700 text-lg font-bold p-0 bg-transparent" placeholder="輸入金額">
-        
-        <button onclick="window.saveBudget()" class="text-white bg-custom-primary w-7 h-7 rounded-full flex items-center justify-center shadow-sm">
-            <i class="fa-solid fa-check text-xs"></i>
+        <input type="number" id="budget-input" value="50000" class="w-24 border-b border-gray-400 focus:outline-none focus:border-custom-primary text-gray-700 text-lg font-bold p-1">
+        <button onclick="window.saveBudget()" class="text-white bg-custom-primary p-1 rounded-md text-sm hover:bg-custom-primary/90">
+            <i class="fa-solid fa-check"></i>
         </button>
-        <button onclick="window.cancelBudgetEdit()" class="text-gray-400 w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100">
-            <i class="fa-solid fa-xmark text-xs"></i>
+        <button onclick="window.cancelBudgetEdit()" class="text-gray-500 p-1 rounded-md text-sm hover:text-gray-700">
+            <i class="fa-solid fa-xmark"></i>
         </button>
     </div>
 </div>
-
-    
                             </div>
                             <div class="p-3 bg-white/80 rounded-2xl shadow-sm">
                                 <p class="text-gray-400 text-xs mb-1">已花總額 (TWD)</p>
