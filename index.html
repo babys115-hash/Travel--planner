@@ -745,20 +745,34 @@ window.saveBudget = async function() {
         }
         
         // 選擇支付方式 (通用函式，用於新增和編輯)
-        window.selectPayment = function(payment, prefix = 'expense') {
-            const paymentId = `${prefix}-payment`;
-            const containerId = `${prefix}-payment-select`;
-            
-            ACTIVE_PAYMENT = payment;
+        window.selectPayment = (payment, context = 'expense') => {
+    // 1. 定義要操作的容器 ID 與隱藏欄位 ID
+    const containerId = context === 'expense' ? 'expense-payment-select' : 'edit-expense-payment-select';
+    const inputId = context === 'expense' ? 'expense-payment' : 'edit-expense-payment';
+    
+    const container = document.getElementById(containerId);
+    const input = document.getElementById(inputId);
 
-            document.querySelectorAll(`#${containerId} .block-select-btn`).forEach(btn => {
-                btn.classList.remove('active-payment');
-                if (btn.getAttribute('data-payment') === payment) {
-                    btn.classList.add('active-payment');
-                }
-            });
-            document.getElementById(paymentId).value = payment;
+    if (!container) return;
+
+    // 2. 更新隱藏 input 的值
+    if (input) input.value = payment;
+
+    // 3. 只針對該容器內的按鈕進行變色處理
+    container.querySelectorAll('.block-select-btn').forEach(btn => {
+        // 使用 getAttribute 確保精確比對 data-payment 的字串
+        if (btn.getAttribute('data-payment') === payment) {
+            btn.classList.add('active-payment');
+        } else {
+            btn.classList.remove('active-payment');
         }
+    });
+
+    // 4. 如果是新增模式，同步更新全域變數
+    if (context === 'expense') {
+        ACTIVE_PAYMENT = payment;
+    }
+};
 
         // 選擇類別 (篩選清單)
         window.filterExpenses = function(category) {
@@ -1397,7 +1411,7 @@ if (dateInput) {
                         <div id="expense-payment-select" class="flex mb-6">
                             <button type="button" class="block-select-btn flex-1" data-payment="Cash" onclick="window.selectPayment('Cash')"><i class="fa-solid fa-money-bill mr-1"></i> 現金</button>
                             <button type="button" class="block-select-btn flex-1" data-payment="Card" onclick="window.selectPayment('Card')"><i class="fa-regular fa-credit-card mr-1"></i> 信用卡</button>
-<button type="button" class="block-select-btn flex-1" data-payment="Paypay" onclick="window.selectPayment('Paypay')"><i class="fa-regular fa-credit-card mr-1"></i> Paypay</button>
+			<button type="button" class="block-select-btn flex-1" data-payment="Paypay" onclick="window.selectPayment('Paypay')"><i class="fa-regular fa-credit-card mr-1"></i> Paypay</button>
                             <input type="hidden" id="expense-payment" value="Cash">
                         </div>
 
@@ -1696,7 +1710,8 @@ if (dateInput) {
 <div id="edit-expense-payment-select" class="flex gap-2 mb-6">
     <button type="button" class="block-select-btn flex-1" data-payment="Cash" onclick="window.selectPayment('Cash', 'edit-expense')">現金</button>
     <button type="button" class="block-select-btn flex-1" data-payment="Card" onclick="window.selectPayment('Card', 'edit-expense')">信用卡</button>
-<button type="button" class="block-select-btn flex-1" data-payment="Paypay" onclick="window.selectPayment('Paypay', 'edit-expense')">Paypay</button>
+    <button type="button" class="block-select-btn flex-1" data-payment="Paypay" onclick="window.selectPayment('Paypay', 'edit-expense')">Paypay</button>
+    <input type="hidden" id="edit-expense-payment" value="Cash">
 </div>
                   
 
