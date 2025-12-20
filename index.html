@@ -196,16 +196,10 @@ window.editExpense = editExpense;
         ========================= */
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
         import {
-            getFirestore,
-            collection,
-            doc,
-            setDoc, // 用於覆寫整個文件 (例如新增行程天數時)
+            getFirestore, collection, doc, setDoc, // 用於覆寫整個文件 (例如新增行程天數時)
             addDoc, // 用於新增文件 (例如記帳和慾望清單)
             updateDoc, // 用於更新現有文件 (例如修改行程內容)
-            deleteDoc,
-            onSnapshot,
-            query,
-            orderBy,
+            deleteDoc, onSnapshot, query, orderBy,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
         
@@ -221,6 +215,7 @@ window.editExpense = editExpense;
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
 /* ===================================================
   預算編輯與儲存功能
 =================================================== */
@@ -420,19 +415,6 @@ async function updateLiveExchangeRate() {
                 console.error("Error listening to wishlists: ", error);
             });
 
-            // 4. ⭐️ 新增：打包清單 (PackingList) - 按打包狀態和時間排序
-            const packingQuery = query(collection(db, "packinglist"), orderBy("packed", "asc"), orderBy("timestamp", "desc"));
-            onSnapshot(packingQuery, (snapshot) => {
-                PACKING_DATA = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                if (document.getElementById('packing-tab') && document.getElementById('packing-tab').classList.contains('hidden') === false) {
-                    window.renderPackingList();
-                }
-            }, (error) => {
-                console.error("Error listening to packinglist: ", error);
-            });
             
             // 渲染匯率 (靜態)
             document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
@@ -1057,11 +1039,70 @@ async function updateLiveExchangeRate() {
     // 更新結算摘要
     if (window.updateSettlementSummary) window.updateSettlementSummary();
 };
-        
+        // 渲染打包清單 (從 PACKING_DATA 讀取) 
+
+ window.PACKING_DATA = [];
+
+   // ✅ 不依賴 timestamp，直接抓全部資料
+    const packingQuery = collection(db, "packinglist");
+    onSnapshot(packingQuery, (snapshot) => {
+      window.PACKING_DATA = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      window.renderPackingList();
+    }, (error) => {
+      console.error("Packinglist snapshot error:", error);
+    });
+
+    window.renderPackingList = function() {
+      const container = document.getElementById('packing-list-container');
+      if (!container) return;
+
+      if (window.PACKING_DATA.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-400">您的行李清單是空的！</p>';
+        return;
+      }
+
+      container.innerHTML = window.PACKING_DATA.map(item => {
+        const isPacked = item.packed;
+        return `
+
+         <div class="p-3 rounded-xl shadow-sm border flex justify-between items-center ${isPacked ? 'bg-gray-50' : 'bg-white'}">
+            <div class="flex items-center cursor-pointer" onclick="window.togglePackingStatus('${item.id}', ${isPacked})">
+              <i class="fa-solid ${isPacked ? 'fa-check-circle text-teal-500' : 'fa-circle text-gray-300'} mr-3"></i>
+              <div>
+                <p class="${isPacked ? 'line-through text-gray-400 italic' : 'text-gray-700 font-bold'}">${item.name}</p>
+                <p class="text-xs text-gray-400">${item.category}</p>
+              </div>
+            </div>
+            <button onclick="window.deletePackingItem('${item.id}')" class="text-gray-300 hover:text-red-400">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+    };
+     window.addPackingItem = async function(event) {
+      event.preventDefault();
+      const name = document.getElementById('packing-name').value;
+      const category = document.getElementById('packing-category').value;
+      if (!name || !category) return;
+
+      const newItem = { name, category, packed: false };
+      await addDoc(collection(db, "packinglist"), newItem);
+      document.getElementById('packing-form').reset();
+    };
+
+    window.togglePackingStatus = async function(id, currentStatus) {
+      await updateDoc(doc(db, "packinglist", id), { packed: !currentStatus });
+    };
+
+    window.deletePackingItem = async function(id) {
+      if (!confirm('確定要刪除這筆打包清單項目嗎？')) return;
+      await deleteDoc(doc(db, "packinglist", id));
+    };
 
         /* ===================================================
           慾望清單 (WISHLIST) 相關函式
-        =================================================== */
+        ============================================  xz======= */
         
         // 新增慾望清單項目 (Add)
         window.addWishlistItem = async function(event) {
@@ -1155,101 +1196,7 @@ async function updateLiveExchangeRate() {
             }).join('');
         }
 
-        /* ===================================================
-          ⭐️ 新增：打包行李 (PACKING LIST) 相關函式
-        =================================================== */
-        
-        // ⭐️ 新增：渲染打包清單
-        window.renderPackingList = function() {
-            const packingListContainer = document.getElementById('packing-list-container');
-            if (!packingListContainer) return;
-
-            if (PACKING_DATA.length === 0) {
-                packingListContainer.innerHTML = '<p class="text-center text-gray-400 text-sm mt-6"><i class="fa-solid fa-suitcase text-2xl mb-2 block text-gray-200"></i>您的行李清單是空的！</p>';
-                return;
-            }
-
-            packingListContainer.innerHTML = PACKING_DATA.map(item => {
-                const isPacked = item.packed;
-                const statusClass = isPacked ? 'packed' : 'not-packed';
-                const statusIcon = isPacked ? 'fa-check-circle' : 'fa-circle';
-                const itemClass = isPacked ? 'line-through text-gray-400 italic' : 'text-gray-700 font-bold';
-                const bgClass = isPacked ? 'bg-gray-50' : 'bg-white';
-                
-                return `
-                    <div class="p-3 mb-2 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center ${bgClass} hover:bg-pink-50 transition duration-150">
-                        <div class="flex items-center flex-1 min-w-0 cursor-pointer" onclick="window.togglePackingStatus('${item.id}', ${item.packed})">
-                            <button class="packing-status-btn mr-3 text-lg">
-                                <i class="fa-solid ${statusIcon} ${isPacked ? 'text-custom-secondary' : 'text-gray-300'}"></i>
-                            </button>
-                            <div class="min-w-0">
-                                <p class="${itemClass} truncate text-lg">${item.name}</p>
-                                <p class="text-xs text-gray-400">${item.category}</p>
-                            </div>
-                        </div>
-                        <div class="text-right ml-4">
-                            <button onclick="window.deletePackingItem('${item.id}')" class="text-gray-300 hover:text-red-400 text-sm p-2">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // ⭐️ 新增：新增打包項目 (Add Packing Item)
-        window.addPackingItem = async function(event) {
-            event.preventDefault();
-            const name = document.getElementById('packing-name').value;
-            const category = document.getElementById('packing-category').value;
-            
-            if (!name || !category) {
-                alert('請填寫項目名稱和類別！');
-                return;
-            }
-
-            const newItem = {
-                name: name,
-                category: category,
-                packed: false, // 預設為未打包
-                timestamp: serverTimestamp()
-            };
-
-            try {
-                await addDoc(collection(db, "packinglist"), newItem);
-                alert('打包清單新增成功！');
-                document.getElementById('packing-form').reset();
-            } catch (e) {
-                console.error("Error adding packing item: ", e);
-                alert('新增打包清單失敗。');
-            }
-        }
-
-        // ⭐️ 新增：切換打包狀態 (Update Packing Status)
-        window.togglePackingStatus = async function(id, currentStatus) {
-            try {
-                const docRef = doc(db, "packinglist", id);
-                await updateDoc(docRef, {
-                    packed: !currentStatus
-                });
-            } catch (e) {
-                console.error("Error updating packing status: ", e);
-                alert('更新狀態失敗。');
-            }
-        }
-
-        // ⭐️ 新增：刪除打包清單項目
-        window.deletePackingItem = async function(id) {
-            if (!confirm('確定要刪除這筆打包清單項目嗎？')) return;
-            try {
-                await deleteDoc(doc(db, "packinglist", id));
-            } catch (e) {
-                console.error("Error deleting packing item: ", e);
-                alert('刪除失敗。');
-            }
-        }
-        
-        /* ===================================================
+              /* ===================================================
           通用函式 (Modal, Navigation, Initialization)
         =================================================== */
 
@@ -1568,47 +1515,49 @@ if (dateInput) {
                 <div id="wishlist-list" class="space-y-3">
                     </div>
             </div>
-            
-            <div id="packing-tab" class="main-tab-content hidden p-4">
-                <div class="bg-white p-5 rounded-3xl shadow-sm border border-blue-100 mb-6">
-                    <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                        <i class="fa-solid fa-shirt mr-2 text-custom-secondary"></i> 新增行李
-                    </h3>
-                    
-                    <form id="packing-form" onsubmit="window.addPackingItem(event)">
-                        <div class="flex gap-2 mb-3">
-                            <div class="flex-1">
-                                <label for="packing-name" class="text-sm font-bold text-gray-500 block mb-1 ml-1">物品名稱</label>
-                                <input type="text" id="packing-name" placeholder="護照" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700" required>
-                            </div>
-                            <div class="w-1/3 relative">
-                                <label for="packing-category" class="text-sm font-bold text-gray-500 block mb-1 ml-1">分類</label>
-                                <select id="packing-category" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700 appearance-none">
-                                    <option value="證件">🪪證件</option>
-                                    <option value="衣物">👕衣物</option>
-                                    <option value="電子">📱3C</option>
-                                    <option value="藥品">💊藥品</option>
-                                    <option value="盥洗">🚿盥洗</option>
-                                    <option value="其他">🧩其他</option>
-                                </select>
-                                <i class="fa-solid fa-chevron-down absolute right-3 top-[34px] text-gray-400 pointer-events-none text-xs"></i>
-                            </div>
-                        </div>
+	<div id="packing-tab" class="main-tab-content hidden">
 
-                        <button type="submit" class="w-full bg-custom-secondary text-white p-3 rounded-2xl font-bold shadow-lg shadow-teal-100 hover:bg-opacity-90 transition">
-                            <i class="fa-solid fa-plus mr-1"></i> 加入行李箱
-                        </button>
-                    </form>
-                </div>
+  <!-- 新增行李表單卡片 -->
+  <div class="bg-white p-5 rounded-3xl shadow-sm border border-blue-100 mb-6">
+    <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
+      <i class="fa-solid fa-shirt mr-2 text-custom-secondary"></i> 新增行李
+    </h3>
 
-                <h3 class="text-lg font-bold text-gray-700 mb-3 flex items-center px-2">
-                    <i class="fa-solid fa-clipboard-check mr-2 text-custom-primary"></i> 檢查清單
-                </h3>
-                <div id="packing-list-container" class="space-y-2">
-                    </div>
-            </div>
+    <form id="packing-form" onsubmit="window.addPackingItem(event)">
+      <div class="flex gap-2 mb-3">
+        <div class="flex-1">
+          <label for="packing-name" class="text-sm font-bold text-gray-500 block mb-1 ml-1">物品名稱</label>
+          <input type="text" id="packing-name" placeholder="護照" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700" required>
+        </div>
+        <div class="w-1/3 relative">
+          <label for="packing-category" class="text-sm font-bold text-gray-500 block mb-1 ml-1">分類</label>
+          <select id="packing-category" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700 appearance-none">
+            <option value="證件">🪪 證件</option>
+            <option value="衣物">👕 衣物</option>
+            <option value="電子">📱 3C</option>
+            <option value="藥品">💊 藥品</option>
+            <option value="盥洗">🚿 盥洗</option>
+            <option value="其他">🧩 其他</option>
+          </select>
+          <i class="fa-solid fa-chevron-down absolute right-3 top-[34px] text-gray-400 pointer-events-none text-xs"></i>
+        </div>
+      </div>
 
-            <div id="weather-tab" class="main-tab-content hidden p-4">
+      <button type="submit" class="w-full bg-custom-secondary text-white p-3 rounded-2xl font-bold shadow-lg shadow-teal-100 hover:bg-opacity-90 transition">
+        <i class="fa-solid fa-plus mr-1"></i> 加入行李箱
+      </button>
+    </form>
+  </div>
+
+  <!-- 檢查清單 -->
+  <h3 class="text-lg font-bold text-gray-700 mb-3 flex items-center px-2">
+    <i class="fa-solid fa-clipboard-check mr-2 text-custom-primary"></i> 檢查清單
+  </h3>
+  <div id="packing-list-container" class="space-y-2"></div>
+
+</div>
+
+<div id="weather-tab" class="main-tab-content hidden p-4">
                 <div class="bg-gradient-to-b from-blue-100 to-white p-8 rounded-3xl text-center shadow-inner mb-6">
                     <i class="fa-solid fa-sun text-6xl text-yellow-400 mb-4 drop-shadow-md"></i>
                     <h2 class="text-2xl font-bold text-gray-700 mb-2">福岡好天氣</h2>
