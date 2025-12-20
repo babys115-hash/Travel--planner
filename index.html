@@ -1672,7 +1672,8 @@ if (dateInput) {
             </div>
         </div>
         
-        <div id="editExpenseModal" class="fixed inset-0 bg-black bg-opacity-30 hidden items-center justify-center z-50">
+       <!-- 編輯支出 Modal -->
+<div id="editExpenseModal" class="fixed inset-0 bg-black bg-opacity-30 hidden items-center justify-center z-50">
   <div class="bg-white p-6 rounded-2xl shadow-lg w-[90%] max-w-md">
     <h3 class="text-lg font-bold mb-4 text-gray-700 flex items-center">
       <i class="fa-solid fa-pen-to-square text-custom-primary mr-2"></i> 編輯支出
@@ -1680,21 +1681,63 @@ if (dateInput) {
     <form onsubmit="window.saveExpenseUpdate(event)">
       <input type="hidden" id="edit-expense-id">
 
+      <!-- 日期 -->
       <label class="block mb-2 text-sm font-bold">日期</label>
       <input type="date" id="edit-expense-date" class="w-full p-3 border rounded-xl mb-4">
 
+      <!-- 金額 -->
       <label class="block mb-2 text-sm font-bold">金額</label>
       <input type="number" id="edit-expense-amount" class="w-full p-3 border rounded-xl mb-4">
 
+      <!-- 支出說明 -->
       <label class="block mb-2 text-sm font-bold">支出說明</label>
       <input type="text" id="edit-expense-description" class="w-full p-3 border rounded-xl mb-4">
 
-      <!-- 其他欄位：幣別、付款人、類別、支付方式 -->
+      <!-- 幣別 -->
+      <label class="block mb-2 text-sm font-bold">幣別</label>
+      <div id="edit-expense-currency-select" class="flex flex-wrap mb-4">
+        <button type="button" class="block-select-btn" data-currency="TWD"
+                onclick="window.selectCurrency('TWD','edit-expense')">TWD</button>
+        <button type="button" class="block-select-btn" data-currency="JPY"
+                onclick="window.selectCurrency('JPY','edit-expense')">JPY</button>
+      </div>
       <input type="hidden" id="edit-expense-currency">
+
+      <!-- 付款人 -->
+      <label class="block mb-2 text-sm font-bold">付款人</label>
+      <div id="edit-expense-payer-select" class="flex flex-wrap mb-4">
+        <button type="button" class="block-select-btn" data-payer="Josh"
+                onclick="window.selectPayer('Josh','edit-expense')">Josh</button>
+        <button type="button" class="block-select-btn" data-payer="Candice"
+                onclick="window.selectPayer('Candice','edit-expense')">Candice</button>
+      </div>
       <input type="hidden" id="edit-expense-payer">
+
+      <!-- 類別 -->
+      <label class="block mb-2 text-sm font-bold">類別</label>
+      <div id="edit-expense-category-select" class="flex flex-wrap mb-4">
+        <button type="button" class="block-select-btn" data-category="Food"
+                onclick="window.selectCategory('Food','edit-expense')">餐飲</button>
+        <button type="button" class="block-select-btn" data-category="Transport"
+                onclick="window.selectCategory('Transport','edit-expense')">交通</button>
+        <button type="button" class="block-select-btn" data-category="Accommodation"
+                onclick="window.selectCategory('Accommodation','edit-expense')">住宿</button>
+        <button type="button" class="block-select-btn" data-category="Shopping"
+                onclick="window.selectCategory('Shopping','edit-expense')">購物</button>
+      </div>
       <input type="hidden" id="edit-expense-category">
+
+      <!-- 支付方式 -->
+      <label class="block mb-2 text-sm font-bold">支付方式</label>
+      <div id="edit-expense-payment-select" class="flex flex-wrap mb-4">
+        <button type="button" class="block-select-btn" data-payment="Cash"
+                onclick="window.selectPayment('Cash','edit-expense')">現金</button>
+        <button type="button" class="block-select-btn" data-payment="Card"
+                onclick="window.selectPayment('Card','edit-expense')">信用卡</button>
+      </div>
       <input type="hidden" id="edit-expense-payment">
 
+      <!-- 按鈕 -->
       <div class="flex justify-end gap-2 mt-4">
         <button type="button" onclick="window.closeModal('editExpenseModal')" class="px-4 py-2 bg-gray-200 rounded">取消</button>
         <button type="submit" class="px-4 py-2 bg-custom-primary text-white rounded">儲存</button>
