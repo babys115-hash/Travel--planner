@@ -426,7 +426,19 @@ async function updateLiveExchangeRate() {
             // 渲染匯率 (靜態)
             document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
         }
-
+// 在 startDataSync 函式內加入
+const spotsQuery = query(collection(db, "spots"), orderBy("createdAt", "desc"));
+onSnapshot(spotsQuery, (snapshot) => {
+    // 將資料存入全域變數，方便之後呼叫
+    window.SPOTS_DATA = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+    }));
+    // 每次資料變動，自動執行畫面的渲染
+    window.renderSpots(); 
+}, (error) => {
+    console.error("監聽 Spots 失敗:", error);
+});
         /* ===================================================
           行程 (ITINERARY) 相關函式
         =================================================== */
@@ -1202,8 +1214,99 @@ async function updateLiveExchangeRate() {
                 `;
             }).join('');
         }
+window.addSpot = async function() {
+    // 1. 取得輸入框元件
+    const nameEl = document.getElementById('new-spot-name');
+    const descEl = document.getElementById('new-spot-desc');
+    const linkEl = document.getElementById('new-spot-link');
 
-              /* ===================================================
+    const name = nameEl.value.trim();
+    const description = descEl.value.trim();
+    const link = linkEl.value.trim();
+
+    // 2. 檢查必填欄位
+    if (!name) {
+        alert("請輸入景點名稱！");
+        return;
+    }
+
+    try {
+        // 3. 執行 Firebase 新增動作
+        const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
+        
+        console.log("正在上傳至 Firebase...");
+        
+        await addDoc(collection(db, "spots"), {
+            name: name,
+            description: description,
+            link: link,
+            createdAt: serverTimestamp() // 使用伺服器時間排序
+        });
+
+        console.log("上傳成功！");
+
+        // 4. 清空輸入框
+        nameEl.value = '';
+        descEl.value = '';
+        linkEl.value = '';
+        
+    } catch (e) {
+        console.error("Firebase 上傳失敗:", e);
+        alert("上傳失敗，請檢查網路或 Firebase Console 設定。");
+    }
+};
+window.renderSpots = function() {
+    const container = document.getElementById('spots-container');
+    if (!container) return;
+
+    const data = window.SPOTS_DATA || [];
+
+    if (data.length === 0) {
+        container.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm">目前還沒有想去的地點喔！</p>`;
+        return;
+    }
+
+    container.innerHTML = data.map(spot => `
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-3 transition-all hover:shadow-md">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <h3 class="font-bold text-gray-700 flex items-center">
+                        <i class="fa-solid fa-location-dot text-custom-primary mr-2"></i>
+                        ${spot.name}
+                    </h3>
+                    
+                    ${spot.description ? `
+                        <p class="text-sm text-gray-500 mt-2 bg-gray-50 p-2 rounded-lg leading-relaxed">
+                            ${spot.description}
+                        </p>` : ''}
+                    
+                    ${spot.link ? `
+                        <div class="mt-3">
+                            <a href="${spot.link}" target="_blank" class="inline-flex items-center text-xs text-custom-secondary font-bold hover:underline">
+                                <i class="fa-solid fa-map-location-dot mr-1 text-sm"></i>
+                                在地圖中開啟
+                            </a>
+                        </div>` : ''}
+                </div>
+
+                <button onclick="window.deleteSpot('${spot.id}')" class="ml-2 w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-400 transition">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+};
+window.deleteSpot = async function(id) {
+    if (!confirm('確定要移除這個地點嗎？')) return;
+    try {
+        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
+        await deleteDoc(doc(db, "spots", id));
+        // 不需要手動刷頁面，onSnapshot 會自動處理
+    } catch (e) {
+        console.error("刪除失敗:", e);
+    }
+};
+     /* ===================================================
           通用函式 (Modal, Navigation, Initialization)
         =================================================== */
 
@@ -1579,11 +1682,7 @@ if (dateInput) {
             </div>
 
             <div id="overview-tab" class="main-tab-content hidden p-4">
-                <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center">
-                    <i class="fa-solid fa-chart-pie mr-2 text-custom-primary"></i> 旅程儀表板
-                </h2>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="p-6 bg-yellow-50 rounded-3xl shadow-sm border border-yellow-100 text-center">
+                <h2 class="text-xl iv class="p-6 bg-yellow-50 rounded-3xl shadow-sm border border-yellow-100 text-center">
                         <i class="fa-regular fa-calendar text-2xl text-yellow-500 mb-2 block"></i>
                         <p class="text-xs text-yellow-700 font-bold uppercase tracking-wider mb-1">Duration</p>
                         <p class="text-2xl font-bold text-yellow-900 font-mono">6 Days</p>
@@ -1593,14 +1692,26 @@ if (dateInput) {
                         <p class="text-xs text-green-700 font-bold uppercase tracking-wider mb-1">Budget</p>
                         <p class="text-2xl font-bold text-green-900 font-mono">$80k</p>
                     </div>
-                </div>
                 
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-pink-100">
+    <h2 class="text-xl font-bold text-gray-700 mb-4"><i class="fa-solid fa-map-pin text-pink-400 mr-2"></i>想去地點清單</h2>
+    
+    <div class="grid grid-cols-1 gap-2 mb-6">
+        <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="p-3 bg-gray-50 rounded-xl text-sm">
+        <input type="text" id="new-spot-desc" placeholder="簡單附註 (選填)" class="p-3 bg-gray-50 rounded-xl text-sm">
+        <input type="text" id="new-spot-link" placeholder="Google Map 連結" class="p-3 bg-gray-50 rounded-xl text-sm">
+        <button onclick="window.addSpot()" class="bg-custom-primary text-white py-3 rounded-xl font-bold">新增景點</button>
+    </div>
+
+    <div id="spots-container" class="space-y-3">
+        </div>
+</div>
                 <div class="mt-6 p-6 bg-white rounded-3xl shadow-sm border border-gray-100 text-center">
                    <p class="text-gray-400 mb-4">更多統計圖表開發中...</p>
                    <i class="fa-solid fa-laptop-code text-4xl text-gray-200"></i>
                 </div>
             </div>
-
+</div>
         </main>
 
         <!-- Modals 樣式優化 -->
@@ -1745,4 +1856,21 @@ if (dateInput) {
     </form>
   </div>
 </div>
+<<div id="overview-tab" class="main-tab-content hidden p-4">
+    <div class="bg-white rounded-3xl p-6 shadow-sm border border-pink-100 mb-6">
+        <h2 class="text-lg font-bold mb-4 text-gray-700">新增想去地點</h2>
+        <div class="space-y-3">
+            <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
+            <input type="text" id="new-spot-desc" placeholder="附註 (String)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
+            <input type="text" id="new-spot-link" placeholder="地圖連結 (String)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
+            <button onclick="window.addSpot()" class="w-full bg-custom-primary text-white py-3 rounded-xl font-bold shadow-lg">
+                確認新增
+            </button>
+        </div>
+    </div>
+
+    <div id="spots-container" class="space-y-4">
+        </div>
+</div>
+
 
