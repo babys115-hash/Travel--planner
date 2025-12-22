@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -190,22 +191,23 @@ function editExpense(expenseId) {
   window.openEditExpenseModal(expenseId);
 }
 window.editExpense = editExpense;
+window.openModal = function(id) {
+  document.getElementById(id).classList.remove('hidden');
+};
+window.closeModal = function(id) {
+  document.getElementById(id).classList.add('hidden');
+};
+
 
         /* =========================
           Firebase 初始化 (使用 ES Modules)
         ========================= */
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
         import {
-            getFirestore,
-            collection,
-            doc,
-            setDoc, // 用於覆寫整個文件 (例如新增行程天數時)
+            getFirestore, collection, doc, setDoc, // 用於覆寫整個文件 (例如新增行程天數時)
             addDoc, // 用於新增文件 (例如記帳和慾望清單)
             updateDoc, // 用於更新現有文件 (例如修改行程內容)
-            deleteDoc,
-            onSnapshot,
-            query,
-            orderBy,
+            deleteDoc, onSnapshot, query, orderBy,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
         
@@ -221,6 +223,7 @@ window.editExpense = editExpense;
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
 /* ===================================================
   預算編輯與儲存功能
 =================================================== */
@@ -420,24 +423,23 @@ async function updateLiveExchangeRate() {
                 console.error("Error listening to wishlists: ", error);
             });
 
-            // 4. ⭐️ 新增：打包清單 (PackingList) - 按打包狀態和時間排序
-            const packingQuery = query(collection(db, "packinglist"), orderBy("packed", "asc"), orderBy("timestamp", "desc"));
-            onSnapshot(packingQuery, (snapshot) => {
-                PACKING_DATA = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                if (document.getElementById('packing-tab') && document.getElementById('packing-tab').classList.contains('hidden') === false) {
-                    window.renderPackingList();
-                }
-            }, (error) => {
-                console.error("Error listening to packinglist: ", error);
-            });
             
             // 渲染匯率 (靜態)
             document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
         }
-
+// 在 startDataSync 函式內加入
+const spotsQuery = query(collection(db, "spots"), orderBy("createdAt", "desc"));
+onSnapshot(spotsQuery, (snapshot) => {
+    // 將資料存入全域變數，方便之後呼叫
+    window.SPOTS_DATA = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+    }));
+    // 每次資料變動，自動執行畫面的渲染
+    window.renderSpots(); 
+}, (error) => {
+    console.error("監聽 Spots 失敗:", error);
+});
         /* ===================================================
           行程 (ITINERARY) 相關函式
         =================================================== */
@@ -1057,11 +1059,70 @@ async function updateLiveExchangeRate() {
     // 更新結算摘要
     if (window.updateSettlementSummary) window.updateSettlementSummary();
 };
-        
+        // 渲染打包清單 (從 PACKING_DATA 讀取) 
+
+ window.PACKING_DATA = [];
+
+   // ✅ 不依賴 timestamp，直接抓全部資料
+    const packingQuery = collection(db, "packinglist");
+    onSnapshot(packingQuery, (snapshot) => {
+      window.PACKING_DATA = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      window.renderPackingList();
+    }, (error) => {
+      console.error("Packinglist snapshot error:", error);
+    });
+
+    window.renderPackingList = function() {
+      const container = document.getElementById('packing-list-container');
+      if (!container) return;
+
+      if (window.PACKING_DATA.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-400">您的行李清單是空的！</p>';
+        return;
+      }
+
+      container.innerHTML = window.PACKING_DATA.map(item => {
+        const isPacked = item.packed;
+        return `
+
+         <div class="p-3 rounded-xl shadow-sm border flex justify-between items-center ${isPacked ? 'bg-gray-50' : 'bg-white'}">
+            <div class="flex items-center cursor-pointer" onclick="window.togglePackingStatus('${item.id}', ${isPacked})">
+              <i class="fa-solid ${isPacked ? 'fa-check-circle text-teal-500' : 'fa-circle text-gray-300'} mr-3"></i>
+              <div>
+                <p class="${isPacked ? 'line-through text-gray-400 italic' : 'text-gray-700 font-bold'}">${item.name}</p>
+                <p class="text-xs text-gray-400">${item.category}</p>
+              </div>
+            </div>
+            <button onclick="window.deletePackingItem('${item.id}')" class="text-gray-300 hover:text-red-400">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+    };
+     window.addPackingItem = async function(event) {
+      event.preventDefault();
+      const name = document.getElementById('packing-name').value;
+      const category = document.getElementById('packing-category').value;
+      if (!name || !category) return;
+
+      const newItem = { name, category, packed: false };
+      await addDoc(collection(db, "packinglist"), newItem);
+      document.getElementById('packing-form').reset();
+    };
+
+    window.togglePackingStatus = async function(id, currentStatus) {
+      await updateDoc(doc(db, "packinglist", id), { packed: !currentStatus });
+    };
+
+    window.deletePackingItem = async function(id) {
+      if (!confirm('確定要刪除這筆打包清單項目嗎？')) return;
+      await deleteDoc(doc(db, "packinglist", id));
+    };
 
         /* ===================================================
           慾望清單 (WISHLIST) 相關函式
-        =================================================== */
+        ============================================  xz======= */
         
         // 新增慾望清單項目 (Add)
         window.addWishlistItem = async function(event) {
@@ -1154,102 +1215,99 @@ async function updateLiveExchangeRate() {
                 `;
             }).join('');
         }
+window.addSpot = async function() {
+    // 1. 取得輸入框元件
+    const nameEl = document.getElementById('new-spot-name');
+    const descEl = document.getElementById('new-spot-desc');
+    const linkEl = document.getElementById('new-spot-link');
 
-        /* ===================================================
-          ⭐️ 新增：打包行李 (PACKING LIST) 相關函式
-        =================================================== */
+    const name = nameEl.value.trim();
+    const description = descEl.value.trim();
+    const link = linkEl.value.trim();
+
+    // 2. 檢查必填欄位
+    if (!name) {
+        alert("請輸入景點名稱！");
+        return;
+    }
+
+    try {
+        // 3. 執行 Firebase 新增動作
+        const { collection, addDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
         
-        // ⭐️ 新增：渲染打包清單
-        window.renderPackingList = function() {
-            const packingListContainer = document.getElementById('packing-list-container');
-            if (!packingListContainer) return;
-
-            if (PACKING_DATA.length === 0) {
-                packingListContainer.innerHTML = '<p class="text-center text-gray-400 text-sm mt-6"><i class="fa-solid fa-suitcase text-2xl mb-2 block text-gray-200"></i>您的行李清單是空的！</p>';
-                return;
-            }
-
-            packingListContainer.innerHTML = PACKING_DATA.map(item => {
-                const isPacked = item.packed;
-                const statusClass = isPacked ? 'packed' : 'not-packed';
-                const statusIcon = isPacked ? 'fa-check-circle' : 'fa-circle';
-                const itemClass = isPacked ? 'line-through text-gray-400 italic' : 'text-gray-700 font-bold';
-                const bgClass = isPacked ? 'bg-gray-50' : 'bg-white';
-                
-                return `
-                    <div class="p-3 mb-2 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center ${bgClass} hover:bg-pink-50 transition duration-150">
-                        <div class="flex items-center flex-1 min-w-0 cursor-pointer" onclick="window.togglePackingStatus('${item.id}', ${item.packed})">
-                            <button class="packing-status-btn mr-3 text-lg">
-                                <i class="fa-solid ${statusIcon} ${isPacked ? 'text-custom-secondary' : 'text-gray-300'}"></i>
-                            </button>
-                            <div class="min-w-0">
-                                <p class="${itemClass} truncate text-lg">${item.name}</p>
-                                <p class="text-xs text-gray-400">${item.category}</p>
-                            </div>
-                        </div>
-                        <div class="text-right ml-4">
-                            <button onclick="window.deletePackingItem('${item.id}')" class="text-gray-300 hover:text-red-400 text-sm p-2">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // ⭐️ 新增：新增打包項目 (Add Packing Item)
-        window.addPackingItem = async function(event) {
-            event.preventDefault();
-            const name = document.getElementById('packing-name').value;
-            const category = document.getElementById('packing-category').value;
-            
-            if (!name || !category) {
-                alert('請填寫項目名稱和類別！');
-                return;
-            }
-
-            const newItem = {
-                name: name,
-                category: category,
-                packed: false, // 預設為未打包
-                timestamp: serverTimestamp()
-            };
-
-            try {
-                await addDoc(collection(db, "packinglist"), newItem);
-                alert('打包清單新增成功！');
-                document.getElementById('packing-form').reset();
-            } catch (e) {
-                console.error("Error adding packing item: ", e);
-                alert('新增打包清單失敗。');
-            }
-        }
-
-        // ⭐️ 新增：切換打包狀態 (Update Packing Status)
-        window.togglePackingStatus = async function(id, currentStatus) {
-            try {
-                const docRef = doc(db, "packinglist", id);
-                await updateDoc(docRef, {
-                    packed: !currentStatus
-                });
-            } catch (e) {
-                console.error("Error updating packing status: ", e);
-                alert('更新狀態失敗。');
-            }
-        }
-
-        // ⭐️ 新增：刪除打包清單項目
-        window.deletePackingItem = async function(id) {
-            if (!confirm('確定要刪除這筆打包清單項目嗎？')) return;
-            try {
-                await deleteDoc(doc(db, "packinglist", id));
-            } catch (e) {
-                console.error("Error deleting packing item: ", e);
-                alert('刪除失敗。');
-            }
-        }
+        console.log("正在上傳至 Firebase...");
         
-        /* ===================================================
+        await addDoc(collection(db, "spots"), {
+            name: name,
+            description: description,
+            link: link,
+            createdAt: serverTimestamp() // 使用伺服器時間排序
+        });
+
+        console.log("上傳成功！");
+
+        // 4. 清空輸入框
+        nameEl.value = '';
+        descEl.value = '';
+        linkEl.value = '';
+        
+    } catch (e) {
+        console.error("Firebase 上傳失敗:", e);
+        alert("上傳失敗，請檢查網路或 Firebase Console 設定。");
+    }
+};
+window.renderSpots = function() {
+    const container = document.getElementById('spots-container');
+    if (!container) return;
+
+    const data = window.SPOTS_DATA || [];
+
+    if (data.length === 0) {
+        container.innerHTML = `<p class="text-center text-gray-400 py-4 text-sm">目前還沒有想去的地點喔！</p>`;
+        return;
+    }
+
+    container.innerHTML = data.map(spot => `
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-3 transition-all hover:shadow-md">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <h3 class="font-bold text-gray-700 flex items-center">
+                        <i class="fa-solid fa-location-dot text-custom-primary mr-2"></i>
+                        ${spot.name}
+                    </h3>
+                    
+                    ${spot.description ? `
+                        <p class="text-sm text-gray-500 mt-2 bg-gray-50 p-2 rounded-lg leading-relaxed">
+                            ${spot.description}
+                        </p>` : ''}
+                    
+                    ${spot.link ? `
+                        <div class="mt-3">
+                            <a href="${spot.link}" target="_blank" class="inline-flex items-center text-xs text-custom-secondary font-bold hover:underline">
+                                <i class="fa-solid fa-map-location-dot mr-1 text-sm"></i>
+                                在地圖中開啟
+                            </a>
+                        </div>` : ''}
+                </div>
+
+                <button onclick="window.deleteSpot('${spot.id}')" class="ml-2 w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-400 transition">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+};
+window.deleteSpot = async function(id) {
+    if (!confirm('確定要移除這個地點嗎？')) return;
+    try {
+        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
+        await deleteDoc(doc(db, "spots", id));
+        // 不需要手動刷頁面，onSnapshot 會自動處理
+    } catch (e) {
+        console.error("刪除失敗:", e);
+    }
+};
+     /* ===================================================
           通用函式 (Modal, Navigation, Initialization)
         =================================================== */
 
@@ -1338,7 +1396,6 @@ if (dateInput) {
 <!-- iOS 主畫面圖標 -->
 <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/babys115-hash/Travel--planner/main/hotel.png">
 <title>My Travel</title>
-
 
     <div class="max-w-xl mx-auto bg-white min-h-screen shadow-2xl overflow-hidden rounded-none sm:rounded-3xl sm:my-8 border border-gray-100">
 
@@ -1574,84 +1631,82 @@ if (dateInput) {
                 <div id="wishlist-list" class="space-y-3">
                     </div>
             </div>
-            
-            <div id="packing-tab" class="main-tab-content hidden p-4">
-                <div class="bg-white p-5 rounded-3xl shadow-sm border border-blue-100 mb-6">
-                    <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                        <i class="fa-solid fa-shirt mr-2 text-custom-secondary"></i> 新增行李
-                    </h3>
-                    
-                    <form id="packing-form" onsubmit="window.addPackingItem(event)">
-                        <div class="flex gap-2 mb-3">
-                            <div class="flex-1">
-                                <label for="packing-name" class="text-sm font-bold text-gray-500 block mb-1 ml-1">物品名稱</label>
-                                <input type="text" id="packing-name" placeholder="護照" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700" required>
-                            </div>
-                            <div class="w-1/3 relative">
-                                <label for="packing-category" class="text-sm font-bold text-gray-500 block mb-1 ml-1">分類</label>
-                                <select id="packing-category" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700 appearance-none">
-                                    <option value="證件">🪪證件</option>
-                                    <option value="衣物">👕衣物</option>
-                                    <option value="電子">📱3C</option>
-                                    <option value="藥品">💊藥品</option>
-                                    <option value="盥洗">🚿盥洗</option>
-                                    <option value="其他">🧩其他</option>
-                                </select>
-                                <i class="fa-solid fa-chevron-down absolute right-3 top-[34px] text-gray-400 pointer-events-none text-xs"></i>
-                            </div>
-                        </div>
+	<div id="packing-tab" class="main-tab-content hidden">
 
-                        <button type="submit" class="w-full bg-custom-secondary text-white p-3 rounded-2xl font-bold shadow-lg shadow-teal-100 hover:bg-opacity-90 transition">
-                            <i class="fa-solid fa-plus mr-1"></i> 加入行李箱
-                        </button>
-                    </form>
-                </div>
+  <!-- 新增行李表單卡片 -->
+  <div class="bg-white p-5 rounded-3xl shadow-sm border border-blue-100 mb-6">
+    <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
+      <i class="fa-solid fa-shirt mr-2 text-custom-secondary"></i> 新增行李
+    </h3>
 
-                <h3 class="text-lg font-bold text-gray-700 mb-3 flex items-center px-2">
-                    <i class="fa-solid fa-clipboard-check mr-2 text-custom-primary"></i> 檢查清單
-                </h3>
-                <div id="packing-list-container" class="space-y-2">
-                    </div>
-            </div>
+    <form id="packing-form" onsubmit="window.addPackingItem(event)">
+      <div class="flex gap-2 mb-3">
+        <div class="flex-1">
+          <label for="packing-name" class="text-sm font-bold text-gray-500 block mb-1 ml-1">物品名稱</label>
+          <input type="text" id="packing-name" placeholder="護照" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700" required>
+        </div>
+        <div class="w-1/3 relative">
+          <label for="packing-category" class="text-sm font-bold text-gray-500 block mb-1 ml-1">分類</label>
+          <select id="packing-category" class="w-full p-3 bg-gray-50 border-0 rounded-xl text-gray-700 appearance-none">
+            <option value="證件">🪪 證件</option>
+            <option value="衣物">👕 衣物</option>
+            <option value="電子">📱 3C</option>
+            <option value="藥品">💊 藥品</option>
+            <option value="盥洗">🚿 盥洗</option>
+            <option value="其他">🧩 其他</option>
+          </select>
+          <i class="fa-solid fa-chevron-down absolute right-3 top-[34px] text-gray-400 pointer-events-none text-xs"></i>
+        </div>
+      </div>
 
-            <div id="weather-tab" class="main-tab-content hidden p-4">
-                <div class="bg-gradient-to-b from-blue-100 to-white p-8 rounded-3xl text-center shadow-inner mb-6">
-                    <i class="fa-solid fa-sun text-6xl text-yellow-400 mb-4 drop-shadow-md"></i>
-                    <h2 class="text-2xl font-bold text-gray-700 mb-2">福岡好天氣</h2>
-                    <p class="text-gray-500">氣溫舒適，適合旅遊！</p>
-                </div>
-                
-                <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center">
-                    <i class="fa-solid fa-calendar-days mr-2 text-custom-primary"></i> 每日預報
-                </h2>
-                <div id="weather-content" class="space-y-3">
-                    </div>
-            </div>
+      <button type="submit" class="w-full bg-custom-secondary text-white p-3 rounded-2xl font-bold shadow-lg shadow-teal-100 hover:bg-opacity-90 transition">
+        <i class="fa-solid fa-plus mr-1"></i> 加入行李箱
+      </button>
+    </form>
+  </div>
 
-            <div id="overview-tab" class="main-tab-content hidden p-4">
-                <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center">
-                    <i class="fa-solid fa-chart-pie mr-2 text-custom-primary"></i> 旅程儀表板
-                </h2>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="p-6 bg-yellow-50 rounded-3xl shadow-sm border border-yellow-100 text-center">
-                        <i class="fa-regular fa-calendar text-2xl text-yellow-500 mb-2 block"></i>
-                        <p class="text-xs text-yellow-700 font-bold uppercase tracking-wider mb-1">Duration</p>
-                        <p class="text-2xl font-bold text-yellow-900 font-mono">6 Days</p>
-                    </div>
-                    <div class="p-6 bg-green-50 rounded-3xl shadow-sm border border-green-100 text-center">
-                        <i class="fa-solid fa-sack-dollar text-2xl text-green-500 mb-2 block"></i>
-                        <p class="text-xs text-green-700 font-bold uppercase tracking-wider mb-1">Budget</p>
-                        <p class="text-2xl font-bold text-green-900 font-mono">$80k</p>
-                    </div>
-                </div>
-                
-                <div class="mt-6 p-6 bg-white rounded-3xl shadow-sm border border-gray-100 text-center">
-                   <p class="text-gray-400 mb-4">更多統計圖表開發中...</p>
-                   <i class="fa-solid fa-laptop-code text-4xl text-gray-200"></i>
-                </div>
-            </div>
+  <!-- 檢查清單 -->
+  <h3 class="text-lg font-bold text-gray-700 mb-3 flex items-center px-2">
+    <i class="fa-solid fa-clipboard-check mr-2 text-custom-primary"></i> 檢查清單
+  </h3>
+  <div id="packing-list-container" class="space-y-2"></div>
 
-        </main>
+</div>
+
+<div id="overview-tab" class="main-tab-content hidden p-4">
+    
+    <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="p-6 bg-yellow-50 rounded-3xl shadow-sm border border-yellow-100 text-center">
+            <i class="fa-regular fa-calendar text-2xl text-yellow-500 mb-2 block"></i>
+            <p class="text-xs text-yellow-700 font-bold uppercase tracking-wider mb-1">Duration</p>
+            <p class="text-2xl font-bold text-yellow-900 font-mono">6 Days</p>
+        </div>
+
+        <div class="p-6 bg-green-50 rounded-3xl shadow-sm border border-green-100 text-center">
+            <i class="fa-solid fa-sack-dollar text-2xl text-green-500 mb-2 block"></i>
+            <p class="text-xs text-green-700 font-bold uppercase tracking-wider mb-1">Budget</p>
+            <p class="text-2xl font-bold text-green-900 font-mono">$80k</p>
+        </div>
+    </div> <div class="bg-white rounded-3xl p-6 shadow-sm border border-pink-100">
+        <h2 class="text-xl font-bold text-gray-700 mb-4">
+            <i class="fa-solid fa-map-pin text-pink-400 mr-2"></i>想去地點清單
+        </h2>
+        
+        <div class="grid grid-cols-1 gap-2 mb-6">
+            <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="p-3 bg-gray-50 rounded-xl text-sm">
+            <input type="text" id="new-spot-desc" placeholder="簡單附註 (選填)" class="p-3 bg-gray-50 rounded-xl text-sm">
+            <input type="text" id="new-spot-link" placeholder="Google Map 連結" class="p-3 bg-gray-50 rounded-xl text-sm">
+            <button onclick="window.addSpot()" class="bg-custom-primary text-white py-3 rounded-xl font-bold active:scale-95 transition">新增景點</button>
+        </div>
+
+        <div id="spots-container" class="space-y-3"></div>
+    </div> <div class="mt-6 p-6 bg-white rounded-3xl shadow-sm border border-gray-100 text-center">
+        <p class="text-gray-400 mb-4">更多統計圖表開發中...</p>
+        <i class="fa-solid fa-laptop-code text-4xl text-gray-200"></i>
+    </div>
+
+</div> 
+    </main>
 
         <!-- Modals 樣式優化 -->
         <div id="addItineraryModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="window.closeModal('addItineraryModal')">
@@ -1722,22 +1777,90 @@ if (dateInput) {
             </div>
         </div>
         
-        <div id="editExpenseModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="window.closeModal('editExpenseModal')">
-            <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm" onclick="event.stopPropagation()">
-                <h3 class="text-xl font-bold mb-4 flex justify-between items-center text-custom-primary">
-                    <span class="flex items-center"><i class="fa-solid fa-pen-to-square mr-2"></i> 編輯支出</span>
-                    <button onclick="window.closeModal('editExpenseModal')" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 flex items-center justify-center transition">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </h3>
-                <form onsubmit="window.saveExpenseUpdate(event)">
-                    <input type="hidden" id="edit-expense-id">
-                    
-                    <label class="text-sm font-bold text-gray-500 block mb-1 ml-1">日期</label>
-                    <input type="date" id="edit-expense-date" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-3 text-gray-700 font-bold" required>
+       <!-- 編輯支出 Modal -->
+<div id="editExpenseModal" class="fixed inset-0 bg-black bg-opacity-30 hidden items-center justify-center z-50">
+  <div class="bg-white p-6 rounded-2xl shadow-lg w-[90%] max-w-md">
+    <h3 class="text-lg font-bold mb-4 text-gray-700 flex items-center">
+      <i class="fa-solid fa-pen-to-square text-custom-primary mr-2"></i> 編輯支出
+    </h3>
+    <form onsubmit="window.saveExpenseUpdate(event)">
+      <input type="hidden" id="edit-expense-id">
 
-                    <label class="text-sm font-bold text-gray-500 block mb-1 ml-1">金額</label>
-                    <div class="flex mb-3">
-                        <input type="number" step="0.01" id="edit-expense-amount" class="flex-1 p-3 bg-gray-50 border-0 rounded-xl text-gray-700 font-bold" required>
-                        <div id="edit-expense-currency-select" class="flex ml-2 items-center">
-                            <button type="button" class="block-select-btn px-3 py-2 text-sm rou
+      <!-- 日期 -->
+      <label class="block mb-2 text-sm font-bold">日期</label>
+      <input type="date" id="edit-expense-date" class="w-full p-3 border rounded-xl mb-4">
+
+      <!-- 金額 -->
+      <label class="block mb-2 text-sm font-bold">金額</label>
+      <input type="number" id="edit-expense-amount" class="w-full p-3 border rounded-xl mb-4">
+
+      <!-- 支出說明 -->
+      <label class="block mb-2 text-sm font-bold">支出說明</label>
+      <input type="text" id="edit-expense-description" class="w-full p-3 border rounded-xl mb-4">
+
+      <!-- 幣別 -->
+      <label class="block mb-2 text-sm font-bold">幣別</label>
+      <div id="edit-expense-currency-select" class="flex flex-wrap mb-4">
+        <button type="button" class="block-select-btn" data-currency="TWD"
+                onclick="window.selectCurrency('TWD','edit-expense')">TWD</button>
+        <button type="button" class="block-select-btn" data-currency="JPY"
+                onclick="window.selectCurrency('JPY','edit-expense')">JPY</button>
+      </div>
+      <input type="hidden" id="edit-expense-currency">
+
+      <!-- 付款人 -->
+      <label class="block mb-2 text-sm font-bold">付款人</label>
+      <div id="edit-expense-payer-select" class="flex flex-wrap mb-4">
+        <button type="button" class="block-select-btn" data-payer="Josh"
+                onclick="window.selectPayer('Josh','edit-expense')">Josh</button>
+        <button type="button" class="block-select-btn" data-payer="Candice"
+                onclick="window.selectPayer('Candice','edit-expense')">Candice</button>
+      </div>
+      <input type="hidden" id="edit-expense-payer">
+
+      <!-- 類別 -->
+      <label class="block mb-2 text-sm font-bold">類別</label>
+      <div id="edit-expense-category-select" class="flex flex-wrap mb-4">
+        <button type="button" class="block-select-btn" data-category="Food"
+                onclick="window.selectCategory('Food','edit-expense')">餐飲</button>
+        <button type="button" class="block-select-btn" data-category="Transport"
+                onclick="window.selectCategory('Transport','edit-expense')">交通</button>
+        <button type="button" class="block-select-btn" data-category="Accommodation"
+                onclick="window.selectCategory('Accommodation','edit-expense')">住宿</button>
+        <button type="button" class="block-select-btn" data-category="Shopping"
+                onclick="window.selectCategory('Shopping','edit-expense')">購物</button>
+      </div>
+      <input type="hidden" id="edit-expense-category">
+
+      <!-- 支付方式 -->
+      <label class="block mb-2 text-sm font-bold">支付方式</label>
+      <div id="edit-expense-payment-select" class="flex flex-wrap mb-4">
+        <button type="button" class="block-select-btn" data-payment="Cash"
+                onclick="window.selectPayment('Cash','edit-expense')">現金</button>
+        <button type="button" class="block-select-btn" data-payment="Card"
+                onclick="window.selectPayment('Card','edit-expense')">信用卡</button>
+      </div>
+      <input type="hidden" id="edit-expense-payment">
+
+      <!-- 按鈕 -->
+      <div class="flex justify-end gap-2 mt-4">
+        <button type="button" onclick="window.closeModal('editExpenseModal')" class="px-4 py-2 bg-gray-200 rounded">取消</button>
+        <button type="submit" class="px-4 py-2 bg-custom-primary text-white rounded">儲存</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div id="overview-tab" class="main-tab-content hidden p-4">
+    <div class="bg-white rounded-3xl p-6 shadow-sm border border-pink-100 mb-6">
+        <h2 class="text-lg font-bold mb-4 text-gray-700">新增想去地點</h2>
+        <div class="space-y-3">
+            <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
+            <input type="text" id="new-spot-desc" placeholder="附註 (String)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
+            <input type="text" id="new-spot-link" placeholder="地圖連結 (String)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
+            <button onclick="window.addSpot()" class="w-full bg-custom-primary text-white py-3 rounded-xl font-bold shadow-lg">
+                確認新增
+            </button>
+        </div>
+    </div>
+
+    
