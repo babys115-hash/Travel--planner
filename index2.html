@@ -221,80 +221,86 @@ window.closeModal = function(id) {
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+/* =========================
+    Firebase Storage 初始化
+   ========================= */
+// --- 1. 引入必要模組 ---
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
-
 const storage = getStorage(app);
 
-// 1. 照片預覽函式
+// --- 2. 修正預覽功能 (掛載到 window 以便 HTML 呼叫) ---
 window.previewImage = function(input) {
     const container = document.getElementById('photo-preview-container');
     const preview = document.getElementById('photo-preview');
+
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
             preview.src = e.target.result;
-            container.classList.remove('hidden');
-        }
+            container.classList.remove('hidden'); // 顯示預覽區塊
+            console.log("預覽已成功觸發");
+        };
         reader.readAsDataURL(input.files[0]);
     }
 };
 
-// 2. 清除照片函式
+// --- 3. 清除預覽 ---
 window.clearPhoto = function() {
     document.getElementById('spot-camera-input').value = "";
     document.getElementById('photo-preview-container').classList.add('hidden');
 };
 
-// 3. 同步新增景點（包含上傳照片）
+// --- 4. 修改 addSpot 函式，整合 Storage 上傳 ---
 window.addSpot = async function() {
-    const name = document.getElementById('new-spot-name').value;
-    const desc = document.getElementById('new-spot-desc').value;
-    const link = document.getElementById('new-spot-link').value;
+    const nameInput = document.getElementById('new-spot-name');
+    const descInput = document.getElementById('new-spot-desc');
+    const linkInput = document.getElementById('new-spot-link');
     const fileInput = document.getElementById('spot-camera-input');
-    const btn = document.getElementById('add-spot-btn');
-
-    if (!name) return alert("請輸入景點名稱！");
+    
+    if (!nameInput.value) return alert("請輸入景點名稱！");
 
     try {
-        btn.innerText = "同步中...";
+        // 按鈕狀態回饋
+        const btn = document.querySelector('button[onclick="window.addSpot()"]');
+        btn.innerText = "同步上傳中...";
         btn.disabled = true;
 
         let imageUrl = "";
-
-        // 如果有拍照片，先同步到 Firebase Storage
+        
+        // 如果有照片，先上傳至 Firebase Storage
         if (fileInput.files[0]) {
             const file = fileInput.files[0];
             const storageRef = ref(storage, `spots/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
-            imageUrl = await getDownloadURL(snapshot.ref); // 取得線上網址
+            imageUrl = await getDownloadURL(snapshot.ref);
         }
 
-        // 存入 Firestore
+        // 存入 Firestore 資料庫
         await addDoc(collection(db, "wishlist"), {
-            name: name,
-            description: desc,
-            mapLink: link,
-            imageUrl: imageUrl, // 這裡存的是雲端連結
+            name: nameInput.value,
+            description: descInput.value,
+            mapLink: linkInput.value,
+            imageUrl: imageUrl, // 存入雲端照片網址
             createdAt: serverTimestamp()
         });
 
-        // 清空欄位
-        document.getElementById('new-spot-name').value = "";
-        document.getElementById('new-spot-desc').value = "";
-        document.getElementById('new-spot-link').value = "";
+        // 成功後重置
+        nameInput.value = "";
+        descInput.value = "";
+        linkInput.value = "";
         window.clearPhoto();
-        alert("成功同步到線上！");
+        alert("已同步到雲端！");
+        
+        btn.innerText = "確認新增";
+        btn.disabled = false;
 
     } catch (e) {
-        console.error("同步出錯：", e);
-        alert("同步失敗，請確認 Firebase Storage 權限已開啟");
-    } finally {
-        btn.innerText = "新增景點";
-        btn.disabled = false;
+        console.error("同步失敗：", e);
+        alert("同步失敗，請檢查網路或 Storage Rules");
     }
 };
 
-// 4. 即時顯示清單（線上同步顯示）
+// --- 5. 即時渲染清單 (包含顯示照片) ---
 const spotsContainer = document.getElementById('spots-container');
 const q = query(collection(db, "wishlist"), orderBy("createdAt", "desc"));
 
@@ -302,19 +308,20 @@ onSnapshot(q, (snapshot) => {
     spotsContainer.innerHTML = '';
     snapshot.forEach((doc) => {
         const data = doc.data();
-        const item = document.createElement('div');
-        item.className = "p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm";
+        const div = document.createElement('div');
+        div.className = "p-4 bg-gray-50 rounded-2xl border border-pink-50 shadow-sm mb-4";
         
-        const imgHtml = data.imageUrl ? `<img src="${data.imageUrl}" class="w-full h-32 object-cover rounded-xl mb-2 shadow-sm">` : '';
-        const linkHtml = data.mapLink ? `<a href="${data.mapLink}" target="_blank" class="text-xs text-blue-400 underline italic mt-1 block">查看地圖</a>` : '';
+        // 顯示照片的 HTML
+        const imgHtml = data.imageUrl ? `<img src="${data.imageUrl}" class="w-full h-40 object-cover rounded-xl mb-2 shadow-sm">` : '';
+        const linkHtml = data.mapLink ? `<a href="${data.mapLink}" target="_blank" class="text-xs text-blue-400 underline">地圖連結</a>` : '';
 
-        item.innerHTML = `
+        div.innerHTML = `
             ${imgHtml}
-            <div class="font-bold text-gray-700">${data.name}</div>
-            <div class="text-xs text-gray-500">${data.description || '無備註'}</div>
+            <h4 class="font-bold text-gray-700">${data.name}</h4>
+            <p class="text-xs text-gray-500">${data.description || ''}</p>
             ${linkHtml}
         `;
-        spotsContainer.appendChild(item);
+        spotsContainer.appendChild(div);
     });
 });
 /* ===================================================
@@ -1400,6 +1407,7 @@ window.deleteSpot = async function(id) {
         console.error("刪除失敗:", e);
     }
 };
+
      /* ===================================================
           通用函式 (Modal, Navigation, Initialization)
         =================================================== */
@@ -1790,15 +1798,21 @@ if (dateInput) {
                 <i class="fa-solid fa-camera"></i> 拍攝照片 / 選擇圖片
             </button>
             
-            <input type="file" id="spot-camera-input" accept="image/*" capture="environment" class="hidden" onchange="window.previewImage(this)">
+            <input type="file" 
+       id="spot-camera-input" 
+       accept="image/*" 
+       class="hidden" 
+       onchange="window.previewImage(this)">
 
             <div id="photo-preview-container" class="hidden relative mt-1">
-                <img id="photo-preview" src="" class="w-full h-40 object-cover rounded-xl border-2 border-pink-100">
-                <button type="button" onclick="window.clearPhoto()" class="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
+               <p class="text-xs text-gray-400 mb-1">照片預覽：</p>
+    <img id="photo-preview" src="" class="w-full h-48 object-cover rounded-2xl border-2 border-pink-100 shadow-sm">
+    
+    <button type="button" onclick="window.clearPhoto()" 
+            class="absolute top-8 right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-md">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+</div>
             <button onclick="window.addSpot()" id="add-spot-btn" class="bg-custom-primary text-white py-3 rounded-xl font-bold active:scale-95 transition">新增景點</button>
         </div>
 
@@ -1966,13 +1980,11 @@ if (dateInput) {
             
             <input type="file" id="spot-camera-input" accept="image/*" capture="environment" class="hidden" onchange="window.previewImage(this)">
 
-            <div id="photo-preview-container" class="hidden relative mt-2">
-                <img id="photo-preview" src="" class="w-full h-48 object-cover rounded-xl border-2 border-pink-200">
-                <button type="button" onclick="window.clearPhoto()" 
-                        class="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
+            <div id="photo-preview-container" class="hidden mt-3 text-center"><img id="photo-preview" src="" class="w-full rounded-xl"> </div>
+    <p class="text-xs text-gray-400 mb-1">照片預覽</p>
+    <img id="photo-preview" src="" class="w-full h-48 object-cover rounded-2xl border-2 border-pink-200 shadow-sm">
+    <button type="button" onclick="window.clearPhoto()" class="text-red-500 text-xs underline mt-1">移除照片</button>
+</div>
 
             <button onclick="window.addSpot()" id="add-spot-btn" class="w-full p-3 bg-custom-primary text-white rounded-xl font-bold shadow-sm mt-4">
                 確認同步到線上
