@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -223,7 +221,107 @@ window.closeModal = function(id) {
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
 
+const storage = getStorage(app);
+
+// --- 拍照預覽功能 ---
+window.previewImage = function(input) {
+    const container = document.getElementById('photo-preview-container');
+    const preview = document.getElementById('photo-preview');
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            container.classList.remove('hidden');
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+};
+
+window.clearPhoto = function() {
+    document.getElementById('spot-camera-input').value = "";
+    document.getElementById('photo-preview-container').classList.add('hidden');
+};
+
+// --- 線上同步新增功能 ---
+window.addSpot = async function() {
+    const name = document.getElementById('new-spot-name').value;
+    const desc = document.getElementById('new-spot-desc').value;
+    const link = document.getElementById('new-spot-link').value;
+    const fileInput = document.getElementById('spot-camera-input');
+    
+    if (!name) return alert("請輸入景點名稱！");
+
+    try {
+        const btn = document.querySelector('#overview-tab button[onclick="window.addSpot()"]');
+        const originalText = btn.innerText;
+        btn.innerText = "同步中...";
+        btn.disabled = true;
+
+        let imageUrl = "";
+
+        // 如果有照片，先上傳到 Firebase Storage
+        if (fileInput.files[0]) {
+            const file = fileInput.files[0];
+            const storageRef = ref(storage, `spots/${Date.now()}_${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            imageUrl = await getDownloadURL(snapshot.ref); // 取得線上永久網址
+        }
+
+        // 存入 Firestore 資料庫
+        await addDoc(collection(db, "wishlist"), {
+            name: name,
+            description: desc,
+            mapLink: link,
+            imageUrl: imageUrl, // 存入線上網址
+            createdAt: serverTimestamp()
+        });
+
+        alert("已成功同步到線上！");
+        
+        // 重置介面
+        document.getElementById('new-spot-name').value = "";
+        document.getElementById('new-spot-desc').value = "";
+        document.getElementById('new-spot-link').value = "";
+        window.clearPhoto();
+        btn.innerText = originalText;
+        btn.disabled = false;
+
+    } catch (e) {
+        console.error("同步失敗: ", e);
+        alert("同步失敗，請檢查網路或 Firebase 權限");
+    }
+};
+
+// --- 即時監聽並顯示清單 ---
+const spotsList = document.getElementById('spots-list');
+const q = query(collection(db, "wishlist"), orderBy("createdAt", "desc"));
+
+onSnapshot(q, (snapshot) => {
+    spotsList.innerHTML = '';
+    snapshot.forEach((doc) => {
+        const spot = doc.data();
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-2xl p-4 shadow-sm border border-pink-50 mb-4";
+        
+        // 如果有圖片網址，就顯示圖片，否則不顯示
+        const imgTag = spot.imageUrl ? 
+            `<img src="${spot.imageUrl}" class="w-full h-40 object-cover rounded-xl mb-3 shadow-inner">` : '';
+        
+        // 如果有連結，顯示按鈕
+        const linkTag = spot.mapLink ? 
+            `<a href="${spot.mapLink}" target="_blank" class="text-blue-400 text-sm underline mt-2 block italic">查看地圖連結</a>` : '';
+
+        card.innerHTML = `
+            ${imgTag}
+            <h3 class="font-bold text-gray-800">${spot.name}</h3>
+            <p class="text-sm text-gray-500">${spot.description || '無附註'}</p>
+            ${linkTag}
+        `;
+        spotsList.appendChild(card);
+    });
+});
 /* ===================================================
   預算編輯與儲存功能
 =================================================== */
@@ -1389,13 +1487,8 @@ if (dateInput) {
     dateInput.value = today;
 }
     </script>
-<head>
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="My Travel">
-<!-- iOS 主畫面圖標 -->
-<link rel="apple-touch-icon" href="https://raw.githubusercontent.com/babys115-hash/Travel--planner/main/luggage.png">
-<title>My Travel</title>
+</head>
+<body class="bg-gray-50 font-sans">
 
     <div class="max-w-xl mx-auto bg-white min-h-screen shadow-2xl overflow-hidden rounded-none sm:rounded-3xl sm:my-8 border border-gray-100">
 
@@ -1698,6 +1791,13 @@ if (dateInput) {
             <input type="text" id="new-spot-link" placeholder="Google Map 連結" class="p-3 bg-gray-50 rounded-xl text-sm">
             <button onclick="window.addSpot()" class="bg-custom-primary text-white py-3 rounded-xl font-bold active:scale-95 transition">新增景點</button>
         </div>
+const photoHTML = spot.imageUrl ? `
+    <div class="mt-2">
+        <a href="${spot.imageUrl}" target="_blank" class="text-pink-500 text-sm font-bold flex items-center gap-1">
+            <i class="fa-solid fa-image"></i> 查看原始照片
+        </a>
+        <img src="${spot.imageUrl}" class="mt-2 w-full h-32 object-cover rounded-lg shadow-inner">
+    </div>
 
         <div id="spots-container" class="space-y-3"></div>
     </div> <div class="mt-6 p-6 bg-white rounded-3xl shadow-sm border border-gray-100 text-center">
@@ -1705,8 +1805,7 @@ if (dateInput) {
         <i class="fa-solid fa-laptop-code text-4xl text-gray-200"></i>
     </div>
 
-</div> 
-    </main>
+</div> ```        </main>
 
         <!-- Modals 樣式優化 -->
         <div id="addItineraryModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="window.closeModal('addItineraryModal')">
@@ -1855,12 +1954,30 @@ if (dateInput) {
         <h2 class="text-lg font-bold mb-4 text-gray-700">新增想去地點</h2>
         <div class="space-y-3">
             <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
-            <input type="text" id="new-spot-desc" placeholder="附註 (String)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
-            <input type="text" id="new-spot-link" placeholder="地圖連結 (String)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
-            <button onclick="window.addSpot()" class="w-full bg-custom-primary text-white py-3 rounded-xl font-bold shadow-lg">
-                確認新增
+            <input type="text" id="new-spot-desc" placeholder="附註" class="w-full p-3 bg-gray-50 rounded-xl border-0">
+            <input type="text" id="new-spot-link" placeholder="地圖連結 (選填)" class="w-full p-3 bg-gray-50 rounded-xl border-0">
+            
+            <button type="button" onclick="document.getElementById('spot-camera-input').click()" 
+                    class="w-full p-3 bg-pink-100 text-pink-600 rounded-xl font-bold flex justify-center items-center gap-2">
+                <i class="fa-solid fa-camera"></i> 點我拍照或選照片
+            </button>
+            
+            <input type="file" id="spot-camera-input" accept="image/*" capture="environment" class="hidden" onchange="window.previewImage(this)">
+
+            <div id="photo-preview-container" class="hidden relative mt-2">
+                <img id="photo-preview" src="" class="w-full h-48 object-cover rounded-xl border-2 border-pink-200">
+                <button type="button" onclick="window.clearPhoto()" 
+                        class="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <button onclick="window.addSpot()" class="w-full p-3 bg-custom-primary text-white rounded-xl font-bold shadow-sm mt-4">
+                確認同步到線上
             </button>
         </div>
     </div>
-
     
+    <div id="spots-list" class="space-y-4"></div>
+</div>
+
