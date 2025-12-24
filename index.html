@@ -142,10 +142,17 @@
         updateLiveExchangeRate();
 
         // 1. 行程
-        onSnapshot(query(collection(db, "itineraries"), orderBy("date", "asc")), (snap) => {
+          onSnapshot(query(collection(db, "itineraries"), orderBy("date", "asc")), (snap) => {
             window.ITINERARY_DATA = snap.docs.map(d => ({id: d.id, ...d.data(), activities: d.data().activities?.sort((a,b)=>a.time.localeCompare(b.time))||[]}));
             if(window.ITINERARY_DATA.length > 0 && !ACTIVE_DATE) ACTIVE_DATE = window.ITINERARY_DATA[0].id;
-            window.generateDateTabs(); window.renderItinerary(); window.populateItineraryModalDates();
+            
+            window.generateDateTabs(); 
+            window.renderItinerary(); 
+            window.populateItineraryModalDates();
+
+            // ★★★ 新增：更新總覽頁面的天數 ★★★
+            const durationEl = document.getElementById('overview-duration-display');
+            if(durationEl) durationEl.innerText = window.ITINERARY_DATA.length;
         });
 
         // 2. 記帳
@@ -824,7 +831,7 @@
                     <div class="p-6 text-center border border-yellow-100 bg-yellow-50 rounded-3xl shadow-sm">
                         <i class="block mb-2 text-2xl text-yellow-500 fa-regular fa-calendar"></i>
                         <p class="mb-1 text-xs font-bold tracking-wider text-yellow-700 uppercase">Duration</p>
-                        <p class="text-2xl font-bold text-yellow-900 font-mono">6 Days</p>
+                       <p class="text-2xl font-bold text-yellow-900 font-mono"><span id="overview-duration-display">0</span> Days</p>
                     </div>
                     <div class="p-6 text-center border border-green-100 bg-green-50 rounded-3xl shadow-sm">
                         <i class="block mb-2 text-2xl text-green-500 fa-solid fa-sack-dollar"></i>
