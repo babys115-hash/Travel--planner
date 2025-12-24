@@ -78,8 +78,13 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
 
-    let ITINERARY_DATA = [], EXPENSES_DATA = [], WISHLIST_DATA = [], PACKING_DATA = [];
+    // 全域變數
+    window.ITINERARY_DATA = [];
+    window.EXPENSES_DATA = [];
+    window.WISHLIST_DATA = [];
+    window.PACKING_DATA = [];
     window.SPOTS_DATA = [];
+    
     let ACTIVE_DATE = '', ACTIVE_CURRENCY = 'TWD', ACTIVE_PAYER = 'Josh', ACTIVE_CATEGORY = 'Food', ACTIVE_PAYMENT = 'Cash', EXPENSE_FILTER = 'All', EXCHANGE_RATE_JPY_TWD = 0.215;
 
     // --- 基礎工具 ---
@@ -97,7 +102,7 @@
     };
     window.clearPhoto = () => { document.getElementById('spot-camera-input').value = ""; document.getElementById('photo-preview-container').classList.add('hidden'); };
 
-    // --- 圖片預覽 (慾望清單頁) ---
+    // --- 圖片預覽 (慾望清單) ---
     window.previewItemImage = (input) => {
         if (input.files && input.files[0]) {
             const r = new FileReader();
@@ -114,21 +119,21 @@
     };
 
     /* =========================
-       數據監聽
+       數據監聽 (資料同步中心)
     ========================= */
     function startDataSync() {
         updateLiveExchangeRate();
 
         // 1. 行程
         onSnapshot(query(collection(db, "itineraries"), orderBy("date", "asc")), (snap) => {
-            ITINERARY_DATA = snap.docs.map(d => ({id: d.id, ...d.data(), activities: d.data().activities?.sort((a,b)=>a.time.localeCompare(b.time))||[]}));
-            if(ITINERARY_DATA.length > 0 && !ACTIVE_DATE) ACTIVE_DATE = ITINERARY_DATA[0].id;
+            window.ITINERARY_DATA = snap.docs.map(d => ({id: d.id, ...d.data(), activities: d.data().activities?.sort((a,b)=>a.time.localeCompare(b.time))||[]}));
+            if(window.ITINERARY_DATA.length > 0 && !ACTIVE_DATE) ACTIVE_DATE = window.ITINERARY_DATA[0].id;
             window.generateDateTabs(); window.renderItinerary(); window.populateItineraryModalDates();
         });
 
         // 2. 記帳
         onSnapshot(query(collection(db, "expenses"), orderBy("date", "desc")), (snap) => {
-            EXPENSES_DATA = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            window.EXPENSES_DATA = snap.docs.map(d => ({id: d.id, ...d.data()}));
             window.renderExpenseTracking();
         });
 
@@ -136,29 +141,34 @@
         onSnapshot(doc(db, "trips", "currentTrip"), (doc) => {
             if(doc.exists()) {
                 window.TOTAL_BUDGET = doc.data().totalBudget || 0;
-                document.getElementById('total-budget').innerText = window.TOTAL_BUDGET.toLocaleString();
-                document.getElementById('overview-budget-display').innerText = window.TOTAL_BUDGET.toLocaleString();
+                const expenseBudget = document.getElementById('total-budget');
+                if(expenseBudget) expenseBudget.innerText = window.TOTAL_BUDGET.toLocaleString();
+                const overviewBudget = document.getElementById('overview-budget-display');
+                if(overviewBudget) overviewBudget.innerText = window.TOTAL_BUDGET.toLocaleString();
                 window.renderExpenseTracking();
             }
         });
 
         // 4. 慾望清單
         onSnapshot(query(collection(db, "wishlists")), (snap) => {
-            WISHLIST_DATA = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            window.WISHLIST_DATA = snap.docs.map(d => ({id: d.id, ...d.data()}));
             if(!document.getElementById('wishlist-tab').classList.contains('hidden')) window.renderWishlist();
         });
 
-        // 5. 打包清單
+        // 5. ★★★ 打包清單 (直接抓取，確保舊資料顯示) ★★★
         onSnapshot(collection(db, "packinglist"), (snap) => {
              let data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+             
+             // 前端簡單排序：未打包的放前面
              data.sort((a, b) => {
                  if (a.packed !== b.packed) return a.packed ? 1 : -1;
                  const t1 = a.createdAt?.seconds || 0;
                  const t2 = b.createdAt?.seconds || 0;
                  return t1 - t2; 
              });
+             
              window.PACKING_DATA = data;
-             window.renderPackingList();
+             window.renderPackingList(); // 立即更新畫面
         });
 
         // 6. 景點
@@ -185,7 +195,7 @@
     /* =========================
        頁面渲染與邏輯
     ========================= */
-    // --- 記帳 & 預算 ---
+    // --- 記帳 ---
     window.switchExpenseView = function(v) {
         document.getElementById('add-expense-container').classList.toggle('hidden', v!=='add');
         document.getElementById('expense-details-container').classList.toggle('hidden', v!=='details');
@@ -223,7 +233,7 @@
     };
     
     window.openEditExpenseModal = function(id) {
-        const e = EXPENSES_DATA.find(x => x.id === id);
+        const e = window.EXPENSES_DATA.find(x => x.id === id);
         document.getElementById('edit-expense-id').value = id;
         document.getElementById('edit-expense-date').value = e.date;
         document.getElementById('edit-expense-amount').value = e.amount;
@@ -249,9 +259,9 @@
         const list = document.getElementById('expense-list');
         const filter = document.getElementById('category-filter-buttons');
         if(!list) return;
-        const cats = ['All', ...new Set(EXPENSES_DATA.map(e=>e.category))];
+        const cats = ['All', ...new Set(window.EXPENSES_DATA.map(e=>e.category))];
         filter.innerHTML = cats.map(c => `<button onclick="window.filterExpenses('${c}')" class="block-select-btn px-3 py-1 text-xs rounded-full ${EXPENSE_FILTER===c?'active-filter':''}">${c==='All'?'全部':c}</button>`).join('');
-        const data = EXPENSES_DATA.filter(e => EXPENSE_FILTER==='All' || e.category===EXPENSE_FILTER);
+        const data = window.EXPENSES_DATA.filter(e => EXPENSE_FILTER==='All' || e.category===EXPENSE_FILTER);
         list.innerHTML = data.map(e => {
             const twd = e.currency==='JPY' ? Math.round(e.amount*EXCHANGE_RATE_JPY_TWD) : e.amount;
             const iconMap = { Food: 'fa-utensils', Transport: 'fa-train', Accommodation: 'fa-bed', Shopping: 'fa-bag-shopping', Ticket: 'fa-ticket', Other: 'fa-shapes' };
@@ -265,7 +275,7 @@
     
     window.updateSettlementSummary = function() {
         let josh = 0, candice = 0;
-        EXPENSES_DATA.forEach(e => {
+        window.EXPENSES_DATA.forEach(e => {
             const v = e.currency==='JPY' ? e.amount*EXCHANGE_RATE_JPY_TWD : e.amount;
             if(e.payer==='Josh') josh+=v; else candice+=v;
         });
@@ -275,9 +285,17 @@
         document.getElementById('candice-paid').innerText = Math.round(candice).toLocaleString();
         const diff = josh - candice; const half = Math.abs(diff)/2;
         const resEl = document.getElementById('settlement-result');
-        if(Math.abs(diff)<1) { resEl.innerText = '無需結算'; resEl.className="text-lg font-bold text-gray-400"; }
-        else if(diff>0) { resEl.innerText = `Candice 給 Josh $${Math.round(half).toLocaleString()}`; resEl.className="text-lg font-bold text-custom-primary"; }
-        else { resEl.innerText = `Josh 給 Candice $${Math.round(half).toLocaleString()}`; resEl.className="text-lg font-bold text-custom-primary"; }
+        if(Math.abs(diff)<1) { 
+            resEl.innerText = '無需結算'; resEl.className="text-lg font-bold text-gray-400"; 
+        }
+        else if(diff>0) { 
+            resEl.innerText = `Candice 給 Josh $${Math.round(half).toLocaleString()}`; 
+            resEl.className="text-lg font-bold text-custom-primary"; 
+        }
+        else { 
+            resEl.innerText = `Josh 給 Candice $${Math.round(half).toLocaleString()}`; 
+            resEl.className="text-lg font-bold text-custom-primary"; 
+        }
     };
     
     window.enableBudgetEdit = () => { 
@@ -342,7 +360,7 @@
     
     window.renderWishlist = function() {
         const c = document.getElementById('wishlist-list'); if(!c) return;
-        c.innerHTML = WISHLIST_DATA.map(i => {
+        c.innerHTML = window.WISHLIST_DATA.map(i => {
             const photoLink = i.imageUrl ? `<a href="${i.imageUrl}" target="_blank" class="text-[#4ECDC4] text-xs underline block mt-1"><i class="fa-solid fa-image"></i> 查看照片</a>` : '';
             return `
             <div class="p-3 mb-2 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center ${i.purchased?'bg-gray-100 opacity-60':'bg-white'}">
@@ -389,12 +407,12 @@
         const container = document.getElementById('packing-list-container');
         if (!container) return;
 
-        if (PACKING_DATA.length === 0) {
+        if (window.PACKING_DATA.length === 0) {
             container.innerHTML = '<p class="text-center text-gray-400 py-10">您的行李清單是空的！</p>';
             return;
         }
 
-        container.innerHTML = PACKING_DATA.map(item => {
+        container.innerHTML = window.PACKING_DATA.map(item => {
             const isPacked = item.packed;
             return `
              <div class="p-3 rounded-xl shadow-sm border flex justify-between items-center mb-2 ${isPacked ? 'bg-gray-50' : 'bg-white'}">
@@ -512,7 +530,7 @@
     // --- 行程功能 ---
     window.generateDateTabs = () => {
         const c = document.getElementById('date-buttons-container'); if(!c) return; c.innerHTML = '';
-        ITINERARY_DATA.forEach((d, i) => {
+        window.ITINERARY_DATA.forEach((d, i) => {
             const btn = document.createElement('button');
             btn.className = `tab-button ${d.id === ACTIVE_DATE ? 'active' : ''}`;
             btn.innerHTML = `<div class="font-bold">Day ${i+1}</div><div class="text-xs font-normal">${d.date.substring(5)} (${d.day_of_week})</div>`;
@@ -522,7 +540,7 @@
     };
     window.renderItinerary = () => {
         const c = document.getElementById('itinerary-container'); if(!c) return;
-        const d = ITINERARY_DATA.find(x => x.id === ACTIVE_DATE);
+        const d = window.ITINERARY_DATA.find(x => x.id === ACTIVE_DATE);
         if(!d || !d.activities?.length) { c.innerHTML = `<div class="m-4 p-6 bg-white rounded-xl shadow-sm text-center border border-pink-100"><p class="text-gray-400">本日尚無行程</p></div>`; return; }
         c.innerHTML = `<div class="mx-4 mt-4 p-4 bg-white rounded-xl shadow-sm border border-pink-100 flex justify-between items-center"><h2 class="text-lg font-bold text-gray-700">${d.city}</h2><span class="bg-pink-50 text-custom-primary px-3 py-1 rounded-full text-sm font-bold">${d.date}</span></div><div class="timeline-container p-4">` + d.activities.map((a, i) => {
             const icon = a.title.includes('餐')?'fa-utensils':a.title.includes('宿')?'fa-bed':'fa-location-dot';
@@ -534,12 +552,12 @@
         const dId = document.getElementById('new-date').value;
         const act = { time: document.getElementById('new-time').value, title: document.getElementById('new-title').value, location: document.getElementById('new-note').value, notes: '', link: '' };
         if(!dId||!act.time||!act.title) return;
-        const d = ITINERARY_DATA.find(x=>x.id===dId);
+        const d = window.ITINERARY_DATA.find(x=>x.id===dId);
         if(d) { await updateDoc(doc(db,'itineraries',dId), {activities: [...(d.activities||[]), act].sort((a,b)=>a.time.localeCompare(b.time))}); window.closeModal('addItineraryModal'); document.getElementById('add-itinerary-form').reset(); }
     };
-    window.populateItineraryModalDates = () => { const s = document.getElementById('new-date'); if(!s) return; s.innerHTML = ITINERARY_DATA.map(d=>`<option value="${d.id}" ${d.id===ACTIVE_DATE?'selected':''}>${d.date.substring(5)} - ${d.city}</option>`).join(''); };
+    window.populateItineraryModalDates = () => { const s = document.getElementById('new-date'); if(!s) return; s.innerHTML = window.ITINERARY_DATA.map(d=>`<option value="${d.id}" ${d.id===ACTIVE_DATE?'selected':''}>${d.date.substring(5)} - ${d.city}</option>`).join(''); };
     window.openEditModal = (dId, idx) => {
-        const d = ITINERARY_DATA.find(x=>x.id===dId); const act = d.activities[idx];
+        const d = window.ITINERARY_DATA.find(x=>x.id===dId); const act = d.activities[idx];
         document.getElementById('edit-modal-date-info').textContent = `${d.city} ${d.date}`;
         document.getElementById('edit-date-key').value = dId; document.getElementById('edit-item-index').value = idx;
         document.getElementById('edit-time').value = act.time; document.getElementById('edit-title').value = act.title; document.getElementById('edit-note').value = act.location||'';
@@ -548,13 +566,13 @@
     window.saveItineraryItem = async (e) => {
         e.preventDefault();
         const dId = document.getElementById('edit-date-key').value, idx = document.getElementById('edit-item-index').value;
-        const d = ITINERARY_DATA.find(x=>x.id===dId); const acts = [...d.activities];
+        const d = window.ITINERARY_DATA.find(x=>x.id===dId); const acts = [...d.activities];
         acts[idx] = {...acts[idx], time: document.getElementById('edit-time').value, title: document.getElementById('edit-title').value, location: document.getElementById('edit-note').value};
         await updateDoc(doc(db,'itineraries',dId), {activities: acts.sort((a,b)=>a.time.localeCompare(b.time))}); window.closeModal('editItineraryModal');
     };
     window.deleteItineraryItem = async (dId, idx) => {
         if(!confirm('刪除?')) return;
-        const d = ITINERARY_DATA.find(x=>x.id===dId);
+        const d = window.ITINERARY_DATA.find(x=>x.id===dId);
         await updateDoc(doc(db,'itineraries',dId), {activities: d.activities.filter((_,i)=>i!==parseInt(idx))});
         window.closeModal('editItineraryModal');
     };
@@ -675,23 +693,17 @@
                                 <div id="budget-display-container">
                                     <p class="mb-1 text-xs text-gray-400">總預算</p>
                                     <div class="flex items-center">
-                                        <p id="budget-display" class="text-lg font-bold text-gray-700 cursor-pointer" onclick="window.enableBudgetEdit()">$ <span id="total-budget">0</span></p>
+                                        <p id="budget-display" class="text-2xl font-bold text-gray-700 cursor-pointer" onclick="window.enableBudgetEdit()">$ <span id="total-budget">0</span></p>
                                         <i class="ml-2 text-sm text-gray-400 cursor-pointer fa-solid fa-pen-to-square hover:text-custom-primary" onclick="window.enableBudgetEdit()"></i>
                                     </div>
                                     <div id="budget-edit-form" class="hidden flex items-center mt-1"><input type="number" id="budget-input" class="w-20 border-b border-gray-400 font-bold p-1 mr-1 text-sm"><button onclick="window.saveBudget()" class="text-custom-primary"><i class="fa-solid fa-check"></i></button><button onclick="window.cancelBudgetEdit()" class="text-gray-400 ml-1"><i class="fa-solid fa-xmark"></i></button></div>
                                 </div>
                             </div>
-                            <div class="p-3 bg-white shadow-sm rounded-2xl"><p class="mb-1 text-xs text-gray-400">已支出</p><p class="text-lg font-bold text-custom-danger">$ <span id="total-spent">0</span></p></div>
-                            <div class="p-3 bg-white shadow-sm rounded-2xl border-2 border-blue-100">
-    <p class="mb-1 text-sm font-bold text-blue-400">Josh 付</p>
-    <p class="text-sm font-bold text-gray-400">$ <span id="josh-paid">0</span></p>
-</div>
-<div class="p-3 bg-white shadow-sm rounded-2xl border-2 border-pink-100">
-    <p class="mb-1 text-sm font-bold text-pink-400">Candice 付</p>
-    <p class="text-sm font-bold text-gray-400">$ <span id="candice-paid">0</span></p>
-</div>
+                            <div class="p-3 bg-white shadow-sm rounded-2xl"><p class="mb-1 text-xs text-gray-400">已支出</p><p class="text-2xl font-bold text-custom-danger">$ <span id="total-spent">0</span></p></div>
+                            <div class="p-3 bg-white shadow-sm rounded-2xl border-2 border-blue-100"><p class="mb-1 text-sm font-bold text-blue-400">Josh 付</p><p class="text-2xl font-bold text-gray-700">$ <span id="josh-paid">0</span></p></div>
+                            <div class="p-3 bg-white shadow-sm rounded-2xl border-2 border-pink-100"><p class="mb-1 text-sm font-bold text-pink-400">Candice 付</p><p class="text-2xl font-bold text-gray-700">$ <span id="candice-paid">0</span></p></div>
                         </div>
-                        <div class="p-2 text-center bg-white border-t border-blue-100 rounded-xl"><p class="mb-1 text-xs text-gray-400">應付結算</p><p id="settlement-result" class="text-lg font-bold text-gray-700">計算中...</p></div>
+                        <div class="p-2 text-center bg-white border-t border-blue-100 rounded-xl"><p class="mb-1 text-xs text-gray-400">應付結算</p><p id="settlement-result" class="text-lg font-bold text-custom-primary">計算中...</p></div>
                     </div>
                     <div id="category-filter-buttons" class="flex flex-wrap gap-2 px-1 pb-2 mb-4 overflow-x-auto no-scrollbar"></div>
                     <div id="expense-list" class="space-y-3"></div>
@@ -813,7 +825,7 @@
                 <label class="block mb-2 text-sm font-bold">說明</label><input type="text" id="edit-expense-description" class="w-full p-3 border rounded-xl mb-4">
                 <label class="block mb-2 text-sm font-bold">幣別</label><div id="edit-expense-currency-select" class="flex gap-2 mb-4"><button type="button" class="block-select-btn" data-currency="TWD" onclick="window.selectEditCurrency('TWD')">TWD</button><button type="button" class="block-select-btn" data-currency="JPY" onclick="window.selectEditCurrency('JPY')">JPY</button></div><input type="hidden" id="edit-expense-currency">
                 <label class="block mb-2 text-sm font-bold">付款</label><div id="edit-expense-payer-select" class="flex gap-2 mb-4"><button type="button" class="block-select-btn" data-payer="Josh" onclick="window.selectEditPayer('Josh')">Josh</button><button type="button" class="block-select-btn" data-payer="Candice" onclick="window.selectEditPayer('Candice')">Candice</button></div><input type="hidden" id="edit-expense-payer">
-                <label class="block mb-2 text-sm font-bold">類別</label><div id="edit-expense-category-select" class="flex flex-wrap gap-2 mb-4"><button type="button" class="block-select-btn" data-category="Food" onclick="window.selectEditCategory('Food')">餐飲</button><button type="button" class="block-select-btn" data-category="Transport" onclick="window.selectEditCategory('Transport')">交通</button><button type="button" class="block-select-btn" data-category="Accommodation" onclick="window.selectEditCategory('Accommodation')">住宿</button><button type="button" class="block-select-btn" data-category="Shopping" onclick="window.selectEditCategory('Shopping')">購物</button></div><input type="hidden" id="edit-expense-category">
+                <label class="block mb-2 text-sm font-bold">類別</label><div id="edit-expense-category-select" class="flex flex-wrap gap-2 mb-4"><button type="button" class="block-select-btn" data-category="Food" onclick="window.selectEditCategory('Food')">餐飲</button><button type="button" class="block-select-btn" data-category="Transport" onclick="window.selectEditCategory('Transport')">交通</button><button type="button" class="block-select-btn" data-category="Accommodation" onclick="window.selectEditCategory('Accommodation')">住宿</button><button type="button" class="block-select-btn" data-category="Shopping" onclick="window.selectEditCategory('Shopping')">購物</button><button type="button" class="block-select-btn" data-category="Ticket" onclick="window.selectEditCategory('Ticket')">門票</button><button type="button" class="block-select-btn" data-category="Other" onclick="window.selectEditCategory('Other')">其他</button></div><input type="hidden" id="edit-expense-category">
                 <label class="block mb-2 text-sm font-bold">方式</label><div id="edit-expense-payment-select" class="flex gap-2 mb-4"><button type="button" class="block-select-btn" data-payment="Cash" onclick="window.selectEditPayment('Cash')">現金</button><button type="button" class="block-select-btn" data-payment="Card" onclick="window.selectEditPayment('Card')">信用卡</button><button type="button" class="block-select-btn" data-payment="Paypay" onclick="window.selectEditPayment('Paypay')">Paypay</button></div><input type="hidden" id="edit-expense-payment">
                 <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="window.closeModal('editExpenseModal')" class="px-4 py-2 bg-gray-200 rounded">取消</button><button type="submit" class="px-4 py-2 bg-custom-primary text-white rounded">儲存</button></div>
             </form>
