@@ -101,7 +101,6 @@
     window.PACKING_DATA = [];
     window.SPOTS_DATA = [];
     
-    // ★★★ 新增 WISHLIST_FILTER 變數 ★★★
     let ACTIVE_DATE = '', ACTIVE_CURRENCY = 'TWD', ACTIVE_PAYER = 'Josh', ACTIVE_CATEGORY = 'Food', ACTIVE_PAYMENT = 'Cash', EXPENSE_FILTER = 'All', WISHLIST_FILTER = 'All', EXCHANGE_RATE_JPY_TWD = 0.215;
 
     // --- 基礎工具 ---
@@ -150,7 +149,6 @@
             window.renderItinerary(); 
             window.populateItineraryModalDates();
 
-            // ★★★ 新增：更新總覽頁面的天數 ★★★
             const durationEl = document.getElementById('overview-duration-display');
             if(durationEl) durationEl.innerText = window.ITINERARY_DATA.length;
         });
@@ -179,7 +177,7 @@
             if(!document.getElementById('wishlist-tab').classList.contains('hidden')) window.renderWishlist();
         });
 
-        // 5. ★★★ 打包清單 (直接抓取，確保舊資料顯示) ★★★
+        // 5. 打包清單
         onSnapshot(collection(db, "packinglist"), (snap) => {
              let data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
              
@@ -192,7 +190,7 @@
              });
              
              window.PACKING_DATA = data;
-             window.renderPackingList(); // 立即更新畫面
+             window.renderPackingList();
         });
 
         // 6. 景點
@@ -338,7 +336,7 @@
         window.cancelBudgetEdit();
     };
 
-    // --- 慾望清單邏輯 (含拍照上傳) ---
+    // --- 慾望清單邏輯 ---
     window.addWishlistItem = async function(e) {
         e.preventDefault();
         const name = document.getElementById('wishlist-name').value;
@@ -382,25 +380,23 @@
     window.toggleWishlistStatus = async function(id, status) { await updateDoc(doc(db, "wishlists", id), {purchased: !status}); };
     window.deleteWishlistItem = async function(id) { if(confirm('刪除?')) await deleteDoc(doc(db, "wishlists", id)); };
     
-    // ★★★ 新增：篩選切換函數 ★★★
     window.filterWishlist = function(cat) {
         WISHLIST_FILTER = cat;
         window.renderWishlist();
     };
 
-    // ★★★ 修改：渲染慾望清單函數 (包含按鈕生成與篩選邏輯) ★★★
+    // --- 慾望清單渲染 (含編輯按鈕) ---
     window.renderWishlist = function() {
         const listContainer = document.getElementById('wishlist-list');
         const filterContainer = document.getElementById('wishlist-filter-buttons');
         
         if(!listContainer) return;
-// 定義清理文字的工具：移除引號 (") (') 和頭尾空白
+
         const cleanText = (text) => (text || '').replace(/['"]/g, '').trim();
-        // A. 產生分類按鈕
+
         const defaultCats = ['伴手禮', '電器', '3C', '服飾', '藥妝', '其他'];
         const existingCats = window.WISHLIST_DATA.map(i => cleanText(i.category));
         const allCats = ['All', ...new Set([...defaultCats, ...existingCats])].filter(c => c);
-
 
         if(filterContainer) {
             filterContainer.innerHTML = allCats.map(c => {
@@ -410,10 +406,11 @@
             }).join('');
         }
 
-        // B. 篩選資料
-        const filteredData = window.WISHLIST_DATA.filter(i => WISHLIST_FILTER === 'All' || i.category === WISHLIST_FILTER);
+        const filteredData = window.WISHLIST_DATA.filter(i => {
+            const itemCat = cleanText(i.category);
+            return WISHLIST_FILTER === 'All' || itemCat === WISHLIST_FILTER;
+        });
 
-        // C. 渲染列表
         if (filteredData.length === 0) {
             listContainer.innerHTML = `<div class="text-center py-8 text-gray-300"><i class="fa-solid fa-box-open text-4xl mb-2"></i><p>沒有這個分類的項目</p></div>`;
             return;
@@ -421,12 +418,14 @@
 
         listContainer.innerHTML = filteredData.map(i => {
             const photoLink = i.imageUrl ? `<a href="${i.imageUrl}" target="_blank" class="text-[#4ECDC4] text-xs underline block mt-1"><i class="fa-solid fa-image"></i> 查看照片</a>` : '';
+            const displayCat = cleanText(i.category);
+
             return `
             <div class="p-3 mb-2 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center ${i.purchased?'bg-gray-100 opacity-60':'bg-white'}">
                 <div>
                     <p class="font-bold text-gray-700">${i.name}</p>
                     <div class="flex items-center gap-2">
-                        <span class="text-[10px] text-white bg-gray-400 px-2 py-0.5 rounded-full">${i.category}</span>
+                        <span class="text-[10px] text-white bg-gray-400 px-2 py-0.5 rounded-full">${displayCat}</span>
                         ${photoLink}
                     </div>
                 </div>
@@ -434,36 +433,86 @@
                     <p class="font-bold text-custom-primary">¥${i.price}</p>
                     <div class="flex justify-end gap-2 mt-1">
                         <button onclick="window.toggleWishlistStatus('${i.id}', ${i.purchased})" class="wishlist-status-btn ${i.purchased?'purchased':'pending'}">${i.purchased?'已買':'想買'}</button>
-                        <button onclick="window.deleteWishlistItem('${i.id}')"><i class="fa-solid fa-trash-can text-gray-300 hover:text-red-400"></i></button>
+                        <button onclick="window.openEditWishlistModal('${i.id}')" class="text-gray-300 hover:text-blue-400 px-1"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="window.deleteWishlistItem('${i.id}')" class="text-gray-300 hover:text-red-400 px-1"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
                 </div>
             </div>`;
         }).join('');
     };
 
-    // --- 打包清單邏輯 ---
-    window.addPackingItem = async function(e) {
-        e.preventDefault();
-        const name = document.getElementById('packing-name').value.trim();
-        const cat = document.getElementById('packing-category').value;
-        if(!name) return alert('請輸入物品名稱');
-        
-        await addDoc(collection(db, "packinglist"), {
-            name: name, category: cat, packed: false, createdAt: serverTimestamp()
-        });
-        document.getElementById('packing-form').reset();
+    // --- 慾望清單編輯功能 (已修正) ---
+    window.openEditWishlistModal = function(id) {
+        const item = window.WISHLIST_DATA.find(i => i.id === id);
+        if(!item) return;
+
+        document.getElementById('edit-wishlist-id').value = id;
+        document.getElementById('edit-wishlist-name').value = item.name;
+        document.getElementById('edit-wishlist-price').value = item.price;
+        const cleanCat = (item.category || '').replace(/['"]/g, '').trim();
+        document.getElementById('edit-wishlist-category').value = cleanCat;
+        document.getElementById('edit-wishlist-old-image').value = item.imageUrl || '';
+        document.getElementById('edit-wishlist-file').value = ""; 
+
+        const img = document.getElementById('edit-wishlist-preview');
+        const container = document.getElementById('edit-wishlist-preview-container');
+        if (item.imageUrl) { 
+            img.src = item.imageUrl; 
+            container.classList.remove('hidden'); 
+        } else { 
+            container.classList.add('hidden'); 
+        }
+
+        window.openModal('editWishlistModal');
     };
 
-    window.togglePackingStatus = async function(id, currentStatus) {
-        await updateDoc(doc(db, "packinglist", id), { packed: !currentStatus });
-    };
-
-    window.deletePackingItem = async function(id) {
-        if(confirm('確定要刪除這筆打包清單項目嗎？')) {
-            await deleteDoc(doc(db, "packinglist", id));
+    window.previewEditWishlistImage = function(input) {
+        if (input.files && input.files[0]) {
+            const r = new FileReader();
+            r.onload = (e) => { 
+                document.getElementById('edit-wishlist-preview').src = e.target.result; 
+                document.getElementById('edit-wishlist-preview-container').classList.remove('hidden'); 
+            };
+            r.readAsDataURL(input.files[0]);
         }
     };
 
+    window.saveWishlistUpdate = async function(e) {
+        e.preventDefault();
+        const id = document.getElementById('edit-wishlist-id').value;
+        const file = document.getElementById('edit-wishlist-file').files[0];
+        const btn = document.getElementById('save-wishlist-btn');
+        
+        btn.innerText = '上傳中...'; 
+        btn.disabled = true;
+
+        try {
+            let url = document.getElementById('edit-wishlist-old-image').value;
+            if(file) {
+                const sRef = ref(storage, `wishlist/updated_${Date.now()}_${file.name}`);
+                const snap = await uploadBytes(sRef, file);
+                url = await getDownloadURL(snap.ref);
+            }
+
+            await updateDoc(doc(db, "wishlists", id), {
+                name: document.getElementById('edit-wishlist-name').value,
+                price: parseFloat(document.getElementById('edit-wishlist-price').value),
+                category: document.getElementById('edit-wishlist-category').value,
+                imageUrl: url
+            });
+
+            window.closeModal('editWishlistModal');
+        } catch(err) {
+            console.error(err);
+            alert('更新失敗');
+        } finally {
+            btn.innerText = '儲存修改'; 
+            btn.disabled = false;
+        }
+    };
+
+    // --- 打包清單邏輯 ---
+    // ★★★ 修改：renderPackingList 增加編輯按鈕 ★★★
     window.renderPackingList = function() {
         const container = document.getElementById('packing-list-container');
         if (!container) return;
@@ -484,12 +533,56 @@
                     <p class="text-xs text-gray-400">${item.category}</p>
                   </div>
                 </div>
-                <button onclick="window.deletePackingItem('${item.id}')" class="text-gray-300 hover:text-red-400 p-2">
-                  <i class="fa-solid fa-trash-can"></i>
-                </button>
-              </div>
+                <div class="flex items-center gap-2"> <!-- 新增的 div 統一管理按鈕 -->
+                    <button onclick="window.openEditPackingModal('${item.id}')" class="text-gray-300 hover:text-blue-400 p-2">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button onclick="window.deletePackingItem('${item.id}')" class="text-gray-300 hover:text-red-400 p-2">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+             </div>
             `;
         }).join('');
+    };
+
+    // ★★★ 新增：編輯行李清單功能 ★★★
+    window.openEditPackingModal = function(id) {
+        const item = window.PACKING_DATA.find(i => i.id === id);
+        if(!item) return;
+
+        document.getElementById('edit-packing-id').value = id;
+        document.getElementById('edit-packing-name').value = item.name;
+        document.getElementById('edit-packing-category').value = item.category || ''; // 確保分類預先填入
+
+        window.openModal('editPackingModal');
+    };
+
+    window.savePackingUpdate = async function(e) {
+        e.preventDefault();
+        const id = document.getElementById('edit-packing-id').value;
+        const name = document.getElementById('edit-packing-name').value.trim();
+        const category = document.getElementById('edit-packing-category').value;
+        const btn = document.getElementById('save-packing-btn');
+
+        if (!name) return alert('請輸入物品名稱');
+
+        btn.innerText = '儲存中...';
+        btn.disabled = true;
+
+        try {
+            await updateDoc(doc(db, "packinglist", id), {
+                name: name,
+                category: category
+            });
+            window.closeModal('editPackingModal');
+        } catch(err) {
+            console.error(err);
+            alert('更新失敗');
+        } finally {
+            btn.innerText = '儲存修改';
+            btn.disabled = false;
+        }
     };
 
     // --- 景點 (Spots) 邏輯 ---
@@ -780,7 +873,6 @@
                         <div class="flex gap-2 mb-3">
                             <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 p-3 border-0 bg-gray-50 rounded-xl" required>
                             <div class="relative w-1/2">
-                                <!-- ★★★ 這裡修改：加入 3C 選項 ★★★ -->
                                 <select id="wishlist-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
                                     <option value="伴手禮">🎁 伴手禮</option>
                                     <option value="電器">⚡ 電器</option>
@@ -799,7 +891,6 @@
                     </form>
                 </div>
 
-                <!-- ★★★ 這裡新增：加入篩選按鈕容器 ★★★ -->
                 <div id="wishlist-filter-buttons" class="flex flex-wrap gap-2 px-1 pb-2 mb-4 overflow-x-auto no-scrollbar"></div>
 
                 <div id="wishlist-list" class="space-y-3"></div>
@@ -922,5 +1013,76 @@
         </div>
     </div>
 
+    <!-- 編輯慾望清單 Modal -->
+    <div id="editWishlistModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editWishlistModal')">
+        <div class="w-full max-w-sm p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[90vh]" onclick="event.stopPropagation()">
+            <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700">編輯物品<button onclick="window.closeModal('editWishlistModal')" class="flex items-center justify-center w-8 h-8 text-gray-400 transition bg-gray-100 rounded-full hover:bg-gray-200"><i class="fa-solid fa-xmark"></i></button></h3>
+            
+            <form onsubmit="window.saveWishlistUpdate(event)">
+                <input type="hidden" id="edit-wishlist-id">
+                <input type="hidden" id="edit-wishlist-old-image">
+
+                <label class="block mb-1 text-sm font-bold text-gray-500">名稱</label>
+                <input type="text" id="edit-wishlist-name" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
+
+                <label class="block mb-1 text-sm font-bold text-gray-500">價格 (JPY)</label>
+                <input type="number" id="edit-wishlist-price" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
+
+                <label class="block mb-1 text-sm font-bold text-gray-500">分類</label>
+                <div class="relative mb-3">
+                    <select id="edit-wishlist-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
+                        <option value="伴手禮">🎁 伴手禮</option>
+                        <option value="電器">⚡ 電器</option>
+                        <option value="3C">📱 3C</option>
+                        <option value="服飾">👕 服飾</option>
+                        <option value="藥妝">💊 藥妝</option>
+                        <option value="其他">✨ 其他</option>
+                    </select>
+                    <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none"></i>
+                </div>
+
+                <div id="edit-wishlist-preview-container" class="relative hidden mb-3">
+                    <p class="mb-1 text-xs text-gray-400">目前圖片：</p>
+                    <img id="edit-wishlist-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl">
+                </div>
+
+                <button type="button" onclick="document.getElementById('edit-wishlist-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
+                    <i class="fa-solid fa-camera"></i> 更換照片
+                </button>
+                <input type="file" id="edit-wishlist-file" accept="image/*" class="hidden" onchange="window.previewEditWishlistImage(this)">
+
+                <button type="submit" id="save-wishlist-btn" class="w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 新增：編輯行李清單 Modal -->
+    <div id="editPackingModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editPackingModal')">
+        <div class="w-full max-w-sm p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[90vh]" onclick="event.stopPropagation()">
+            <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700"><i class="mr-2 fa-solid fa-pen-to-square text-custom-secondary"></i> 編輯行李項目<button onclick="window.closeModal('editPackingModal')" class="flex items-center justify-center w-8 h-8 text-gray-400 transition bg-gray-100 rounded-full hover:bg-gray-200"><i class="fa-solid fa-xmark"></i></button></h3>
+            
+            <form onsubmit="window.savePackingUpdate(event)">
+                <input type="hidden" id="edit-packing-id">
+
+                <label class="block mb-1 text-sm font-bold text-gray-500">物品名稱</label>
+                <input type="text" id="edit-packing-name" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
+
+                <label class="block mb-1 text-sm font-bold text-gray-500">分類</label>
+                <div class="relative mb-3">
+                    <select id="edit-packing-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
+                        <option value="證件">🪪 證件</option>
+                        <option value="衣物">👕 衣物</option>
+                        <option value="電子">📱 3C</option>
+                        <option value="藥品">💊 藥品</option>
+                        <option value="盥洗">🚿 盥洗</option>
+                        <option value="其他">🧩 其他</option>
+                    </select>
+                    <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none"></i>
+                </div>
+
+                <button type="submit" id="save-packing-btn" class="w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
+            </form>
+        </div>
+    </div>
 </body>
 </html>
