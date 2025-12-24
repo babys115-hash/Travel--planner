@@ -391,7 +391,8 @@ window.PACKING_DATA = [];
         if (!container) return;
         
         container.innerHTML = window.SPOTS_DATA.map(s => {
-            const img = s.imageUrl ? `<img src="${s.imageUrl}" class="w-full h-32 object-cover rounded-xl mb-3 border border-gray-100">` : '';
+            // 加入 onclick="window.open(...)" 讓列表中的照片也能點擊放大
+const img = s.imageUrl ? `<img src="${s.imageUrl}" class="w-full h-32 object-cover rounded-xl mb-3 border border-gray-100 cursor-pointer hover:opacity-90 transition" onclick="window.open(this.src, '_blank')" title="點擊查看原圖">` : '';
             return `
             <div class="bg-white p-4 rounded-2xl border border-gray-100 mb-4 shadow-sm relative">
                 ${img}
@@ -706,8 +707,8 @@ window.PACKING_DATA = [];
                         <button type="button" onclick="document.getElementById('spot-camera-input').click()" class="flex items-center justify-center w-full gap-2 p-3 font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition"><i class="fa-solid fa-camera"></i> 點我拍照或選照片</button>
                         <input type="file" id="spot-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this)">
                         <div id="photo-preview-container" class="relative hidden mt-1">
-                            <!-- 修改：加入 cursor-pointer, hover 效果, 以及 onclick 開啟新視窗 -->
-                            <img id="photo-preview" src="" class="object-cover w-full h-40 border-2 border-gray-200 rounded-xl cursor-pointer hover:opacity-90 transition" onclick="window.open(this.src, '_blank')" title="點擊查看大圖">
+                            <!-- 加入 cursor-pointer 和 onclick 事件 -->
+                            <img id="photo-preview" src="" class="object-cover w-full h-40 border-2 border-gray-200 rounded-xl cursor-pointer hover:opacity-80 transition" onclick="window.open(this.src, '_blank')" title="點擊查看原圖">
                             <button type="button" onclick="window.clearPhoto()" class="absolute flex items-center justify-center w-7 h-7 text-white bg-red-400 rounded-full shadow top-2 right-2"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                         <button onclick="window.addSpot()" id="add-spot-btn" class="w-full p-3 font-bold text-white bg-[#FF8BA7] rounded-xl shadow-md hover:bg-[#FF7596] transition transform active:scale-95">新增景點</button>
@@ -776,8 +777,8 @@ window.PACKING_DATA = [];
                 <textarea id="edit-spot-desc" rows="2" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl"></textarea>
                 <input type="text" id="edit-spot-link" class="w-full p-3 mb-4 text-sm border-0 bg-gray-50 rounded-xl">
                 <div id="edit-photo-preview-container" class="relative hidden mb-3">
-                    <!-- 修改：加入 cursor-pointer, hover 效果, 以及 onclick 開啟新視窗 -->
-                    <img id="edit-photo-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl cursor-pointer hover:opacity-90 transition" onclick="window.open(this.src, '_blank')" title="點擊查看大圖">
+                    <!-- 加入 cursor-pointer 和 onclick 事件 -->
+                    <img id="edit-photo-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl cursor-pointer hover:opacity-80 transition" onclick="window.open(this.src, '_blank')" title="點擊查看原圖">
                 </div>
                 <button type="button" onclick="document.getElementById('edit-spot-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100"><i class="fa-solid fa-camera"></i> 更換照片</button>
                 <input type="file" id="edit-spot-file" accept="image/*" class="hidden" onchange="window.previewEditImage(this)">
