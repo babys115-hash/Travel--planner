@@ -707,36 +707,64 @@
             c.appendChild(btn);
         });
     };
+    // ★★★ 修改：渲染行程 (加上地圖按鈕) ★★★
     window.renderItinerary = () => {
         const c = document.getElementById('itinerary-container'); if(!c) return;
         const d = window.ITINERARY_DATA.find(x => x.id === ACTIVE_DATE);
         if(!d || !d.activities?.length) { c.innerHTML = `<div class="m-4 p-6 bg-white rounded-xl shadow-sm text-center border border-pink-100"><p class="text-gray-400">本日尚無行程</p></div>`; return; }
         c.innerHTML = `<div class="mx-4 mt-4 p-4 bg-white rounded-xl shadow-sm border border-pink-100 flex justify-between items-center"><h2 class="text-lg font-bold text-gray-700">${d.city}</h2><span class="bg-pink-50 text-custom-primary px-3 py-1 rounded-full text-sm font-bold">${d.date}</span></div><div class="timeline-container p-4">` + d.activities.map((a, i) => {
             const icon = a.title.includes('餐')?'fa-utensils':a.title.includes('宿')?'fa-bed':'fa-location-dot';
-            return `<div class="flex items-start mb-6 group" onclick="window.openEditModal('${d.id}', ${i})"><div class="w-1/4 text-sm font-bold text-gray-400 pt-1 text-center font-mono bg-gray-50 rounded-lg mr-3">${a.time}</div><div class="flex-1 bg-white p-3 rounded-xl shadow-sm border border-gray-100 relative z-10"><div class="timeline-item relative !pl-0"><span class="absolute -left-[2.1rem] top-2 h-4 w-4 rounded-full bg-custom-primary border-4 border-white timeline-dot z-20"></span><div class="font-bold text-gray-700 mb-1"><i class="fa-solid ${icon} text-custom-primary mr-2"></i>${a.title}</div><div class="text-sm text-gray-500 ml-8">${a.location||''}</div></div></div></div>`;
+            
+            // ★★★ 新增：如果有連結，顯示按鈕 ★★★
+            const linkBtn = a.link ? `<a href="${a.link}" target="_blank" onclick="event.stopPropagation()" class="text-custom-secondary text-sm ml-2 hover:underline">(地圖 <i class="fa-solid fa-map-location-dot"></i>)</a>` : '';
+
+            return `<div class="flex items-start mb-6 group" onclick="window.openEditModal('${d.id}', ${i})"><div class="w-1/4 text-sm font-bold text-gray-400 pt-1 text-center font-mono bg-gray-50 rounded-lg mr-3">${a.time}</div><div class="flex-1 bg-white p-3 rounded-xl shadow-sm border border-gray-100 relative z-10"><div class="timeline-item relative !pl-0"><span class="absolute -left-[2.1rem] top-2 h-4 w-4 rounded-full bg-custom-primary border-4 border-white timeline-dot z-20"></span><div class="font-bold text-gray-700 mb-1"><i class="fa-solid ${icon} text-custom-primary mr-2"></i>${a.title}${linkBtn}</div><div class="text-sm text-gray-500 ml-8">${a.location||''}</div></div></div></div>`;
         }).join('') + '</div>';
     };
+
+    // ★★★ 修改：新增行程 (讀取連結) ★★★
     window.addItineraryItem = async (e) => {
         e.preventDefault();
         const dId = document.getElementById('new-date').value;
-        const act = { time: document.getElementById('new-time').value, title: document.getElementById('new-title').value, location: document.getElementById('new-note').value, notes: '', link: '' };
+        // 注意：這裡新增了 link 欄位的讀取
+        const act = { 
+            time: document.getElementById('new-time').value, 
+            title: document.getElementById('new-title').value, 
+            location: document.getElementById('new-note').value, 
+            link: document.getElementById('new-link').value, // 新增這一行
+            notes: '' 
+        };
         if(!dId||!act.time||!act.title) return;
         const d = window.ITINERARY_DATA.find(x=>x.id===dId);
         if(d) { await updateDoc(doc(db,'itineraries',dId), {activities: [...(d.activities||[]), act].sort((a,b)=>a.time.localeCompare(b.time))}); window.closeModal('addItineraryModal'); document.getElementById('add-itinerary-form').reset(); }
     };
     window.populateItineraryModalDates = () => { const s = document.getElementById('new-date'); if(!s) return; s.innerHTML = window.ITINERARY_DATA.map(d=>`<option value="${d.id}" ${d.id===ACTIVE_DATE?'selected':''}>${d.date.substring(5)} - ${d.city}</option>`).join(''); };
+    
+    // ★★★ 修改：打開編輯 Modal (填入連結) ★★★
     window.openEditModal = (dId, idx) => {
         const d = window.ITINERARY_DATA.find(x=>x.id===dId); const act = d.activities[idx];
         document.getElementById('edit-modal-date-info').textContent = `${d.city} ${d.date}`;
         document.getElementById('edit-date-key').value = dId; document.getElementById('edit-item-index').value = idx;
-        document.getElementById('edit-time').value = act.time; document.getElementById('edit-title').value = act.title; document.getElementById('edit-note').value = act.location||'';
+        document.getElementById('edit-time').value = act.time; 
+        document.getElementById('edit-title').value = act.title; 
+        document.getElementById('edit-note').value = act.location||'';
+        document.getElementById('edit-link').value = act.link||''; // 新增這一行
         window.openModal('editItineraryModal');
     };
+
+    // ★★★ 修改：儲存編輯 (更新連結) ★★★
     window.saveItineraryItem = async (e) => {
         e.preventDefault();
         const dId = document.getElementById('edit-date-key').value, idx = document.getElementById('edit-item-index').value;
         const d = window.ITINERARY_DATA.find(x=>x.id===dId); const acts = [...d.activities];
-        acts[idx] = {...acts[idx], time: document.getElementById('edit-time').value, title: document.getElementById('edit-title').value, location: document.getElementById('edit-note').value};
+        // 更新 link 欄位
+        acts[idx] = {
+            ...acts[idx], 
+            time: document.getElementById('edit-time').value, 
+            title: document.getElementById('edit-title').value, 
+            location: document.getElementById('edit-note').value,
+            link: document.getElementById('edit-link').value // 新增這一行
+        };
         await updateDoc(doc(db,'itineraries',dId), {activities: acts.sort((a,b)=>a.time.localeCompare(b.time))}); window.closeModal('editItineraryModal');
     };
     window.deleteItineraryItem = async (dId, idx) => {
@@ -1134,4 +1162,4 @@
         </div>
     </div>
 </body>
-</html>
+</html>幫我新增行程的時候可以多一個連結的欄位嗎 行程卡上面會出現地圖的按鈕
