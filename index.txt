@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Travel</title>
-<link rel="icon" type="image/png" href="./luggage.png">
-<link rel="apple-touch-icon" href="./luggage.png">
+    <link rel="icon" type="image/png" href="./luggage.png">
+    <link rel="apple-touch-icon" href="./luggage.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
@@ -47,24 +47,11 @@
             background-color: #FF7596!important; border-color: #FF748D !important; color: white !important; @apply shadow-md; transform: scale(1.05);
         }
         
-       /* ★★★ 新增：給容器定位基準，確保線條不會亂跑 ★★★ */
-        .timeline-container {
-            position: relative;
-        }
-
-        /* ★★★ 修改：調整線條位置 (left) 與粗細 ★★★ */
+        .timeline-container { position: relative; }
         .timeline-container::before {
-            content: ''; 
-            position: absolute; 
-            top: 30px; 
-            bottom: 30px; 
-            left: 28.5%;  /* 關鍵修改：改成 28.5% 剛好對齊圓點 (因為左邊時間欄位是 25%) */
-            width: 2px;   /* 線條改細一點比較精緻 */
-            background-image: linear-gradient(to bottom, #FFE5EA 50%, transparent 50%); 
-            background-size: 2px 10px; 
-            z-index: 0;
+            content: ''; position: absolute; top: 30px; bottom: 30px; left: 28.5%; width: 2px;
+            background-image: linear-gradient(to bottom, #FFE5EA 50%, transparent 50%); background-size: 2px 10px; z-index: 0;
         }
-        
         .timeline-item { padding-left: 1.5rem; min-height: 20px; cursor: pointer; }
         .timeline-dot { box-shadow: 0 0 0 3px #FFF0F3; }
         
@@ -438,7 +425,7 @@
         }).join('');
     };
 
-    // --- 慾望清單編輯功能 (已修正) ---
+    // --- 慾望清單編輯功能 (已修正語法錯誤) ---
     window.openEditWishlistModal = function(id) {
         const item = window.WISHLIST_DATA.find(i => i.id === id);
         if(!item) return;
@@ -509,7 +496,7 @@
     };
 
     // --- 打包清單邏輯 ---
-    // ★★★ 修改：renderPackingList 增加編輯按鈕 ★★★
+    // ★★★ 修改：renderPackingList 增加編輯按鈕與刪除線 ★★★
     window.renderPackingList = function() {
         const container = document.getElementById('packing-list-container');
         if (!container) return;
@@ -520,7 +507,7 @@
         }
 
         container.innerHTML = window.PACKING_DATA.map(item => {
-            const isPacked = item.packed;
+            const isPacked = item.packed || false; // 確保有值
             return `
              <div class="p-3 rounded-xl shadow-sm border flex justify-between items-center mb-2 ${isPacked ? 'bg-gray-50' : 'bg-white'}">
                 <div class="flex items-center cursor-pointer flex-1" onclick="window.togglePackingStatus('${item.id}', ${isPacked})">
@@ -541,6 +528,10 @@
              </div>
             `;
         }).join('');
+    };
+
+    window.togglePackingStatus = async function(id, currentStatus) {
+        await updateDoc(doc(db, "packinglist", id), { packed: !currentStatus });
     };
 
     // ★★★ 新增：編輯行李清單功能 ★★★
@@ -744,8 +735,8 @@
         startDataSync(); 
         
         // ★★★ 新增：設定記帳預設日期為今天 ★★★
-        const today = new Date();
-        const localDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        const now = new Date();
+        const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
         document.getElementById('expense-date').value = localDate;
     });
 </script>
