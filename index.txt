@@ -194,10 +194,8 @@
                 EXCHANGE_RATE_JPY_TWD = data.rates.TWD;
                 document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
                 
-                // ★★★ 更新計算機的匯率顯示 ★★★
                 const calcRate = document.getElementById('calc-rate-display');
                 if(calcRate) calcRate.innerText = EXCHANGE_RATE_JPY_TWD.toFixed(4);
-                // 如果計算機已經有數字，重新計算
                 if(window.calculateTwd) window.calculateTwd();
 
                 if(window.updateSettlementSummary) window.updateSettlementSummary();
@@ -205,7 +203,6 @@
         } catch(e) { console.error('匯率失敗', e); }
     }
     
-    // ★★★ 新增：即時匯率計算功能 ★★★
     window.calculateTwd = () => {
         const jpyInput = document.getElementById('calc-jpy');
         const twdOutput = document.getElementById('calc-twd');
@@ -217,9 +214,8 @@
             return;
         }
         
-        // 四捨五入到整數
         const twd = Math.round(jpy * EXCHANGE_RATE_JPY_TWD);
-        twdOutput.innerText = twd.toLocaleString(); // 加上千分位
+        twdOutput.innerText = twd.toLocaleString(); 
     };
 
     /* =========================
@@ -711,36 +707,64 @@
             c.appendChild(btn);
         });
     };
+    // ★★★ 修改：渲染行程 (加上地圖按鈕) ★★★
     window.renderItinerary = () => {
         const c = document.getElementById('itinerary-container'); if(!c) return;
         const d = window.ITINERARY_DATA.find(x => x.id === ACTIVE_DATE);
         if(!d || !d.activities?.length) { c.innerHTML = `<div class="m-4 p-6 bg-white rounded-xl shadow-sm text-center border border-pink-100"><p class="text-gray-400">本日尚無行程</p></div>`; return; }
         c.innerHTML = `<div class="mx-4 mt-4 p-4 bg-white rounded-xl shadow-sm border border-pink-100 flex justify-between items-center"><h2 class="text-lg font-bold text-gray-700">${d.city}</h2><span class="bg-pink-50 text-custom-primary px-3 py-1 rounded-full text-sm font-bold">${d.date}</span></div><div class="timeline-container p-4">` + d.activities.map((a, i) => {
             const icon = a.title.includes('餐')?'fa-utensils':a.title.includes('宿')?'fa-bed':'fa-location-dot';
-            return `<div class="flex items-start mb-6 group" onclick="window.openEditModal('${d.id}', ${i})"><div class="w-1/4 text-sm font-bold text-gray-400 pt-1 text-center font-mono bg-gray-50 rounded-lg mr-3">${a.time}</div><div class="flex-1 bg-white p-3 rounded-xl shadow-sm border border-gray-100 relative z-10"><div class="timeline-item relative !pl-0"><span class="absolute -left-[2.1rem] top-2 h-4 w-4 rounded-full bg-custom-primary border-4 border-white timeline-dot z-20"></span><div class="font-bold text-gray-700 mb-1"><i class="fa-solid ${icon} text-custom-primary mr-2"></i>${a.title}</div><div class="text-sm text-gray-500 ml-8">${a.location||''}</div></div></div></div>`;
+            
+            // ★★★ 新增：如果有連結，顯示按鈕 ★★★
+            const linkBtn = a.link ? `<a href="${a.link}" target="_blank" onclick="event.stopPropagation()" class="text-custom-secondary text-sm ml-2 hover:underline">(地圖 <i class="fa-solid fa-map-location-dot"></i>)</a>` : '';
+
+            return `<div class="flex items-start mb-6 group" onclick="window.openEditModal('${d.id}', ${i})"><div class="w-1/4 text-sm font-bold text-gray-400 pt-1 text-center font-mono bg-gray-50 rounded-lg mr-3">${a.time}</div><div class="flex-1 bg-white p-3 rounded-xl shadow-sm border border-gray-100 relative z-10"><div class="timeline-item relative !pl-0"><span class="absolute -left-[2.1rem] top-2 h-4 w-4 rounded-full bg-custom-primary border-4 border-white timeline-dot z-20"></span><div class="font-bold text-gray-700 mb-1"><i class="fa-solid ${icon} text-custom-primary mr-2"></i>${a.title}${linkBtn}</div><div class="text-sm text-gray-500 ml-8">${a.location||''}</div></div></div></div>`;
         }).join('') + '</div>';
     };
+
+    // ★★★ 修改：新增行程 (讀取連結) ★★★
     window.addItineraryItem = async (e) => {
         e.preventDefault();
         const dId = document.getElementById('new-date').value;
-        const act = { time: document.getElementById('new-time').value, title: document.getElementById('new-title').value, location: document.getElementById('new-note').value, notes: '', link: '' };
+        // 注意：這裡新增了 link 欄位的讀取
+        const act = { 
+            time: document.getElementById('new-time').value, 
+            title: document.getElementById('new-title').value, 
+            location: document.getElementById('new-note').value, 
+            link: document.getElementById('new-link').value, // 新增這一行
+            notes: '' 
+        };
         if(!dId||!act.time||!act.title) return;
         const d = window.ITINERARY_DATA.find(x=>x.id===dId);
         if(d) { await updateDoc(doc(db,'itineraries',dId), {activities: [...(d.activities||[]), act].sort((a,b)=>a.time.localeCompare(b.time))}); window.closeModal('addItineraryModal'); document.getElementById('add-itinerary-form').reset(); }
     };
     window.populateItineraryModalDates = () => { const s = document.getElementById('new-date'); if(!s) return; s.innerHTML = window.ITINERARY_DATA.map(d=>`<option value="${d.id}" ${d.id===ACTIVE_DATE?'selected':''}>${d.date.substring(5)} - ${d.city}</option>`).join(''); };
+    
+    // ★★★ 修改：打開編輯 Modal (填入連結) ★★★
     window.openEditModal = (dId, idx) => {
         const d = window.ITINERARY_DATA.find(x=>x.id===dId); const act = d.activities[idx];
         document.getElementById('edit-modal-date-info').textContent = `${d.city} ${d.date}`;
         document.getElementById('edit-date-key').value = dId; document.getElementById('edit-item-index').value = idx;
-        document.getElementById('edit-time').value = act.time; document.getElementById('edit-title').value = act.title; document.getElementById('edit-note').value = act.location||'';
+        document.getElementById('edit-time').value = act.time; 
+        document.getElementById('edit-title').value = act.title; 
+        document.getElementById('edit-note').value = act.location||'';
+        document.getElementById('edit-link').value = act.link||''; // 新增這一行
         window.openModal('editItineraryModal');
     };
+
+    // ★★★ 修改：儲存編輯 (更新連結) ★★★
     window.saveItineraryItem = async (e) => {
         e.preventDefault();
         const dId = document.getElementById('edit-date-key').value, idx = document.getElementById('edit-item-index').value;
         const d = window.ITINERARY_DATA.find(x=>x.id===dId); const acts = [...d.activities];
-        acts[idx] = {...acts[idx], time: document.getElementById('edit-time').value, title: document.getElementById('edit-title').value, location: document.getElementById('edit-note').value};
+        // 更新 link 欄位
+        acts[idx] = {
+            ...acts[idx], 
+            time: document.getElementById('edit-time').value, 
+            title: document.getElementById('edit-title').value, 
+            location: document.getElementById('edit-note').value,
+            link: document.getElementById('edit-link').value // 新增這一行
+        };
         await updateDoc(doc(db,'itineraries',dId), {activities: acts.sort((a,b)=>a.time.localeCompare(b.time))}); window.closeModal('editItineraryModal');
     };
     window.deleteItineraryItem = async (dId, idx) => {
@@ -1004,6 +1028,10 @@
                 <div class="relative mb-3"><select id="new-date" class="w-full p-3 font-bold border-0 appearance-none bg-gray-50 rounded-xl text-gray-700" required></select><i class="absolute pointer-events-none fa-solid fa-chevron-down right-4 top-4 text-gray-400"></i></div>
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">幾點?</label><input type="time" id="new-time" class="w-full p-3 mb-3 text-lg font-bold text-center border-0 bg-gray-50 rounded-xl text-gray-700" required>
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">做什麼?</label><input type="text" id="new-title" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl text-gray-700" required>
+                <!-- Add Link Field -->
+                <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">地圖連結</label>
+                <input type="text" id="new-link" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl text-gray-700" placeholder="貼上 Google Maps 網址">
+                <!-- End Add Link Field -->
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">備註</label><textarea id="new-note" rows="3" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl text-gray-700"></textarea>
                 <button type="submit" class="w-full p-3 font-bold text-white transition shadow-lg bg-custom-primary rounded-2xl hover:bg-custom-primary-dark">完成</button>
             </form>
@@ -1018,6 +1046,9 @@
                 <input type="hidden" id="edit-date-key"><input type="hidden" id="edit-item-index">
                 <input type="time" id="edit-time" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
                 <input type="text" id="edit-title" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" required>
+                <!-- Add Link Field -->
+                <input type="text" id="edit-link" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" placeholder="地圖連結">
+                <!-- End Add Link Field -->
                 <textarea id="edit-note" rows="3" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl"></textarea>
                 <div class="flex space-x-3"><button type="button" onclick="window.deleteItineraryItem(document.getElementById('edit-date-key').value, document.getElementById('edit-item-index').value)" class="flex-1 p-3 font-bold text-red-400 transition bg-white border-2 border-red-100 rounded-2xl hover:bg-red-50">刪除</button><button type="submit" class="flex-[2] p-3 font-bold text-white transition shadow-lg bg-custom-primary rounded-2xl hover:bg-custom-primary-dark">儲存</button></div>
             </form>
@@ -1131,4 +1162,4 @@
         </div>
     </div>
 </body>
-</html>
+</html>幫我新增行程的時候可以多一個連結的欄位嗎 行程卡上面會出現地圖的按鈕
