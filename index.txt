@@ -193,10 +193,34 @@
             if(data.result === 'success') {
                 EXCHANGE_RATE_JPY_TWD = data.rates.TWD;
                 document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
+                
+                // ★★★ 更新計算機的匯率顯示 ★★★
+                const calcRate = document.getElementById('calc-rate-display');
+                if(calcRate) calcRate.innerText = EXCHANGE_RATE_JPY_TWD.toFixed(4);
+                // 如果計算機已經有數字，重新計算
+                if(window.calculateTwd) window.calculateTwd();
+
                 if(window.updateSettlementSummary) window.updateSettlementSummary();
             }
         } catch(e) { console.error('匯率失敗', e); }
     }
+    
+    // ★★★ 新增：即時匯率計算功能 ★★★
+    window.calculateTwd = () => {
+        const jpyInput = document.getElementById('calc-jpy');
+        const twdOutput = document.getElementById('calc-twd');
+        if(!jpyInput || !twdOutput) return;
+
+        const jpy = parseFloat(jpyInput.value);
+        if(isNaN(jpy)) {
+            twdOutput.innerText = '0';
+            return;
+        }
+        
+        // 四捨五入到整數
+        const twd = Math.round(jpy * EXCHANGE_RATE_JPY_TWD);
+        twdOutput.innerText = twd.toLocaleString(); // 加上千分位
+    };
 
     /* =========================
        頁面渲染與邏輯
@@ -425,7 +449,7 @@
         }).join('');
     };
 
-    // --- 慾望清單編輯功能 (已修正語法錯誤) ---
+    // --- 慾望清單編輯功能 (已修正) ---
     window.openEditWishlistModal = function(id) {
         const item = window.WISHLIST_DATA.find(i => i.id === id);
         if(!item) return;
@@ -532,6 +556,13 @@
 
     window.togglePackingStatus = async function(id, currentStatus) {
         await updateDoc(doc(db, "packinglist", id), { packed: !currentStatus });
+    };
+    
+    // ★★★ 補回缺失的 deletePackingItem 函式 ★★★
+    window.deletePackingItem = async function(id) {
+        if(confirm('確定要刪除這筆打包清單項目嗎？')) {
+            await deleteDoc(doc(db, "packinglist", id));
+        }
     };
 
     // ★★★ 新增：編輯行李清單功能 ★★★
@@ -863,7 +894,7 @@
             <!-- 3. 慾望清單 TAB -->
             <div id="wishlist-tab" class="main-tab-content hidden p-4">
                 <div class="p-6 mb-6 bg-white border-2 border-pink-100 shadow-lg rounded-3xl">
-                    <h3 class="flex items-center mb-4 text-xl font-bold text-gray-700"><i class="mr-2 fa-solid fa-cart-plus text-custom-primary"></i> 新增慾望清單</h3>
+                    <h3 class="flex items-center mb-4 text-xl font-bold text-gray-700"><i class="mr-2 fa-solid fa-cart-plus text-custom-primary"></i> 新增慾望</h3>
                     <form onsubmit="window.addWishlistItem(event)" id="wishlist-form">
                         <input type="text" id="wishlist-name" placeholder="商品名稱" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" required>
                         <div class="flex gap-2 mb-3">
@@ -926,6 +957,25 @@
                         <p class="text-2xl font-bold text-green-900 font-mono">$<span id="overview-budget-display">Loading...</span></p>
                     </div>
                 </div> 
+
+                <!-- ★★★ 新增：簡易換匯計算機 ★★★ -->
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-green-100 mb-6">
+                    <h3 class="font-bold text-gray-700 mb-3 flex items-center">
+                        <i class="fa-solid fa-calculator text-custom-secondary mr-2"></i> 簡易換算
+                    </h3>
+                    <div class="flex items-center gap-3">
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-400 block mb-1">日幣 (JPY)</label>
+                            <input type="number" id="calc-jpy" class="w-full p-3 bg-gray-50 rounded-xl font-bold text-lg border-2 border-gray-100 focus:border-green-300 transition-colors" placeholder="0" oninput="window.calculateTwd()">
+                        </div>
+                        <i class="fa-solid fa-arrow-right text-gray-300 mt-4"></i>
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-400 block mb-1">台幣 (TWD)</label>
+                            <div id="calc-twd" class="w-full p-3 bg-green-50 text-custom-secondary rounded-xl font-bold text-lg border-2 border-green-100 flex items-center h-[54px]">0</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2 text-right">即時匯率: <span id="calc-rate-display" class="font-bold text-custom-primary">0.2150</span></p>
+                </div>
 
                 <div class="p-6 mb-6 bg-white border border-pink-100 shadow-sm rounded-3xl">
                     <div class="flex items-center mb-4"><i class="fa-solid fa-location-dot text-[#FF8BA7] text-lg mr-2"></i><h2 class="text-lg font-bold text-gray-700">想去地點清單</h2></div>
