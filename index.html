@@ -180,15 +180,12 @@
         // 5. 打包清單
         onSnapshot(collection(db, "packinglist"), (snap) => {
              let data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-             
-             // 前端簡單排序：未打包的放前面
              data.sort((a, b) => {
                  if (a.packed !== b.packed) return a.packed ? 1 : -1;
                  const t1 = a.createdAt?.seconds || 0;
                  const t2 = b.createdAt?.seconds || 0;
                  return t1 - t2; 
              });
-             
              window.PACKING_DATA = data;
              window.renderPackingList();
         });
@@ -742,7 +739,15 @@
         if(tid==='overview-tab') window.renderSpots();
     };
 
-    document.addEventListener('DOMContentLoaded', () => { window.switchMainNav('itinerary-tab'); startDataSync(); });
+    document.addEventListener('DOMContentLoaded', () => { 
+        window.switchMainNav('itinerary-tab'); 
+        startDataSync(); 
+        
+        // ★★★ 新增：設定記帳預設日期為今天 ★★★
+        const today = new Date();
+        const localDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        document.getElementById('expense-date').value = localDate;
+    });
 </script>
 </head>
 <body class="bg-gray-50 font-sans">
@@ -881,7 +886,7 @@
                                     <option value="藥妝">💊 藥妝</option>
                                     <option value="其他">✨ 其他</option>
                                 </select>
-                                <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down"></i>
+                                <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none"></i>
                             </div>
                         </div>
                         <input type="file" id="item-camera-input" accept="image/*" class="hidden" onchange="window.previewItemImage(this)">
