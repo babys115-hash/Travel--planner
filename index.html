@@ -194,10 +194,8 @@
                 EXCHANGE_RATE_JPY_TWD = data.rates.TWD;
                 document.getElementById('exchange-rate-display').textContent = EXCHANGE_RATE_JPY_TWD.toFixed(4);
                 
-                // ★★★ 更新計算機的匯率顯示 ★★★
                 const calcRate = document.getElementById('calc-rate-display');
                 if(calcRate) calcRate.innerText = EXCHANGE_RATE_JPY_TWD.toFixed(4);
-                // 如果計算機已經有數字，重新計算
                 if(window.calculateTwd) window.calculateTwd();
 
                 if(window.updateSettlementSummary) window.updateSettlementSummary();
@@ -205,7 +203,6 @@
         } catch(e) { console.error('匯率失敗', e); }
     }
     
-    // ★★★ 新增：即時匯率計算功能 ★★★
     window.calculateTwd = () => {
         const jpyInput = document.getElementById('calc-jpy');
         const twdOutput = document.getElementById('calc-twd');
@@ -217,9 +214,8 @@
             return;
         }
         
-        // 四捨五入到整數
         const twd = Math.round(jpy * EXCHANGE_RATE_JPY_TWD);
-        twdOutput.innerText = twd.toLocaleString(); // 加上千分位
+        twdOutput.innerText = twd.toLocaleString(); 
     };
 
     /* =========================
@@ -1004,6 +1000,10 @@
                 <div class="relative mb-3"><select id="new-date" class="w-full p-3 font-bold border-0 appearance-none bg-gray-50 rounded-xl text-gray-700" required></select><i class="absolute pointer-events-none fa-solid fa-chevron-down right-4 top-4 text-gray-400"></i></div>
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">幾點?</label><input type="time" id="new-time" class="w-full p-3 mb-3 text-lg font-bold text-center border-0 bg-gray-50 rounded-xl text-gray-700" required>
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">做什麼?</label><input type="text" id="new-title" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl text-gray-700" required>
+                <!-- Add Link Field -->
+                <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">地圖連結</label>
+                <input type="text" id="new-link" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl text-gray-700" placeholder="貼上 Google Maps 網址">
+                <!-- End Add Link Field -->
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">備註</label><textarea id="new-note" rows="3" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl text-gray-700"></textarea>
                 <button type="submit" class="w-full p-3 font-bold text-white transition shadow-lg bg-custom-primary rounded-2xl hover:bg-custom-primary-dark">完成</button>
             </form>
@@ -1018,6 +1018,9 @@
                 <input type="hidden" id="edit-date-key"><input type="hidden" id="edit-item-index">
                 <input type="time" id="edit-time" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
                 <input type="text" id="edit-title" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" required>
+                <!-- Add Link Field -->
+                <input type="text" id="edit-link" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" placeholder="地圖連結">
+                <!-- End Add Link Field -->
                 <textarea id="edit-note" rows="3" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl"></textarea>
                 <div class="flex space-x-3"><button type="button" onclick="window.deleteItineraryItem(document.getElementById('edit-date-key').value, document.getElementById('edit-item-index').value)" class="flex-1 p-3 font-bold text-red-400 transition bg-white border-2 border-red-100 rounded-2xl hover:bg-red-50">刪除</button><button type="submit" class="flex-[2] p-3 font-bold text-white transition shadow-lg bg-custom-primary rounded-2xl hover:bg-custom-primary-dark">儲存</button></div>
             </form>
