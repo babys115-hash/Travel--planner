@@ -252,8 +252,10 @@
         const amount = parseFloat(document.getElementById('expense-amount').value);
         const desc = document.getElementById('expense-description').value;
         if(!date || !amount || !desc) return alert('請填寫完整');
+        // 幣別由隱藏欄位獲取
+        const currency = document.getElementById('expense-currency').value;
         await addDoc(collection(db, "expenses"), {
-            date, amount, description: desc, currency: ACTIVE_CURRENCY, payer: ACTIVE_PAYER, category: ACTIVE_CATEGORY, payment: ACTIVE_PAYMENT, timestamp: serverTimestamp()
+            date, amount, description: desc, currency: currency, payer: ACTIVE_PAYER, category: ACTIVE_CATEGORY, payment: ACTIVE_PAYMENT, timestamp: serverTimestamp()
         });
         alert('記帳成功'); document.getElementById('expense-amount').value = ''; document.getElementById('expense-description').value = '';
     };
@@ -264,6 +266,8 @@
         document.getElementById('edit-expense-date').value = e.date;
         document.getElementById('edit-expense-amount').value = e.amount;
         document.getElementById('edit-expense-description').value = e.description;
+        // 設定編輯 Modal 的隱藏欄位與按鈕狀態
+        document.getElementById('edit-expense-currency').value = e.currency;
         window.selectEditCurrency(e.currency); window.selectEditPayer(e.payer); window.selectEditCategory(e.category); window.selectEditPayment(e.payment);
         window.openModal('editExpenseModal');
     };
@@ -271,9 +275,12 @@
         evt.preventDefault();
         const id = document.getElementById('edit-expense-id').value;
         await updateDoc(doc(db, "expenses", id), {
-             date: document.getElementById('edit-expense-date').value, amount: parseFloat(document.getElementById('edit-expense-amount').value),
-             description: document.getElementById('edit-expense-description').value, currency: document.getElementById('edit-expense-currency').value,
-             payer: document.getElementById('edit-expense-payer').value, category: document.getElementById('edit-expense-category').value,
+             date: document.getElementById('edit-expense-date').value, 
+             amount: parseFloat(document.getElementById('edit-expense-amount').value),
+             description: document.getElementById('edit-expense-description').value, 
+             currency: document.getElementById('edit-expense-currency').value,
+             payer: document.getElementById('edit-expense-payer').value, 
+             category: document.getElementById('edit-expense-category').value,
              payment: document.getElementById('edit-expense-payment').value
         });
         window.closeModal('editExpenseModal');
@@ -293,7 +300,7 @@
             const iconMap = { Food: 'fa-utensils', Transport: 'fa-train', Accommodation: 'fa-bed', Shopping: 'fa-bag-shopping', Ticket: 'fa-ticket', Other: 'fa-shapes' };
             return `<div class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center transition cursor-pointer hover:shadow-md" onclick="window.editExpense('${e.id}')">
                 <div class="flex items-center"><div class="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center mr-3 text-custom-primary"><i class="fa-solid ${iconMap[e.category]||'fa-circle'}"></i></div><div><p class="font-bold text-gray-700">${e.description}</p><p class="text-xs text-gray-400">${e.date} · ${e.payer}</p></div></div>
-                <div class="text-right flex items-center gap-2"><div class="text-right"><p class="font-bold text-custom-danger">${e.currency} ${e.amount}</p><p class="text-[10px] text-gray-400">約 $${twd}</p></div><button onclick="event.stopPropagation(); window.deleteExpense('${e.id}')" class="text-gray-300 hover:text-red-400"><i class="fa-solid fa-trash-can"></i></button></div>
+                <div class="text-right flex items-center gap-2"><div class="text-right"><p class="font-bold text-custom-danger">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">約 TWD $${twd.toLocaleString()}</p></div><button onclick="event.stopPropagation(); window.deleteExpense('${e.id}')" class="text-gray-300 hover:text-red-400"><i class="fa-solid fa-trash-can"></i></button></div>
             </div>`;
         }).join('');
         window.updateSettlementSummary();
@@ -389,7 +396,7 @@
         window.renderWishlist();
     };
 
-    // --- 慾望清單渲染 (含編輯按鈕) ---
+    // --- 慾望清單渲染 ---
     window.renderWishlist = function() {
         const listContainer = document.getElementById('wishlist-list');
         const filterContainer = document.getElementById('wishlist-filter-buttons');
@@ -434,7 +441,7 @@
                     </div>
                 </div>
                 <div class="text-right">
-                    <p class="font-bold text-custom-primary">¥${i.price}</p>
+                    <p class="font-bold text-custom-primary">¥${i.price.toLocaleString()}</p>
                     <div class="flex justify-end gap-2 mt-1">
                         <button onclick="window.toggleWishlistStatus('${i.id}', ${i.purchased})" class="wishlist-status-btn ${i.purchased?'purchased':'pending'}">${i.purchased?'已買':'想買'}</button>
                         <button onclick="window.openEditWishlistModal('${i.id}')" class="text-gray-300 hover:text-blue-400 px-1"><i class="fa-solid fa-pen"></i></button>
@@ -445,7 +452,6 @@
         }).join('');
     };
 
-    // --- 慾望清單編輯功能 (已修正) ---
     window.openEditWishlistModal = function(id) {
         const item = window.WISHLIST_DATA.find(i => i.id === id);
         if(!item) return;
@@ -516,7 +522,6 @@
     };
 
     // --- 打包清單邏輯 ---
-    // ★★★ 修改：renderPackingList 增加編輯按鈕與刪除線 ★★★
     window.renderPackingList = function() {
         const container = document.getElementById('packing-list-container');
         if (!container) return;
@@ -527,7 +532,7 @@
         }
 
         container.innerHTML = window.PACKING_DATA.map(item => {
-            const isPacked = item.packed || false; // 確保有值
+            const isPacked = item.packed || false;
             return `
              <div class="p-3 rounded-xl shadow-sm border flex justify-between items-center mb-2 ${isPacked ? 'bg-gray-50' : 'bg-white'}">
                 <div class="flex items-center cursor-pointer flex-1" onclick="window.togglePackingStatus('${item.id}', ${isPacked})">
@@ -537,7 +542,7 @@
                     <p class="text-xs text-gray-400">${item.category}</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-2"> <!-- 新增的 div 統一管理按鈕 -->
+                <div class="flex items-center gap-2">
                     <button onclick="window.openEditPackingModal('${item.id}')" class="text-gray-300 hover:text-blue-400 p-2">
                         <i class="fa-solid fa-pen"></i>
                     </button>
@@ -554,21 +559,19 @@
         await updateDoc(doc(db, "packinglist", id), { packed: !currentStatus });
     };
     
-    // ★★★ 補回缺失的 deletePackingItem 函式 ★★★
     window.deletePackingItem = async function(id) {
         if(confirm('確定要刪除這筆打包清單項目嗎？')) {
             await deleteDoc(doc(db, "packinglist", id));
         }
     };
 
-    // ★★★ 新增：編輯行李清單功能 ★★★
     window.openEditPackingModal = function(id) {
         const item = window.PACKING_DATA.find(i => i.id === id);
         if(!item) return;
 
         document.getElementById('edit-packing-id').value = id;
         document.getElementById('edit-packing-name').value = item.name;
-        document.getElementById('edit-packing-category').value = item.category || ''; // 確保分類預先填入
+        document.getElementById('edit-packing-category').value = item.category || '';
 
         window.openModal('editPackingModal');
     };
@@ -600,7 +603,7 @@
         }
     };
 
-    // --- 景點 (Spots) 邏輯 ---
+    // --- 景點 ---
     window.addSpot = async function() {
         const name = document.getElementById('new-spot-name').value;
         const desc = document.getElementById('new-spot-desc').value;
@@ -651,7 +654,6 @@
         }).join('');
     };
 
-    // --- 編輯景點 (Modal) ---
     window.openEditSpotModal = function(id) {
         const spot = window.SPOTS_DATA.find(s => s.id === id); if(!spot) return;
         document.getElementById('edit-spot-id').value = spot.id;
@@ -696,7 +698,7 @@
     };
     window.deleteSpot = async (id) => { if(confirm('刪除?')) await deleteDoc(doc(db, "spots", id)); };
 
-    // --- 行程功能 ---
+    // --- 行程 ---
     window.generateDateTabs = () => {
         const c = document.getElementById('date-buttons-container'); if(!c) return; c.innerHTML = '';
         window.ITINERARY_DATA.forEach((d, i) => {
@@ -707,64 +709,39 @@
             c.appendChild(btn);
         });
     };
-    // ★★★ 修改：渲染行程 (加上地圖按鈕) ★★★
     window.renderItinerary = () => {
         const c = document.getElementById('itinerary-container'); if(!c) return;
         const d = window.ITINERARY_DATA.find(x => x.id === ACTIVE_DATE);
         if(!d || !d.activities?.length) { c.innerHTML = `<div class="m-4 p-6 bg-white rounded-xl shadow-sm text-center border border-pink-100"><p class="text-gray-400">本日尚無行程</p></div>`; return; }
         c.innerHTML = `<div class="mx-4 mt-4 p-4 bg-white rounded-xl shadow-sm border border-pink-100 flex justify-between items-center"><h2 class="text-lg font-bold text-gray-700">${d.city}</h2><span class="bg-pink-50 text-custom-primary px-3 py-1 rounded-full text-sm font-bold">${d.date}</span></div><div class="timeline-container p-4">` + d.activities.map((a, i) => {
             const icon = a.title.includes('餐')?'fa-utensils':a.title.includes('宿')?'fa-bed':'fa-location-dot';
-            
-            // ★★★ 新增：如果有連結，顯示按鈕 ★★★
             const linkBtn = a.link ? `<a href="${a.link}" target="_blank" onclick="event.stopPropagation()" class="text-custom-secondary text-sm ml-2 hover:underline">(地圖 <i class="fa-solid fa-map-location-dot"></i>)</a>` : '';
 
             return `<div class="flex items-start mb-6 group" onclick="window.openEditModal('${d.id}', ${i})"><div class="w-1/4 text-sm font-bold text-gray-400 pt-1 text-center font-mono bg-gray-50 rounded-lg mr-3">${a.time}</div><div class="flex-1 bg-white p-3 rounded-xl shadow-sm border border-gray-100 relative z-10"><div class="timeline-item relative !pl-0"><span class="absolute -left-[2.1rem] top-2 h-4 w-4 rounded-full bg-custom-primary border-4 border-white timeline-dot z-20"></span><div class="font-bold text-gray-700 mb-1"><i class="fa-solid ${icon} text-custom-primary mr-2"></i>${a.title}${linkBtn}</div><div class="text-sm text-gray-500 ml-8">${a.location||''}</div></div></div></div>`;
         }).join('') + '</div>';
     };
 
-    // ★★★ 修改：新增行程 (讀取連結) ★★★
     window.addItineraryItem = async (e) => {
         e.preventDefault();
         const dId = document.getElementById('new-date').value;
-        // 注意：這裡新增了 link 欄位的讀取
-        const act = { 
-            time: document.getElementById('new-time').value, 
-            title: document.getElementById('new-title').value, 
-            location: document.getElementById('new-note').value, 
-            link: document.getElementById('new-link').value, // 新增這一行
-            notes: '' 
-        };
+        const act = { time: document.getElementById('new-time').value, title: document.getElementById('new-title').value, location: document.getElementById('new-note').value, link: document.getElementById('new-link').value, notes: '' };
         if(!dId||!act.time||!act.title) return;
         const d = window.ITINERARY_DATA.find(x=>x.id===dId);
         if(d) { await updateDoc(doc(db,'itineraries',dId), {activities: [...(d.activities||[]), act].sort((a,b)=>a.time.localeCompare(b.time))}); window.closeModal('addItineraryModal'); document.getElementById('add-itinerary-form').reset(); }
     };
     window.populateItineraryModalDates = () => { const s = document.getElementById('new-date'); if(!s) return; s.innerHTML = window.ITINERARY_DATA.map(d=>`<option value="${d.id}" ${d.id===ACTIVE_DATE?'selected':''}>${d.date.substring(5)} - ${d.city}</option>`).join(''); };
-    
-    // ★★★ 修改：打開編輯 Modal (填入連結) ★★★
     window.openEditModal = (dId, idx) => {
         const d = window.ITINERARY_DATA.find(x=>x.id===dId); const act = d.activities[idx];
         document.getElementById('edit-modal-date-info').textContent = `${d.city} ${d.date}`;
         document.getElementById('edit-date-key').value = dId; document.getElementById('edit-item-index').value = idx;
-        document.getElementById('edit-time').value = act.time; 
-        document.getElementById('edit-title').value = act.title; 
-        document.getElementById('edit-note').value = act.location||'';
-        document.getElementById('edit-link').value = act.link||''; // 新增這一行
+        document.getElementById('edit-time').value = act.time; document.getElementById('edit-title').value = act.title; document.getElementById('edit-note').value = act.location||''; document.getElementById('edit-link').value = act.link||'';
         window.openModal('editItineraryModal');
     };
-
-    // ★★★ 修改：儲存編輯 (更新連結) ★★★
     window.saveItineraryItem = async (e) => {
         e.preventDefault();
         const dId = document.getElementById('edit-date-key').value, idx = document.getElementById('edit-item-index').value;
         const d = window.ITINERARY_DATA.find(x=>x.id===dId); const acts = [...d.activities];
-        // 更新 link 欄位
-        acts[idx] = {
-            ...acts[idx], 
-            time: document.getElementById('edit-time').value, 
-            title: document.getElementById('edit-title').value, 
-            location: document.getElementById('edit-note').value,
-            link: document.getElementById('edit-link').value // 新增這一行
-        };
+        acts[idx] = { ...acts[idx], time: document.getElementById('edit-time').value, title: document.getElementById('edit-title').value, location: document.getElementById('edit-note').value, link: document.getElementById('edit-link').value };
         await updateDoc(doc(db,'itineraries',dId), {activities: acts.sort((a,b)=>a.time.localeCompare(b.time))}); window.closeModal('editItineraryModal');
     };
     window.deleteItineraryItem = async (dId, idx) => {
@@ -788,8 +765,6 @@
     document.addEventListener('DOMContentLoaded', () => { 
         window.switchMainNav('itinerary-tab'); 
         startDataSync(); 
-        
-        // ★★★ 新增：設定記帳預設日期為今天 ★★★
         const now = new Date();
         const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
         document.getElementById('expense-date').value = localDate;
@@ -853,7 +828,7 @@
                 <div id="add-expense-container" class="hidden bg-white p-5 rounded-3xl shadow-sm border border-pink-100">
                     <form onsubmit="event.preventDefault(); window.addExpense();">
                         <label class="block mb-1 text-sm font-bold text-gray-500">日期</label>
-                        <input type="date" id="expense-date" value="2024-05-18" class="w-full p-3 mb-4 font-bold border-0 bg-gray-50 rounded-xl" required>
+                        <input type="date" id="expense-date" class="w-full p-3 mb-4 font-bold border-0 bg-gray-50 rounded-xl" required>
                         <label class="block mb-1 text-sm font-bold text-gray-500">金額</label>
                         <div class="flex mb-4">
                             <input type="number" step="0.01" id="expense-amount" placeholder="0" class="flex-1 p-3 text-xl font-bold border-0 bg-gray-50 rounded-xl" required>
@@ -861,6 +836,7 @@
                                 <button type="button" class="block-select-btn active-filter" data-currency="TWD" onclick="window.selectCurrency('TWD')">TWD</button>
                                 <button type="button" class="block-select-btn" data-currency="JPY" onclick="window.selectCurrency('JPY')">JPY</button>
                             </div>
+                            <!-- 用於儲存當前選擇幣別的隱藏欄位 -->
                             <input type="hidden" id="expense-currency" value="TWD">
                         </div>
                         <label class="block mb-1 text-sm font-bold text-gray-500">用途</label>
@@ -923,6 +899,7 @@
                         <input type="text" id="wishlist-name" placeholder="商品名稱" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" required>
                         <div class="flex gap-2 mb-3">
                             <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 p-3 border-0 bg-gray-50 rounded-xl" required>
+                            <!-- 清單輸入時的類別選單 -->
                             <div class="relative w-1/2">
                                 <select id="wishlist-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
                                     <option value="伴手禮">🎁 伴手禮</option>
@@ -982,7 +959,6 @@
                     </div>
                 </div> 
 
-                <!-- ★★★ 新增：簡易換匯計算機 ★★★ -->
                 <div class="bg-white p-6 rounded-3xl shadow-sm border border-green-100 mb-6">
                     <h3 class="font-bold text-gray-700 mb-3 flex items-center">
                         <i class="fa-solid fa-calculator text-custom-secondary mr-2"></i> 簡易換算
@@ -1028,10 +1004,8 @@
                 <div class="relative mb-3"><select id="new-date" class="w-full p-3 font-bold border-0 appearance-none bg-gray-50 rounded-xl text-gray-700" required></select><i class="absolute pointer-events-none fa-solid fa-chevron-down right-4 top-4 text-gray-400"></i></div>
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">幾點?</label><input type="time" id="new-time" class="w-full p-3 mb-3 text-lg font-bold text-center border-0 bg-gray-50 rounded-xl text-gray-700" required>
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">做什麼?</label><input type="text" id="new-title" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl text-gray-700" required>
-                <!-- Add Link Field -->
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">地圖連結</label>
                 <input type="text" id="new-link" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl text-gray-700" placeholder="貼上 Google Maps 網址">
-                <!-- End Add Link Field -->
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">備註</label><textarea id="new-note" rows="3" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl text-gray-700"></textarea>
                 <button type="submit" class="w-full p-3 font-bold text-white transition shadow-lg bg-custom-primary rounded-2xl hover:bg-custom-primary-dark">完成</button>
             </form>
@@ -1046,25 +1020,30 @@
                 <input type="hidden" id="edit-date-key"><input type="hidden" id="edit-item-index">
                 <input type="time" id="edit-time" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
                 <input type="text" id="edit-title" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" required>
-                <!-- Add Link Field -->
                 <input type="text" id="edit-link" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" placeholder="地圖連結">
-                <!-- End Add Link Field -->
                 <textarea id="edit-note" rows="3" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl"></textarea>
                 <div class="flex space-x-3"><button type="button" onclick="window.deleteItineraryItem(document.getElementById('edit-date-key').value, document.getElementById('edit-item-index').value)" class="flex-1 p-3 font-bold text-red-400 transition bg-white border-2 border-red-100 rounded-2xl hover:bg-red-50">刪除</button><button type="submit" class="flex-[2] p-3 font-bold text-white transition shadow-lg bg-custom-primary rounded-2xl hover:bg-custom-primary-dark">儲存</button></div>
             </form>
         </div>
     </div>
 
-    <!-- 編輯支出 Modal -->
+    <!-- 編輯支出 Modal (支援幣別編輯) -->
     <div id="editExpenseModal" class="fixed inset-0 bg-black bg-opacity-30 hidden items-center justify-center z-50">
         <div class="bg-white p-6 rounded-2xl shadow-lg w-[90%] max-w-md">
             <h3 class="text-lg font-bold mb-4 text-gray-700 flex items-center"><i class="fa-solid fa-pen-to-square text-custom-primary mr-2"></i> 編輯支出</h3>
             <form onsubmit="window.saveExpenseUpdate(event)">
                 <input type="hidden" id="edit-expense-id">
                 <label class="block mb-2 text-sm font-bold">日期</label><input type="date" id="edit-expense-date" class="w-full p-3 border rounded-xl mb-4">
-                <label class="block mb-2 text-sm font-bold">金額</label><input type="number" id="edit-expense-amount" class="w-full p-3 border rounded-xl mb-4">
+                <label class="block mb-2 text-sm font-bold">金額</label>
+                <div class="flex gap-2 mb-4">
+                    <input type="number" step="0.01" id="edit-expense-amount" class="flex-1 p-3 border rounded-xl">
+                    <div id="edit-expense-currency-select" class="flex">
+                        <button type="button" class="block-select-btn" data-currency="TWD" onclick="window.selectEditCurrency('TWD')">TWD</button>
+                        <button type="button" class="block-select-btn" data-currency="JPY" onclick="window.selectEditCurrency('JPY')">JPY</button>
+                    </div>
+                    <input type="hidden" id="edit-expense-currency">
+                </div>
                 <label class="block mb-2 text-sm font-bold">說明</label><input type="text" id="edit-expense-description" class="w-full p-3 border rounded-xl mb-4">
-                <label class="block mb-2 text-sm font-bold">幣別</label><div id="edit-expense-currency-select" class="flex gap-2 mb-4"><button type="button" class="block-select-btn" data-currency="TWD" onclick="window.selectEditCurrency('TWD')">TWD</button><button type="button" class="block-select-btn" data-currency="JPY" onclick="window.selectEditCurrency('JPY')">JPY</button></div><input type="hidden" id="edit-expense-currency">
                 <label class="block mb-2 text-sm font-bold">付款</label><div id="edit-expense-payer-select" class="flex gap-2 mb-4"><button type="button" class="block-select-btn" data-payer="Josh" onclick="window.selectEditPayer('Josh')">Josh</button><button type="button" class="block-select-btn" data-payer="Candice" onclick="window.selectEditPayer('Candice')">Candice</button></div><input type="hidden" id="edit-expense-payer">
                 <label class="block mb-2 text-sm font-bold">類別</label><div id="edit-expense-category-select" class="flex flex-wrap gap-2 mb-4"><button type="button" class="block-select-btn" data-category="Food" onclick="window.selectEditCategory('Food')">餐飲</button><button type="button" class="block-select-btn" data-category="Transport" onclick="window.selectEditCategory('Transport')">交通</button><button type="button" class="block-select-btn" data-category="Accommodation" onclick="window.selectEditCategory('Accommodation')">住宿</button><button type="button" class="block-select-btn" data-category="Shopping" onclick="window.selectEditCategory('Shopping')">購物</button><button type="button" class="block-select-btn" data-category="Ticket" onclick="window.selectEditCategory('Ticket')">門票</button><button type="button" class="block-select-btn" data-category="Other" onclick="window.selectEditCategory('Other')">其他</button></div><input type="hidden" id="edit-expense-category">
                 <label class="block mb-2 text-sm font-bold">方式</label><div id="edit-expense-payment-select" class="flex gap-2 mb-4"><button type="button" class="block-select-btn" data-payment="Cash" onclick="window.selectEditPayment('Cash')">現金</button><button type="button" class="block-select-btn" data-payment="Card" onclick="window.selectEditPayment('Card')">信用卡</button><button type="button" class="block-select-btn" data-payment="Paypay" onclick="window.selectEditPayment('Paypay')">Paypay</button></div><input type="hidden" id="edit-expense-payment">
@@ -1090,21 +1069,17 @@
         </div>
     </div>
 
-    <!-- 編輯慾望清單 Modal -->
+    <!-- 編輯慾望清單 Modal (支援類別編輯) -->
     <div id="editWishlistModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editWishlistModal')">
         <div class="w-full max-w-sm p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[90vh]" onclick="event.stopPropagation()">
             <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700">編輯物品<button onclick="window.closeModal('editWishlistModal')" class="flex items-center justify-center w-8 h-8 text-gray-400 transition bg-gray-100 rounded-full hover:bg-gray-200"><i class="fa-solid fa-xmark"></i></button></h3>
-            
             <form onsubmit="window.saveWishlistUpdate(event)">
                 <input type="hidden" id="edit-wishlist-id">
                 <input type="hidden" id="edit-wishlist-old-image">
-
                 <label class="block mb-1 text-sm font-bold text-gray-500">名稱</label>
                 <input type="text" id="edit-wishlist-name" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
-
                 <label class="block mb-1 text-sm font-bold text-gray-500">價格 (JPY)</label>
                 <input type="number" id="edit-wishlist-price" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
-
                 <label class="block mb-1 text-sm font-bold text-gray-500">分類</label>
                 <div class="relative mb-3">
                     <select id="edit-wishlist-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
@@ -1117,33 +1092,27 @@
                     </select>
                     <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none"></i>
                 </div>
-
                 <div id="edit-wishlist-preview-container" class="relative hidden mb-3">
                     <p class="mb-1 text-xs text-gray-400">目前圖片：</p>
                     <img id="edit-wishlist-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl">
                 </div>
-
                 <button type="button" onclick="document.getElementById('edit-wishlist-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
                     <i class="fa-solid fa-camera"></i> 更換照片
                 </button>
                 <input type="file" id="edit-wishlist-file" accept="image/*" class="hidden" onchange="window.previewEditWishlistImage(this)">
-
                 <button type="submit" id="save-wishlist-btn" class="w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
             </form>
         </div>
     </div>
 
-    <!-- 新增：編輯行李清單 Modal -->
+    <!-- 編輯行李清單 Modal -->
     <div id="editPackingModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editPackingModal')">
         <div class="w-full max-w-sm p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[90vh]" onclick="event.stopPropagation()">
             <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700"><i class="mr-2 fa-solid fa-pen-to-square text-custom-secondary"></i> 編輯行李項目<button onclick="window.closeModal('editPackingModal')" class="flex items-center justify-center w-8 h-8 text-gray-400 transition bg-gray-100 rounded-full hover:bg-gray-200"><i class="fa-solid fa-xmark"></i></button></h3>
-            
             <form onsubmit="window.savePackingUpdate(event)">
                 <input type="hidden" id="edit-packing-id">
-
                 <label class="block mb-1 text-sm font-bold text-gray-500">物品名稱</label>
                 <input type="text" id="edit-packing-name" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
-
                 <label class="block mb-1 text-sm font-bold text-gray-500">分類</label>
                 <div class="relative mb-3">
                     <select id="edit-packing-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
@@ -1156,7 +1125,6 @@
                     </select>
                     <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none"></i>
                 </div>
-
                 <button type="submit" id="save-packing-btn" class="w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
             </form>
         </div>
