@@ -467,15 +467,50 @@
     };
     window.renderSpots = function() {
         const container = document.getElementById('spots-list'); if (!container) return;
-        container.innerHTML = window.SPOTS_DATA.map(s => `
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 mb-4 shadow-sm relative">
-                ${s.imageUrl ? `<img src="${s.imageUrl}" class="w-full h-32 object-cover rounded-xl mb-3 border border-gray-100 cursor-pointer" onclick="window.open(this.src, '_blank')">` : ''}
-                <div class="flex justify-between items-start"><div class="flex-1 pr-2"><div class="flex items-center mb-2"><i class="fa-solid fa-location-dot text-[#FF8BA7] text-lg mr-2"></i><h3 class="font-bold text-gray-700 text-lg tracking-wide">${s.name}</h3></div>
-                ${s.description ? `<div class="bg-[#FFF8F0] p-2 rounded-lg text-sm text-gray-500 mb-2 leading-relaxed tracking-wide">${s.description}</div>` : ''}
-                ${s.link ? `<a href="${s.link}" target="_blank" class="text-[#4ECDC4] font-bold text-sm flex items-center hover:underline mt-1"><i class="fa-solid fa-map-location-dot mr-1"></i> 在地圖中開啟</a>` : ''}</div>
-                <div class="flex flex-col gap-3 ml-2 pt-1"><button onclick="window.deleteSpot('${s.id}')" class="text-gray-300 hover:text-red-400 transition transform hover:scale-110"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                <button onclick="window.openEditSpotModal('${s.id}')" class="text-gray-300 hover:text-blue-400 transition transform hover:scale-110"><i class="fa-solid fa-pen text-sm"></i></button></div></div>
-            </div>`).join('');
+        
+        container.innerHTML = window.SPOTS_DATA.map(s => {
+            // 判斷是否有連結，若有則加入 onclick 事件與滑鼠樣式
+            const hasLink = s.link && s.link.trim() !== "";
+            const clickAction = hasLink ? `onclick="window.open('${s.link}', '_blank')"` : '';
+            const cursorClass = hasLink ? 'cursor-pointer hover:opacity-70' : '';
+            const titleColor = hasLink ? 'text-custom-secondary underline decoration-2 underline-offset-4 decoration-pink-200' : 'text-gray-700';
+            const iconColor = hasLink ? 'text-custom-secondary' : 'text-[#FF8BA7]';
+
+            return `
+            <div class="bg-white p-4 rounded-2xl border border-gray-100 mb-4 shadow-sm relative transition hover:shadow-md">
+                
+                <!-- 圖片點擊 (預覽大圖) - 加入 stopPropagation 防止觸發父層點擊(若有) -->
+                ${s.imageUrl ? `<img src="${s.imageUrl}" class="w-full h-32 object-cover rounded-xl mb-3 border border-gray-100 cursor-pointer" onclick="event.stopPropagation(); window.openImageModal(this.src)">` : ''}
+                
+                <div class="flex justify-between items-start">
+                    <!-- 主要內容區塊 -->
+                    <div class="flex-1 pr-2">
+                        
+                        <!-- 標題區域：現在可以點擊跳轉了 -->
+                        <div class="flex items-center mb-2 transition ${cursorClass}" ${clickAction}>
+                            <i class="fa-solid fa-location-dot ${iconColor} text-lg mr-2"></i>
+                            <h3 class="font-bold ${titleColor} text-lg tracking-wide">${s.name}</h3>
+                            ${hasLink ? '<i class="fa-solid fa-arrow-up-right-from-square text-xs text-gray-300 ml-2"></i>' : ''}
+                        </div>
+
+                        ${s.description ? `<div class="bg-[#FFF8F0] p-2 rounded-lg text-sm text-gray-500 mb-2 leading-relaxed tracking-wide">${s.description}</div>` : ''}
+                        
+                        <!-- 保留原本的文字連結，作為輔助 -->
+                        ${hasLink ? `<a href="${s.link}" target="_blank" onclick="event.stopPropagation()" class="text-gray-400 text-xs flex items-center hover:text-custom-secondary mt-1"><i class="fa-solid fa-link mr-1"></i> 連結已設定 (點擊標題開啟)</a>` : ''}
+                    </div>
+
+                    <!-- 操作按鈕：加入 stopPropagation 防止觸發連結 -->
+                    <div class="flex flex-col gap-3 ml-2 pt-1">
+                        <button onclick="event.stopPropagation(); window.deleteSpot('${s.id}')" class="text-gray-300 hover:text-red-400 transition transform hover:scale-110 p-2">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); window.openEditSpotModal('${s.id}')" class="text-gray-300 hover:text-blue-400 transition transform hover:scale-110 p-2">
+                            <i class="fa-solid fa-pen text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
     };
     window.openEditSpotModal = function(id) {
         const spot = window.SPOTS_DATA.find(s => s.id === id); if(!spot) return;
