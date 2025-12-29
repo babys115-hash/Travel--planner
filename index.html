@@ -274,13 +274,13 @@
         document.getElementById('edit-expense-currency').value = e.currency;
         document.getElementById('edit-expense-payer').value = e.payer;
         document.getElementById('edit-expense-category').value = e.category;
-        document.getElementById('edit-expense-payment').value = e.payment;
+        document.getElementById('edit-expense-payment').value = e.payment || 'Cash';
 
         // 更新按鈕狀態
         window.selectEditCurrency(e.currency); 
         window.selectEditPayer(e.payer); 
         window.selectEditCategory(e.category); 
-        window.selectEditPayment(e.payment);
+        window.selectEditPayment(e.payment || 'Cash');
         
         window.openModal('editExpenseModal');
     };
@@ -608,7 +608,7 @@
                     <button id="tab-add-expense-btn" class="flex-1 py-2.5 rounded-xl text-sm font-bold bg-white text-gray-500 shadow-sm transition-all" onclick="window.switchExpenseView('add')"><i class="fa-solid fa-pen mr-1"></i> 記一筆</button>
                     <button id="tab-view-details-btn" class="flex-1 py-2.5 rounded-xl text-sm font-bold text-gray-500 hover:bg-white/50 transition-all" onclick="window.switchExpenseView('details')"><i class="fa-solid fa-list mr-1"></i> 查明細</button>
                 </div>
-                <!-- 記帳表單 (修復按鈕擠壓問題) -->
+                <!-- 記帳表單 -->
                 <div id="add-expense-container" class="hidden bg-white p-5 rounded-3xl shadow-sm border border-pink-100">
                     <form onsubmit="event.preventDefault(); window.addExpense();">
                         <label class="block mb-1 text-sm font-bold text-gray-500">日期</label>
@@ -759,7 +759,7 @@
         </div>
     </div>
 
-    <!-- 編輯支出 Modal (補全編輯邏輯與修復幣別顯示) -->
+    <!-- 編輯支出 Modal (已修復支付方式顯示問題) -->
     <div id="editExpenseModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="window.closeModal('editExpenseModal')">
         <div class="bg-white p-6 rounded-3xl shadow-xl w-full max-w-md" onclick="event.stopPropagation()">
             <h3 class="text-lg font-bold mb-4 text-gray-700 flex items-center"><i class="fa-solid fa-pen-to-square text-custom-primary mr-2"></i> 編輯支出</h3>
@@ -776,33 +776,42 @@
                     <input type="hidden" id="edit-expense-currency">
                 </div>
                 <label class="block mb-2 text-sm font-bold">用途</label><input type="text" id="edit-expense-description" class="w-full p-3 bg-gray-50 border-0 rounded-xl mb-4">
+                
                 <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div><label class="block mb-2 text-sm font-bold">付款人</label><div id="edit-expense-payer-select" class="flex gap-1"><button type="button" class="block-select-btn !text-xs !p-1 !m-0 !flex-1" data-payer="Josh" onclick="window.selectEditPayer('Josh')">Josh</button><button type="button" class="block-select-btn !text-xs !p-1 !m-0 !flex-1" data-payer="Candice" onclick="window.selectEditPayer('Candice')">Candice</button></div><input type="hidden" id="edit-expense-payer"></div>
-                  <button type="button"
-        class="block-select-btn !text-xs !p-1 !m-0 !flex-1"
-        data-payment="Cash"
-        onclick="window.selectEditPayment('Cash')">
-  現金
-</button>
-
-<button type="button"
-        class="block-select-btn !text-xs !p-1 !m-0 !flex-1"
-        data-payment="Card"
-        onclick="window.selectEditPayment('Card')">
-  信用卡
-</button>
-
-<button type="button"
-        class="block-select-btn !text-xs !p-1 !m-0 !flex-1"
-        data-payment="PayPay"
-        onclick="window.selectEditPayment('PayPay')">
-  PayPay
-</button>
-
-<input type="hidden" id="edit-expense-payment">
+                    <div>
+                        <label class="block mb-2 text-sm font-bold">付款人</label>
+                        <div id="edit-expense-payer-select" class="flex gap-1">
+                            <button type="button" class="block-select-btn !text-xs !p-1 !m-0 !flex-1" data-payer="Josh" onclick="window.selectEditPayer('Josh')">Josh</button>
+                            <button type="button" class="block-select-btn !text-xs !p-1 !m-0 !flex-1" data-payer="Candice" onclick="window.selectEditPayer('Candice')">Candice</button>
+                        </div>
+                        <input type="hidden" id="edit-expense-payer">
+                    </div>
+                    <div>
+                        <label class="block mb-2 text-sm font-bold">支付方式</label>
+                        <div id="edit-expense-payment-select" class="flex gap-1">
+                            <button type="button" class="block-select-btn !text-xs !p-1 !m-0 !flex-1" data-payment="Cash" onclick="window.selectEditPayment('Cash')">現金</button>
+                            <button type="button" class="block-select-btn !text-xs !p-1 !m-0 !flex-1" data-payment="Card" onclick="window.selectEditPayment('Card')">信用卡</button>
+                            <button type="button" class="block-select-btn !text-xs !p-1 !m-0 !flex-1" data-payment="Paypay" onclick="window.selectEditPayment('Paypay')">Paypay</button>
+                        </div>
+                        <input type="hidden" id="edit-expense-payment">
+                    </div>
                 </div>
-                <label class="block mb-2 text-sm font-bold">類別</label><div id="edit-expense-category-select" class="grid grid-cols-3 gap-2 mb-6"><button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Food" onclick="window.selectEditCategory('Food')">餐飲</button><button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Transport" onclick="window.selectEditCategory('Transport')">交通</button><button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Accommodation" onclick="window.selectEditCategory('Accommodation')">住宿</button><button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Shopping" onclick="window.selectEditCategory('Shopping')">購物</button><button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Ticket" onclick="window.selectEditCategory('Ticket')">門票</button><button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Other" onclick="window.selectEditCategory('Other')">其他</button></div><input type="hidden" id="edit-expense-category">
-                <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="window.closeModal('editExpenseModal')" class="px-4 py-2 bg-gray-100 rounded-xl font-bold">取消</button><button type="submit" class="px-6 py-2 bg-custom-primary text-white rounded-xl font-bold shadow-md">儲存修改</button></div>
+
+                <label class="block mb-2 text-sm font-bold">類別</label>
+                <div id="edit-expense-category-select" class="grid grid-cols-3 gap-2 mb-6">
+                    <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Food" onclick="window.selectEditCategory('Food')">餐飲</button>
+                    <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Transport" onclick="window.selectEditCategory('Transport')">交通</button>
+                    <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Accommodation" onclick="window.selectEditCategory('Accommodation')">住宿</button>
+                    <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Shopping" onclick="window.selectEditCategory('Shopping')">購物</button>
+                    <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Ticket" onclick="window.selectEditCategory('Ticket')">門票</button>
+                    <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-category="Other" onclick="window.selectEditCategory('Other')">其他</button>
+                </div>
+                <input type="hidden" id="edit-expense-category">
+                
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="window.closeModal('editExpenseModal')" class="px-4 py-2 bg-gray-100 rounded-xl font-bold">取消</button>
+                    <button type="submit" class="px-6 py-2 bg-custom-primary text-white rounded-xl font-bold shadow-md">儲存修改</button>
+                </div>
             </form>
         </div>
     </div>
@@ -855,4 +864,3 @@
     </div>
 </body>
 </html>
-
