@@ -93,7 +93,6 @@
     window.SPOTS_DATA = [];
     
     let ACTIVE_DATE = '', ACTIVE_CURRENCY = 'TWD', ACTIVE_PAYER = 'Josh', ACTIVE_CATEGORY = 'Food', ACTIVE_PAYMENT = 'Cash', EXPENSE_FILTER = 'All', WISHLIST_FILTER = 'All', EXCHANGE_RATE_JPY_TWD = 0.215;
-    // ★★★ 新增：記錄目前的付款方式篩選狀態 ('All', 'Cash', 'NonCash') ★★★
     let PAYMENT_FILTER = 'All';
 
     // --- 基礎工具 ---
@@ -274,7 +273,6 @@
         window.selectEditCurrency(e.currency); window.selectEditPayer(e.payer); window.selectEditCategory(e.category); window.selectEditPayment(e.payment || 'Cash');
         window.openModal('editExpenseModal');
     };
-
     window.saveExpenseUpdate = async function(evt) {
         evt.preventDefault();
         const id = document.getElementById('edit-expense-id').value;
@@ -284,7 +282,6 @@
 
         try {
             let url = document.getElementById('edit-expense-old-image').value;
-            // 如果有選新檔案，上傳並更新網址
             if(file) {
                 const sRef = ref(storage, `expenses/updated_${Date.now()}_${file.name}`);
                 const snap = await uploadBytes(sRef, file);
@@ -307,7 +304,7 @@
         window.renderExpenseTracking(); 
     };
 
-    // ★★★ 記帳列表渲染 (使用 this.src 修復點擊預覽) ★★★
+    // ★★★ 記帳列表渲染 (使用 this.src 修復點擊預覽，並加上類別顯示) ★★★
     window.renderExpenseTracking = function() {
         const list = document.getElementById('expense-list');
         const catFilterContainer = document.getElementById('category-filter-buttons');
@@ -340,12 +337,23 @@
             return catMatch && payMatch;
         });
 
+        // 類別名稱對照表
+        const categoryNameMap = {
+            Food: '餐飲', Transport: '交通', Accommodation: '住宿',
+            Shopping: '購物', Ticket: '門票', Other: '其他'
+        };
+
         list.innerHTML = data.map(e => {
             const twd = e.currency==='JPY' ? Math.round(e.amount*EXCHANGE_RATE_JPY_TWD) : e.amount;
             const iconMap = { Food: 'fa-utensils', Transport: 'fa-train', Accommodation: 'fa-bed', Shopping: 'fa-bag-shopping', Ticket: 'fa-ticket', Other: 'fa-shapes' };
             const imageHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-12 h-12 object-cover rounded-lg mr-3 border border-gray-200 cursor-pointer" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center mr-3 text-custom-primary"><i class="fa-solid ${iconMap[e.category]||'fa-circle'}"></i></div>`;
+            
+            // 顯示中文類別
+            const catName = categoryNameMap[e.category] || e.category;
+
             return `<div class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center transition cursor-pointer hover:shadow-md" onclick="window.editExpense('${e.id}')">
-                <div class="flex items-center">${imageHtml}<div><p class="font-bold text-gray-700">${e.description}</p><p class="text-xs text-gray-400">${e.date} · ${e.payer}</p></div></div>
+                <div class="flex items-center">${imageHtml}<div><p class="font-bold text-gray-700">${e.description}</p>
+                <p class="text-xs text-gray-400">${e.date} · ${e.payer} · <span class="text-custom-secondary">${catName}</span></p></div></div>
                 <div class="text-right flex items-center gap-2"><div class="text-right"><p class="font-bold text-custom-danger">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">約 TWD $${twd.toLocaleString()}</p></div><button onclick="event.stopPropagation(); window.deleteExpense('${e.id}')" class="text-gray-300 hover:text-red-400"><i class="fa-solid fa-trash-can"></i></button></div>
             </div>`;
         }).join('');
@@ -943,7 +951,7 @@
                 <div id="edit-photo-preview-container" class="relative hidden mb-3"><img id="edit-photo-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl"></div>
                 <button type="button" onclick="document.getElementById('edit-spot-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100"><i class="fa-solid fa-camera"></i> 更換照片</button>
                 <input type="file" id="edit-spot-file" accept="image/*" class="hidden" onchange="window.previewEditImage(this)">
-                <button type="submit" id="save-spot-btn" class="w-full p-3 mt-4 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
+                <button type="submit" id="save-spot-btn" class="w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
             </form>
         </div>
     </div>
@@ -986,7 +994,7 @@
                 </button>
                 <input type="file" id="edit-wishlist-file" accept="image/*" class="hidden" onchange="window.previewEditWishlistImage(this)">
 
-                <button type="submit" id="save-wishlist-btn" class="w-full p-3 mt-4 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
+                <button type="submit" id="save-wishlist-btn" class="w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
             </form>
         </div>
     </div>
