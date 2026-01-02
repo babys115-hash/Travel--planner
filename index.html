@@ -356,7 +356,7 @@
             window.enterTrip = (id) => {
                 window.CURRENT_TRIP_ID = id;
                 const trip = window.TRIP_LIST.find(t => t.id === id);
-                window.CURRENT_TRIP_NAME = trip ? trip.name : 'My Trip';
+                window.CURRENT_TRIP_NAME = trip ? trip.name : 'My Trip List';
                 document.getElementById('trip-list-view').classList.add('hidden');
                 document.getElementById('trip-dashboard-view').classList.remove('hidden');
                 document.getElementById('trip-title-display').innerText = window.CURRENT_TRIP_NAME;
