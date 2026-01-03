@@ -11,6 +11,8 @@
         <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
         <script src="https://cdn.tailwindcss.com"></script>
+        <!-- SheetJS for Excel Export -->
+        <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
         <style type="text/tailwindcss">
             :root {
                 --custom-primary: #FF8BA7;
@@ -191,6 +193,7 @@
             window.TRIP_PARTICIPANTS = ['Josh', 'Candice'];
             window.CURRENT_CURRENCY = 'JPY';
             window.EXCHANGE_RATE = 0.215;
+            window.TOTAL_BUDGET = 0; // Initialize to avoid undefined error
 
             let ACTIVE_DATE = ''
               , ACTIVE_PAYER = 'Josh'
@@ -244,88 +247,9 @@
             document.addEventListener('DOMContentLoaded', () => {
                 window.initTripList();
                 document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
-                // Initialize currency UI based on default selection
-                window.saveTripCurrency(); 
+                updateLiveExchangeRate();
             }
             );
-
-            // --- Currency Management ---
-            window.saveTripCurrency = () => {
-                const sel = document.getElementById('currency-selector');
-                window.CURRENT_CURRENCY = sel.value;
-                window.updateCurrencyUI();
-                updateLiveExchangeRate();
-            };
-
-            window.updateCurrencyUI = () => {
-                const cur = window.CURRENT_CURRENCY;
-
-                // 1. Update Add Expense Form
-                const addContainer = document.getElementById('add-currency-container');
-                if (addContainer) {
-                    const btns = addContainer.querySelectorAll('button');
-                    btns.forEach(b => {
-                        // We assume TWD is the home currency and shouldn't change
-                        if (b.textContent.trim() !== 'TWD') {
-                            b.innerText = cur;
-                            b.setAttribute('data-currency', cur);
-                            // Update the click handler to select the new currency
-                            b.onclick = () => window.selectCurrency(cur);
-                            
-                            // If the hidden input is currently set to a non-TWD value (old foreign), update it
-                            const hiddenInput = document.getElementById('expense-currency');
-                            if (hiddenInput.value !== 'TWD') {
-                                window.selectCurrency(cur);
-                            }
-                        }
-                    });
-                }
-
-                // 2. Update Edit Expense Form
-                const editContainer = document.getElementById('edit-currency-container');
-                if (editContainer) {
-                    const btns = editContainer.querySelectorAll('button');
-                    btns.forEach(b => {
-                        if (b.textContent.trim() !== 'TWD') {
-                            b.innerText = cur;
-                            b.setAttribute('data-currency', cur);
-                            b.onclick = () => window.selectCurrency(cur, 'edit-');
-                        }
-                    });
-                }
-
-                // 3. Update Overview Simple Converter
-                const calcLabel = document.getElementById('calc-currency-label');
-                if (calcLabel) {
-                    calcLabel.innerText = cur;
-                }
-                
-                // Clear calculator inputs to avoid confusion
-                document.getElementById('calc-jpy').value = '';
-                document.getElementById('calc-twd').value = '0';
-            };
-
-            async function updateLiveExchangeRate() {
-                try {
-                    const res = await fetch(`https://open.er-api.com/v6/latest/${window.CURRENT_CURRENCY}`);
-                    const data = await res.json();
-                    if (data.result === 'success') {
-                        window.EXCHANGE_RATE = data.rates.TWD;
-                        // Update Rate Displays
-                        document.getElementById('exchange-rate-display').innerText = ': ' + window.EXCHANGE_RATE.toFixed(4);
-                        document.getElementById('calc-rate-display').innerText = window.EXCHANGE_RATE.toFixed(4);
-                        
-                        // Recalculate calculator if it has value
-                        if(document.getElementById('calc-jpy').value) {
-                            window.calculateTwd();
-                        }
-                        // Refresh dashboard to apply new rate to foreign expenses
-                        window.renderExpenseDashboard();
-                    }
-                } catch (e) {
-                    console.error("Exchange rate fetch failed", e);
-                }
-            }
 
             // --- Trip Management ---
             window.initTripList = () => {
@@ -356,7 +280,7 @@
             window.enterTrip = (id) => {
                 window.CURRENT_TRIP_ID = id;
                 const trip = window.TRIP_LIST.find(t => t.id === id);
-                window.CURRENT_TRIP_NAME = trip ? trip.name : 'My Trip List';
+                window.CURRENT_TRIP_NAME = trip ? trip.name : 'My Trip';
                 document.getElementById('trip-list-view').classList.add('hidden');
                 document.getElementById('trip-dashboard-view').classList.remove('hidden');
                 document.getElementById('trip-title-display').innerText = window.CURRENT_TRIP_NAME;
@@ -571,7 +495,17 @@
                 btn.disabled = false;
             }
             ;
-            
+            async function updateLiveExchangeRate() {
+                try {
+                    const res = await fetch(`https://open.er-api.com/v6/latest/${window.CURRENT_CURRENCY}`);
+                    const data = await res.json();
+                    if (data.result === 'success') {
+                        window.EXCHANGE_RATE = data.rates.TWD;
+                        document.getElementById('exchange-rate-display').innerText = ': ' + window.EXCHANGE_RATE.toFixed(4);
+                        document.getElementById('calc-rate-display').innerText = window.EXCHANGE_RATE.toFixed(4);
+                    }
+                } catch (e) {}
+            }
             window.switchMainNav = (tid) => {
                 document.querySelectorAll('.main-tab-content').forEach(e => e.classList.add('hidden'));
                 document.querySelectorAll('.main-nav-btn').forEach(b => b.classList.remove('active'));
@@ -600,11 +534,9 @@
                 }
                 );
                 const btn = container.querySelector(`[data-currency="${c}"]`);
-                if(btn) {
-                    btn.classList.remove('text-gray-400');
-                    btn.classList.add('bg-[#FF7596]', 'text-white');
-                    document.getElementById(id).value = c;
-                }
+                btn.classList.remove('text-gray-400');
+                btn.classList.add('bg-[#FF7596]', 'text-white');
+                document.getElementById(id).value = c;
             }
             ;
             window.selectPayer = (p, isEdit=false) => {
@@ -806,7 +738,7 @@
                 );
                 document.getElementById('total-budget-display').innerText = (window.TOTAL_BUDGET || 0).toLocaleString();
                 document.getElementById('total-spent').innerText = Math.round(total).toLocaleString();
-                document.getElementById('overview-budget-display').innerText = window.TOTAL_BUDGET.toLocaleString();
+                document.getElementById('overview-budget-display').innerText = (window.TOTAL_BUDGET || 0).toLocaleString();
                 const colors = ['text-blue-500', 'text-pink-500', 'text-orange-500'];
                 document.getElementById('payer-cards-container').innerHTML = window.TRIP_PARTICIPANTS.map( (p, i) => `<div onclick="window.togglePayerFilter('${p}')" class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 cursor-pointer transition ${PAYER_FILTER === p ? 'filter-card-active blue' : 'hover:bg-gray-50'}"><p class="text-xs font-bold mb-1 ${colors[i % 3]} flex justify-between">${p} 付 ${PAYER_FILTER === p ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`).join('');
                 const cashActive = PAYMENT_FILTER === 'Cash' ? 'filter-card-active green' : 'hover:bg-gray-50';
@@ -929,24 +861,12 @@
             }
             ;
 
-                        window.saveTripName = async () => {
-                const newName = document.getElementById('trip-name-input').value;
-                
-                // Update settings (for internal usage)
+            window.saveTripName = async () => {
                 await setDoc(doc(db, "trips_settings", window.CURRENT_TRIP_ID), {
-                    tripName: newName
+                    tripName: document.getElementById('trip-name-input').value
                 }, {
                     merge: true
                 });
-
-                // Update meta (for the Trip List view)
-                await setDoc(doc(db, "trips_meta", window.CURRENT_TRIP_ID), {
-                    name: newName
-                }, {
-                    merge: true
-                });
-                
-                window.CURRENT_TRIP_NAME = newName;
             }
             ;
             window.updateTripNamePreview = () => {
@@ -998,13 +918,13 @@
             }
             ;
 
-                        window.saveTripDates = async () => {
+            window.saveTripDates = async () => {
                 const startStr = document.getElementById('edit-trip-start').value;
                 const days = parseInt(document.getElementById('edit-trip-days').value);
                 if (!startStr || !days)
                     return alert("請輸入完整日期");
 
-                if (!confirm(`即將更新旅程日期：${startStr} 起，共 ${days} 天。\n(行程將會保留並依序移動到新日期)`))
+                if (!confirm(`即將更新旅程日期：${startStr} 起，共 ${days} 天。\n(這將清除並重新建立行程表日期格子)`))
                     return;
 
                 const btn = document.getElementById('save-trip-date-btn');
@@ -1012,64 +932,44 @@
                 btn.disabled = true;
 
                 try {
-                    // 1. Get Old Data to preserve it
-                    const q = query(collection(db, "itineraries"), where("tripId", "==", window.CURRENT_TRIP_ID));
-                    const snapshot = await getDocs(q);
-                    // Sort by date so we map Day 1 -> New Day 1, Day 2 -> New Day 2, etc.
-                    const oldItineraries = snapshot.docs
-                        .map(d => ({id: d.id, ...d.data()}))
-                        .sort((a, b) => a.date.localeCompare(b.date));
+                    // 1. Delete Old Dates
+                    const oldDocs = await getDocs(query(collection(db, "itineraries"), where("tripId", "==", window.CURRENT_TRIP_ID)));
+                    const deleteBatch = writeBatch(db);
+                    oldDocs.forEach(doc => deleteBatch.delete(doc.ref));
+                    await deleteBatch.commit();
 
-                    const batch = writeBatch(db);
-
-                    // 2. Delete all old documents (to avoid ID collisions or orphans)
-                    snapshot.docs.forEach(doc => {
-                        batch.delete(doc.ref);
-                    });
-
-                    // 3. Update Meta
+                    // 2. Update Meta (even for legacy)
                     const metaRef = doc(db, "trips_meta", window.CURRENT_TRIP_ID);
-                    batch.set(metaRef, {
+                    await setDoc(metaRef, {
                         startDate: startStr,
                         days: days
                     }, {
                         merge: true
                     });
 
-                    // 4. Generate New Dates and Map Data
+                    // 3. Generate New Dates
                     const startDate = new Date(startStr);
                     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    const createBatch = writeBatch(db);
 
                     for (let i = 0; i < days; i++) {
                         const d = new Date(startDate);
                         d.setDate(startDate.getDate() + i);
                         const dateId = d.toISOString().split('T')[0];
-                        // Ensure we use a unique ID format if possible, or fallback to dateId if that was the convention
-                        // The previous code used `${window.CURRENT_TRIP_ID}_${dateId}` for saveTripDates, so we stick to that.
                         const docId = `${window.CURRENT_TRIP_ID}_${dateId}`;
                         const ref = doc(db, "itineraries", docId);
-
-                        // Extract data from the corresponding old day (index i)
-                        let preservedData = {};
-                        if (i < oldItineraries.length) {
-                            preservedData = oldItineraries[i];
-                        }
-
-                        batch.set(ref, {
+                        createBatch.set(ref, {
                             tripId: window.CURRENT_TRIP_ID,
                             date: dateId,
                             day_of_week: dayNames[d.getDay()],
-                            city: preservedData.city || `Day ${i + 1}`,
-                            activities: preservedData.activities || []
+                            city: `Day ${i + 1}`
                         });
                     }
-                    
-                    await batch.commit();
+                    await createBatch.commit();
 
-                    alert("日期已更新，行程資料已保留並遷移！");
+                    alert("日期已更新！");
                     window.closeModal('editTripDateModal');
-                    // We don't call enterTrip here because onSnapshot listeners are already active 
-                    // and will pick up the changes (delete + create) automatically.
+                    window.enterTrip(window.CURRENT_TRIP_ID);
 
                 } catch (e) {
                     console.error(e);
@@ -1487,6 +1387,54 @@
                 alert('行程日期已生成');
             }
             ;
+
+            // Excel Export Functions
+            window.exportExpensesToExcel = () => {
+                if (!window.EXPENSES_DATA.length) return alert('無記帳資料可匯出');
+                
+                // Transform data
+                const data = window.EXPENSES_DATA.map(e => ({
+                    "日期": e.date,
+                    "項目": e.description,
+                    "金額": e.amount,
+                    "幣別": e.currency,
+                    "台幣(約)": Math.round(e.currency === 'TWD' ? e.amount : e.amount * window.EXCHANGE_RATE),
+                    "付款人": e.payer,
+                    "類別": e.category,
+                    "支付方式": e.payment,
+                    "分帳": e.splitType === 'personal' ? '個人' : '共同'
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Expenses");
+                XLSX.writeFile(wb, `${window.CURRENT_TRIP_NAME}_記帳.xlsx`);
+            }
+
+            window.exportItineraryToExcel = () => {
+                const rows = [];
+                window.ITINERARY_DATA.forEach(day => {
+                    if(day.activities) {
+                        day.activities.forEach(act => {
+                            rows.push({
+                               "日期": day.date,
+                               "星期": day.day_of_week,
+                               "時間": act.time,
+                               "活動": act.title,
+                               "備註": act.location || '',
+                               "連結": act.link || ''
+                            });
+                        });
+                    }
+                });
+
+                if (!rows.length) return alert('無行程資料可匯出');
+
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Itinerary");
+                XLSX.writeFile(wb, `${window.CURRENT_TRIP_NAME}_行程.xlsx`);
+            }
         </script>
     </head>
     <body class="bg-gray-50 font-sans">
@@ -1621,6 +1569,12 @@
                     </div>
                     <div id="expense-details-container" class="hidden">
                         <div class="space-y-4">
+                            <!-- Export Button for Expenses (Moved to TOP) -->
+                            <button onclick="window.exportExpensesToExcel()" class="w-full py-3 rounded-2xl bg-white border-2 border-[#4ECDC4] text-[#4ECDC4] font-bold shadow-sm hover:bg-[#E0F7FA] transition flex items-center justify-center mb-4">
+                                <i class="fa-solid fa-file-excel mr-2 text-xl"></i>
+                                匯出記帳 Excel
+                            </button>
+
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
                                     <p class="text-xs text-gray-400 font-bold mb-1">總預算</p>
@@ -1677,6 +1631,13 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Export Button for Itinerary (Moved to TOP) -->
+                    <button onclick="window.exportItineraryToExcel()" class="w-full py-2 mb-4 rounded-2xl bg-white border-2 border-[#FF8BA7] text-[#FF8BA7] font-bold text-sm shadow-sm hover:bg-[#FFF0F5] transition flex items-center justify-center">
+                         <i class="fa-solid fa-file-excel mr-2 text-lg"></i>
+                         匯出行程表
+                    </button>
+
                     <div class="bg-white p-2 rounded-3xl shadow-sm border border-pink-50 mb-6 sticky top-[70px] z-10">
                         <div id="date-buttons-container" class="flex overflow-x-auto no-scrollbar p-1 gap-2"></div>
                     </div>
