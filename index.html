@@ -1166,50 +1166,75 @@
             }
             ;
             window.addExpense = async () => {
-                const date = document.getElementById('expense-date').value
-                  , amount = parseFloat(document.getElementById('expense-amount').value)
-                  , desc = document.getElementById('expense-description').value
-                  , currency = document.getElementById('expense-currency').value;
-                const fileIn = document.getElementById('expense-camera-input');
-                if (!date || !amount || !desc)
-                    return alert('請填寫完整');
-                let imgUrl = '';
-                if (fileIn.files[0]) {
-                    const snap = await uploadBytes(ref(storage, `expenses/${Date.now()}_${fileIn.files[0].name}`), fileIn.files[0]);
-                    imgUrl = await getDownloadURL(snap.ref);
+                const submitBtn = document.querySelector('#add-expense-container button[type="submit"]');
+                if(submitBtn) { submitBtn.disabled = true; submitBtn.innerText = "儲存中..."; }
+
+                try {
+                    const date = document.getElementById('expense-date').value
+                      , amount = parseFloat(document.getElementById('expense-amount').value)
+                      , desc = document.getElementById('expense-description').value
+                      , currency = document.getElementById('expense-currency').value;
+                    const fileIn = document.getElementById('expense-camera-input');
+                    
+                    if (!date || isNaN(amount) || amount <= 0 || !desc) {
+                        alert('請填寫完整資訊 (日期、金額 > 0、用途)');
+                        if(submitBtn) { submitBtn.disabled = false; submitBtn.innerText = "確認紀錄"; }
+                        return;
+                    }
+
+                    let imgUrl = '';
+                    if (fileIn.files[0]) {
+                        const snap = await uploadBytes(ref(storage, `expenses/${Date.now()}_${fileIn.files[0].name}`), fileIn.files[0]);
+                        imgUrl = await getDownloadURL(snap.ref);
+                    }
+                    
+                    // Fallback to defaults to prevent undefined errors
+                    const payer = ACTIVE_PAYER || window.TRIP_PARTICIPANTS[0] || 'Josh';
+                    const category = ACTIVE_CATEGORY || 'Food';
+                    const payment = ACTIVE_PAYMENT || 'Cash';
+                    const splitType = ACTIVE_SPLIT_TYPE || 'shared';
+                    const beneficiaries = (ACTIVE_BENEFICIARIES && ACTIVE_BENEFICIARIES.length > 0) ? ACTIVE_BENEFICIARIES : window.TRIP_PARTICIPANTS;
+
+                    await window.addDocWithTripId('expenses', {
+                        date,
+                        amount,
+                        description: desc,
+                        currency,
+                        payer,
+                        category,
+                        payment,
+                        splitType,
+                        beneficiaries,
+                        imageUrl: imgUrl,
+                        exchangeRate: window.EXCHANGE_RATE || 0.215, 
+                        timestamp: serverTimestamp()
+                    });
+                    
+                    // Clear Form
+                    document.getElementById('expense-description').value = '';
+                    document.getElementById('expense-amount').value = '';
+                    document.getElementById('expense-preview-container').classList.add('hidden');
+                    document.getElementById('expense-camera-input').value = ''; 
+                    document.getElementById('expense-date').classList.remove('bg-yellow-100');
+                    
+                    // Reset Filters
+                    PAYER_FILTER = 'All';
+                    PAYMENT_FILTER = 'All';
+                    CATEGORY_FILTER = 'All';
+                    SPLIT_FILTER = 'All';
+                    
+                    window.switchExpenseView('details');
+                    setTimeout(() => {
+                        const list = document.getElementById('expense-list');
+                        if(list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 300);
+
+                } catch (e) {
+                    console.error("Add Expense Error:", e);
+                    alert("儲存失敗: " + e.message);
+                } finally {
+                    if(submitBtn) { submitBtn.disabled = false; submitBtn.innerText = "確認紀錄"; }
                 }
-                await window.addDocWithTripId('expenses', {
-                    date,
-                    amount,
-                    description: desc,
-                    currency,
-                    payer: ACTIVE_PAYER,
-                    category: ACTIVE_CATEGORY,
-                    payment: ACTIVE_PAYMENT,
-                    splitType: ACTIVE_SPLIT_TYPE,
-                    beneficiaries: ACTIVE_BENEFICIARIES,
-                    imageUrl: imgUrl,
-                    exchangeRate: window.EXCHANGE_RATE, // Save current exchange rate
-                    timestamp: serverTimestamp()
-                });
-                
-                // Clear Form
-                document.getElementById('expense-description').value = '';
-                document.getElementById('expense-amount').value = '';
-                document.getElementById('expense-preview-container').classList.add('hidden');
-                
-                // Reset Filters to All so user sees the new item
-                PAYER_FILTER = 'All';
-                PAYMENT_FILTER = 'All';
-                CATEGORY_FILTER = 'All';
-                SPLIT_FILTER = 'All';
-                
-                // Switch to Details View and Scroll to List
-                window.switchExpenseView('details');
-                setTimeout(() => {
-                    const list = document.getElementById('expense-list');
-                    if(list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 300);
             }
             ;
             window.togglePayerFilter = (p) => {
