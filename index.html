@@ -1043,14 +1043,27 @@
                     EDIT_SPLIT_TYPE = t;
                     document.getElementById('edit-btn-split-shared').className = t === 'shared' ? 'split-type-btn active' : 'split-type-btn inactive';
                     document.getElementById('edit-btn-split-personal').className = t === 'personal' ? 'split-type-btn active' : 'split-type-btn inactive';
-                    // Personal -> Clear to allow single select, Shared -> All
-                    EDIT_BENEFICIARIES = t === 'shared' ? [...window.TRIP_PARTICIPANTS] : [];
+                    
+                    if (t === 'personal') {
+                        // Default to payer when switching to personal
+                        const currentPayer = EDIT_PAYER || window.TRIP_PARTICIPANTS[0];
+                        EDIT_BENEFICIARIES = [currentPayer];
+                    } else {
+                        EDIT_BENEFICIARIES = [...window.TRIP_PARTICIPANTS];
+                    }
                     window.renderEditBeneficiaryButtons();
                 } else {
                     ACTIVE_SPLIT_TYPE = t;
                     document.getElementById('btn-split-shared').className = t === 'shared' ? 'split-type-btn active !text-xs !py-1 !px-2' : 'split-type-btn inactive !text-xs !py-1 !px-2';
                     document.getElementById('btn-split-personal').className = t === 'personal' ? 'split-type-btn active !text-xs !py-1 !px-2' : 'split-type-btn inactive !text-xs !py-1 !px-2';
-                    ACTIVE_BENEFICIARIES = t === 'shared' ? [...window.TRIP_PARTICIPANTS] : [];
+                    
+                    if (t === 'personal') {
+                        // Default to payer when switching to personal
+                        const currentPayer = ACTIVE_PAYER;
+                        ACTIVE_BENEFICIARIES = [currentPayer];
+                    } else {
+                        ACTIVE_BENEFICIARIES = [...window.TRIP_PARTICIPANTS];
+                    }
                     window.renderBeneficiaryButtons();
                 }
 
@@ -1152,6 +1165,95 @@
                 document.getElementById('edit-expense-payer-select').innerHTML = window.TRIP_PARTICIPANTS.map(p => `<button type="button" class="edit-payer-btn flex-1 block-select-btn ${p === EDIT_PAYER ? 'active-payer' : ''}" onclick="window.selectPayer('${p}', true)">${p}</button>`).join('');
             }
             ;
+            window.addExpense = async () => {
+                const date = document.getElementById('expense-date').value
+                  , amount = parseFloat(document.getElementById('expense-amount').value)
+                  , desc = document.getElementById('expense-description').value
+                  , currency = document.getElementById('expense-currency').value;
+                const fileIn = document.getElementById('expense-camera-input');
+                if (!date || !amount || !desc)
+                    return alert('請填寫完整');
+                let imgUrl = '';
+                if (fileIn.files[0]) {
+                    const snap = await uploadBytes(ref(storage, `expenses/${Date.now()}_${fileIn.files[0].name}`), fileIn.files[0]);
+                    imgUrl = await getDownloadURL(snap.ref);
+                }
+                await window.addDocWithTripId('expenses', {
+                    date,
+                    amount,
+                    description: desc,
+                    currency,
+                    payer: ACTIVE_PAYER,
+                    category: ACTIVE_CATEGORY,
+                    payment: ACTIVE_PAYMENT,
+                    splitType: ACTIVE_SPLIT_TYPE,
+                    beneficiaries: ACTIVE_BENEFICIARIES,
+                    imageUrl: imgUrl,
+                    exchangeRate: window.EXCHANGE_RATE, // Save current exchange rate
+                    timestamp: serverTimestamp()
+                });
+                
+                // Clear Form
+                document.getElementById('expense-description').value = '';
+                document.getElementById('expense-amount').value = '';
+                document.getElementById('expense-preview-container').classList.add('hidden');
+                
+                // Reset Filters to All so user sees the new item
+                PAYER_FILTER = 'All';
+                PAYMENT_FILTER = 'All';
+                CATEGORY_FILTER = 'All';
+                SPLIT_FILTER = 'All';
+                
+                // Switch to Details View and Scroll to List
+                window.switchExpenseView('details');
+                setTimeout(() => {
+                    const list = document.getElementById('expense-list');
+                    if(list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
+            }
+            ;
+            window.togglePayerFilter = (p) => {
+                PAYER_FILTER = (PAYER_FILTER === p) ? 'All' : p;
+                window.renderExpenseDashboard();
+            }
+            ;
+            window.togglePaymentFilter = (p) => {
+                PAYMENT_FILTER = (PAYMENT_FILTER === p) ? 'All' : p;
+                window.renderExpenseDashboard();
+            }
+            ;
+            window.toggleCategoryFilter = (c) => {
+                CATEGORY_FILTER = (CATEGORY_FILTER === c) ? 'All' : c;
+                window.renderExpenseDashboard();
+            }
+            ;
+
+            window.toggleSplitFilter = (type) => {
+                SPLIT_FILTER = type;
+                window.renderExpenseDashboard();
+            };
+
+            window.enableBudgetEdit = () => {
+                document.getElementById('budget-display-area').classList.add('hidden');
+                document.getElementById('budget-edit-area').classList.remove('hidden');
+                document.getElementById('budget-edit-input').value = window.TOTAL_BUDGET;
+            }
+            ;
+            window.saveBudget = async () => {
+                const val = parseFloat(document.getElementById('budget-edit-input').value);
+                if (!isNaN(val)) {
+                    const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
+                    await setDoc(ref, {
+                        totalBudget: val
+                    }, {
+                        merge: true
+                    });
+                }
+                document.getElementById('budget-display-area').classList.remove('hidden');
+                document.getElementById('budget-edit-area').classList.add('hidden');
+            }
+            ;
+            
             window.getParticipantStyle = (name) => {
                 const styles = [
                     'bg-purple-50 text-purple-500 border-purple-200',
@@ -1184,7 +1286,8 @@
                 window.TRIP_PAYMENT_METHODS.forEach(pm => paymentTotals[pm] = 0);
 
                 window.EXPENSES_DATA.forEach(e => {
-                    const v = e.currency !== 'TWD' ? e.amount * window.EXCHANGE_RATE : e.amount;
+                    const rate = e.exchangeRate || window.EXCHANGE_RATE;
+                    const v = e.currency !== 'TWD' ? e.amount * rate : e.amount;
                     
                     // Only add to Total Spent if it is NOT a Transfer
                     if (e.category !== 'Transfer') {
@@ -1229,7 +1332,8 @@
                 let balance = {};
                 window.TRIP_PARTICIPANTS.forEach(p => balance[p] = 0);
                 window.EXPENSES_DATA.forEach(e => {
-                    const val = e.currency !== 'TWD' ? e.amount * window.EXCHANGE_RATE : e.amount;
+                    const rate = e.exchangeRate || window.EXCHANGE_RATE;
+                    const val = e.currency !== 'TWD' ? e.amount * rate : e.amount;
                     balance[e.payer] += val;
                     const bens = e.beneficiaries && e.beneficiaries.length > 0 ? e.beneficiaries : window.TRIP_PARTICIPANTS;
                     const split = val / bens.length;
@@ -1380,7 +1484,8 @@
                 // Calculate Total for displayed list
                 let currentTotal = 0;
                 filteredData.forEach(e => {
-                     const val = e.currency === 'TWD' ? e.amount : e.amount * window.EXCHANGE_RATE;
+                     const rate = e.exchangeRate || window.EXCHANGE_RATE;
+                     const val = e.currency === 'TWD' ? e.amount : e.amount * rate;
                      currentTotal += val;
                 });
                 
@@ -1401,7 +1506,8 @@
                     Transfer: 'fa-money-bill-transfer'
                 };
                 document.getElementById('expense-list').innerHTML = filteredData.map(e => {
-                    const twd = e.currency !== 'TWD' ? Math.round(e.amount * window.EXCHANGE_RATE) : e.amount;
+                    const rate = e.exchangeRate || window.EXCHANGE_RATE;
+                    const twd = e.currency !== 'TWD' ? Math.round(e.amount * rate) : e.amount;
                     const iconClass = iconMap[e.category] || 'fa-tag'; // Default icon for custom categories
                     const isTransfer = e.category === 'Transfer';
                     const iconColorClass = isTransfer ? 'text-green-500 bg-green-50' : 'text-custom-primary bg-pink-50';
@@ -2163,7 +2269,7 @@
                     "項目": e.description,
                     "金額": e.amount,
                     "幣別": e.currency,
-                    "台幣(約)": Math.round(e.currency === 'TWD' ? e.amount : e.amount * window.EXCHANGE_RATE),
+                    "台幣(約)": Math.round(e.currency === 'TWD' ? e.amount : e.amount * (e.exchangeRate || window.EXCHANGE_RATE)),
                     "付款人": e.payer,
                     "類別": e.category,
                     "支付方式": e.payment,
@@ -2387,6 +2493,7 @@
                                                 </div>
                                             </div>
                                         </div>
+
                                         <!-- Row 2: Description & Camera -->
                                         <div class="flex gap-2 mb-2">
                                             <input type="text" id="expense-description" placeholder="用途 (例如: 拉麵)" class="flex-1 min-w-0 p-2 bg-gray-50 rounded-xl font-bold text-gray-700">
