@@ -28,6 +28,21 @@
                 background-color: var(--custom-bg);
             }
 
+            /* --- Guest Mode Styles --- */
+            /* Hide elements marked as auth-only when in guest mode */
+            body.guest-mode .auth-only {
+                display: none !important;
+            }
+            
+            /* Show elements marked as guest-only when in guest mode */
+            body.guest-mode .guest-banner {
+                display: flex;
+            }
+            
+            .guest-banner {
+                display: none;
+            }
+
             .bg-gray-50 {
                 background-color: var(--custom-bg) !important;
             }
@@ -193,6 +208,10 @@
             window.TRIP_PARTICIPANTS = ['Josh', 'Candice'];
             window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
             
+            // Permissions
+            window.IS_LOCKED = true; // Default to locked (Guest Mode)
+            window.TRIP_PIN = "8888"; // Default PIN
+
             // Default Categories
             window.DEFAULT_CATEGORIES = ['Food', 'Transport', 'Accommodation', 'Shopping', 'Ticket', 'Purchasing'];
             window.TRIP_CATEGORIES = [...window.DEFAULT_CATEGORIES];
@@ -264,8 +283,38 @@
                 window.initTripList();
                 document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
                 updateLiveExchangeRate();
+                window.applyLockState();
             }
             );
+
+            // --- Authentication / Permission Logic ---
+            window.applyLockState = () => {
+                const body = document.body;
+                const lockIcon = document.getElementById('lock-icon-display');
+                if (window.IS_LOCKED) {
+                    body.classList.add('guest-mode');
+                    if(lockIcon) lockIcon.className = "fa-solid fa-lock text-red-400";
+                } else {
+                    body.classList.remove('guest-mode');
+                    if(lockIcon) lockIcon.className = "fa-solid fa-lock-open text-green-400";
+                }
+            };
+
+            window.toggleLock = () => {
+                if (window.IS_LOCKED) {
+                    const input = prompt("請輸入旅程編輯密碼 (預設: 8888):");
+                    if (input === window.TRIP_PIN) {
+                        window.IS_LOCKED = false;
+                        alert("已解鎖編輯權限！");
+                        window.applyLockState();
+                    } else {
+                        if(input !== null) alert("密碼錯誤");
+                    }
+                } else {
+                    window.IS_LOCKED = true;
+                    window.applyLockState();
+                }
+            };
 
             // --- Trip Management ---
             window.initTripList = () => {
@@ -307,7 +356,7 @@
                                 <h3 class="font-bold text-lg text-gray-700 mb-1">${t.name}</h3>
                                 <p class="text-xs text-gray-400 font-bold">${t.startDate} · ${t.days} Days</p>
                             </div>
-                            <div class="flex gap-2" onclick="event.stopPropagation()">
+                            <div class="flex gap-2 auth-only" onclick="event.stopPropagation()">
                                 <button onclick="window.deleteTrip('${t.id}')" class="text-gray-300 hover:text-red-400 p-2"><i class="fa-solid fa-trash-can"></i></button>
                             </div>
                         </div>
@@ -317,6 +366,9 @@
             ;
             window.enterTrip = (id) => {
                 window.CURRENT_TRIP_ID = id;
+                window.IS_LOCKED = true; // Default lock on entry
+                window.applyLockState();
+
                 const trip = window.TRIP_LIST.find(t => t.id === id);
                 window.CURRENT_TRIP_NAME = trip ? trip.name : 'My Trip';
                 document.getElementById('trip-list-view').classList.add('hidden');
@@ -351,6 +403,7 @@
                 const name = document.getElementById('new-trip-name').value;
                 const start = document.getElementById('new-trip-start').value;
                 const days = parseInt(document.getElementById('new-trip-days').value);
+                const pin = document.getElementById('new-trip-pin').value || "8888";
                 
                 const color = document.querySelector('input[name="new-trip-color"]:checked')?.value || 'pink';
                 const icon = document.querySelector('input[name="new-trip-icon"]:checked')?.value || 'fa-suitcase';
@@ -382,7 +435,8 @@
                     paymentMethods: ['Cash', 'Card'],
                     categories: window.DEFAULT_CATEGORIES,
                     wishlistCategories: window.DEFAULT_WISHLIST_CATEGORIES,
-                    tripName: name
+                    tripName: name,
+                    pin: pin
                 });
                 window.closeModal('createTripModal');
                 window.enterTrip(ref.id);
@@ -520,6 +574,8 @@
                         if (window.applyCurrencySettings) {
                             window.applyCurrencySettings(data.currency || 'JPY');
                         }
+                        
+                        if (data.pin) window.TRIP_PIN = data.pin;
 
                         window.renderExpensePayerButtons();
                         window.renderBeneficiaryButtons();
@@ -533,6 +589,10 @@
                         
                         window.renderExpenseDashboard();
                         window.renderParticipantsList();
+                        
+                        if(document.getElementById('edit-trip-info-pin')) {
+                            document.getElementById('edit-trip-info-pin').value = data.pin || '8888';
+                        }
                     }
                 });
             }
@@ -647,7 +707,7 @@
             window.switchExpenseView = (v) => {
                 document.getElementById('add-expense-container').classList.toggle('hidden', v !== 'add');
                 document.getElementById('expense-details-container').classList.toggle('hidden', v !== 'details');
-                document.getElementById('tab-add-expense-btn').className = v === 'add' ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all' : 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
+                document.getElementById('tab-add-expense-btn').className = v === 'add' ? 'auth-only flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all' : 'auth-only flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
                 document.getElementById('tab-view-details-btn').className = v === 'details' ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all' : 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
                 if (v === 'add') {
                     ACTIVE_BENEFICIARIES = [...window.TRIP_PARTICIPANTS];
@@ -733,8 +793,8 @@
                     return `<button type="button" data-category="${c}" onclick="${clickFn}" class="category-btn block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass}">${c}</button>`;
                 }).join('');
 
-                // Add "Plus" button
-                html += `<button type="button" onclick="window.addCategory()" class="block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
+                // Add "Plus" button - AUTH ONLY
+                html += `<button type="button" onclick="window.addCategory()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
 
                 // Wrap for Edit Modal grid layout if needed, otherwise flex wrap
                 if (isEdit) {
@@ -795,8 +855,8 @@
                    return `<button type="button" onclick="${clickFn}" class="block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass}">${icon} ${c}</button>`;
                 }).join('');
 
-                // Add Button
-                html += `<button type="button" onclick="window.addWishlistCategory()" class="block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
+                // Add Button - AUTH ONLY
+                html += `<button type="button" onclick="window.addWishlistCategory()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
 
                 if(isEdit) {
                     container.className = "grid grid-cols-3 gap-2 mb-3";
@@ -852,7 +912,8 @@
                     return `<button type="button" ${dataAttr} onclick="window.selectPayment('${p}', ${isEdit})" class="${btnClass} block-select-btn ${activeClass}">${p}</button>`;
                 }).join('');
 
-                html += `<button type="button" onclick="window.addPaymentMethod()" class="block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary"><i class="fa-solid fa-plus"></i></button>`;
+                // AUTH ONLY
+                html += `<button type="button" onclick="window.addPaymentMethod()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary"><i class="fa-solid fa-plus"></i></button>`;
                 
                 // Force horizontal scroll for non-edit mode
                 container.className = isEdit ? "flex flex-wrap gap-2" : "flex gap-2 overflow-x-auto no-scrollbar pb-1";
@@ -1210,6 +1271,8 @@
                 } else {
                     img.parentElement.classList.add('hidden');
                 }
+                
+                // Allow opening details in View-Only mode by default
                 window.openModal('editExpenseModal');
             }
             ;
@@ -1299,14 +1362,15 @@
                     <div>
                         <p class="text-xs text-${color}-400 font-bold mb-1 flex items-center">
                             <i class="fa-regular fa-calendar-days mr-2"></i> ${dateStr}
-                            <button onclick="window.openEditTripDateModal('${startDate}', '${endDate}')" class="ml-2 text-gray-400 hover:text-custom-primary"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="window.openEditTripDateModal('${startDate}', '${endDate}')" class="auth-only ml-2 text-gray-400 hover:text-custom-primary"><i class="fa-solid fa-pen"></i></button>
                         </p>
                         <h3 id="summary-trip-name" class="text-2xl font-bold text-gray-700 tracking-wide flex items-center">
                             ${window.CURRENT_TRIP_NAME}
-                            <button onclick="window.openEditTripInfoModal()" class="ml-3 text-sm text-gray-300 hover:text-custom-primary bg-gray-50 w-8 h-8 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-gear"></i></button>
+                            <button onclick="window.openEditTripInfoModal()" class="auth-only ml-3 text-sm text-gray-300 hover:text-custom-primary bg-gray-50 w-8 h-8 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-gear"></i></button>
                         </h3>
                     </div>
-                    <div onclick="window.openEditTripInfoModal()" class="cursor-pointer w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm hover:scale-110 transition"><i class="fa-solid ${icon}"></i></div>
+                    <div onclick="window.openEditTripInfoModal()" class="auth-only cursor-pointer w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm hover:scale-110 transition"><i class="fa-solid ${icon}"></i></div>
+                    <div class="cursor-default w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm hidden" style="display: ${window.IS_LOCKED ? 'flex' : 'none'} !important"><i class="fa-solid ${icon}"></i></div>
                 </div>`;
                 
                 // Update container border color dynamically
@@ -1331,6 +1395,7 @@
                 if (!trip) return;
 
                 document.getElementById('edit-trip-info-name').value = window.CURRENT_TRIP_NAME;
+                document.getElementById('edit-trip-info-pin').value = window.TRIP_PIN;
                 
                 // Set Color Radio
                 const color = trip.color || 'pink';
@@ -1348,6 +1413,7 @@
             window.saveTripInfo = async (e) => {
                 e.preventDefault();
                 const name = document.getElementById('edit-trip-info-name').value;
+                const pin = document.getElementById('edit-trip-info-pin').value;
                 const color = document.querySelector('input[name="edit-trip-color"]:checked')?.value || 'pink';
                 const icon = document.querySelector('input[name="edit-trip-icon"]:checked')?.value || 'fa-suitcase';
 
@@ -1361,11 +1427,13 @@
                 // Update Settings (for Dashboard title view - keeping legacy consistency)
                 const settingsRef = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
                 await setDoc(settingsRef, {
-                    tripName: name
+                    tripName: name,
+                    pin: pin
                 }, { merge: true });
 
                 // Update local visual state immediately for better UX
                 window.CURRENT_TRIP_NAME = name;
+                window.TRIP_PIN = pin;
                 document.getElementById('trip-title-display').innerText = name;
                 document.getElementById('trip-name-input').value = name;
                 
@@ -1473,7 +1541,7 @@
             }
             ;
             window.renderParticipantsList = () => {
-                document.getElementById('participants-list').innerHTML = window.TRIP_PARTICIPANTS.map(p => `<span class="inline-flex items-center bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-sm font-bold mr-2 mb-2 border border-blue-100">${p} <button onclick="window.removeParticipant('${p}')" class="ml-2 text-blue-300 hover:text-red-400"><i class="fa-solid fa-xmark"></i></button></span>`).join('');
+                document.getElementById('participants-list').innerHTML = window.TRIP_PARTICIPANTS.map(p => `<span class="inline-flex items-center bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-sm font-bold mr-2 mb-2 border border-blue-100">${p} <button onclick="window.removeParticipant('${p}')" class="auth-only ml-2 text-blue-300 hover:text-red-400"><i class="fa-solid fa-xmark"></i></button></span>`).join('');
             }
             ;
             window.calculateTwd = () => {
@@ -1507,7 +1575,7 @@
                 document.getElementById('spots-list').innerHTML = window.SPOTS_DATA.map(s => {
                     const img = s.imageUrl ? `<img src="${s.imageUrl}" class="w-full h-32 object-cover rounded-xl mb-3 border border-gray-100 cursor-pointer" onclick="window.openImagePreview(this.src)">` : '';
                     const link = s.link ? `<a href="${s.link}" target="_blank" class="text-xs text-pink-400 hover:underline mt-2 inline-block"><i class="fa-solid fa-map-location-dot mr-1"></i> 開啟地圖</a>` : '';
-                    return `<div class="bg-white p-4 rounded-2xl border border-gray-100 mb-4 shadow-sm relative">${img}<div><h3 class="font-bold text-gray-700 text-lg">${s.name}</h3><p class="text-sm text-gray-500 mt-1">${s.description || ''}</p>${link}</div><div class="absolute top-4 right-4 flex gap-2"><button onclick="window.openEditSpotModal('${s.id}')" class="bg-white/80 p-2 rounded-full text-gray-400 hover:text-blue-400"><i class="fa-solid fa-pen"></i></button><button onclick="window.deleteDoc('spots','${s.id}')" class="bg-white/80 p-2 rounded-full text-gray-400 hover:text-red-400"><i class="fa-solid fa-trash-can"></i></button></div></div>`;
+                    return `<div class="bg-white p-4 rounded-2xl border border-gray-100 mb-4 shadow-sm relative">${img}<div><h3 class="font-bold text-gray-700 text-lg">${s.name}</h3><p class="text-sm text-gray-500 mt-1">${s.description || ''}</p>${link}</div><div class="auth-only absolute top-4 right-4 flex gap-2"><button onclick="window.openEditSpotModal('${s.id}')" class="bg-white/80 p-2 rounded-full text-gray-400 hover:text-blue-400"><i class="fa-solid fa-pen"></i></button><button onclick="window.deleteDoc('spots','${s.id}')" class="bg-white/80 p-2 rounded-full text-gray-400 hover:text-red-400"><i class="fa-solid fa-trash-can"></i></button></div></div>`;
                 }
                 ).join('');
             }
@@ -1567,7 +1635,7 @@
 
                 const headerHtml = `
                 <div class="bg-white p-4 rounded-2xl shadow-sm border border-pink-100 mb-6 flex justify-between items-center cursor-pointer hover:bg-gray-50" onclick="window.openEditDailyTitleModal()">
-                    <h2 class="text-lg font-bold text-gray-700">${d.city || '設定今日標題'} <i class="fa-solid fa-pen text-xs text-gray-300 ml-2"></i></h2>
+                    <h2 class="text-lg font-bold text-gray-700">${d.city || '設定今日標題'} <i class="auth-only fa-solid fa-pen text-xs text-gray-300 ml-2"></i></h2>
                     <span class="bg-pink-50 text-custom-primary px-3 py-1 rounded-full text-xs font-bold">${d.date}</span>
                 </div>`;
 
@@ -1643,6 +1711,8 @@
             ;
 
             window.openEditItineraryModal = (dId, idx) => {
+                // Allow opening modal in guest mode to view details
+                
                 const d = window.ITINERARY_DATA.find(x => x.id === dId);
                 const act = d.activities[idx];
 
@@ -1721,6 +1791,7 @@
             }
             ;
             window.openEditDailyTitleModal = () => {
+                if (window.IS_LOCKED) return;
                 const d = window.ITINERARY_DATA.find(x => x.id === ACTIVE_DATE);
                 document.getElementById('edit-daily-title-input').value = d.city || '';
                 window.openModal('editDailyTitleModal');
@@ -1761,6 +1832,7 @@
             ;
             
             window.toggleWishlistStatus = async (id, currentStatus) => {
+                if (window.IS_LOCKED) return; // Prevent Guests from checking off items
                 event.stopPropagation();
                 const nextStatusMap = {
                     'pending': 'bought',
@@ -1790,6 +1862,7 @@
             };
 
             window.openEditWishlistModal = (id) => {
+                if (window.IS_LOCKED) return; 
                 const item = window.WISHLIST_DATA.find(i => i.id === id);
                 document.getElementById('edit-wishlist-id').value = id;
                 document.getElementById('edit-wishlist-name').value = item.name;
@@ -1857,7 +1930,8 @@
             }
             ;
             window.renderPackingList = () => {
-                document.getElementById('packing-list').innerHTML = window.PACKING_DATA.map(i => `<div class="p-4 mb-2 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center ${i.packed ? 'opacity-50' : ''}"><div class="flex items-center cursor-pointer flex-1" onclick="window.updateDoc(window.doc(window.db, 'packinglist', '${i.id}'), {packed: !${i.packed}})"><i class="fa-solid ${i.packed ? 'fa-circle-check text-[#4ECDC4]' : 'fa-circle text-gray-200'} text-xl mr-3"></i><div><p class="font-bold text-gray-700 ${i.packed ? 'line-through' : ''}">${i.name}</p><p class="text-xs text-gray-400">${i.category}</p></div></div><button onclick="window.deleteDoc('packinglist', '${i.id}')" class="text-gray-300 hover:text-red-400"><i class="fa-solid fa-trash-can"></i></button></div>`).join('');
+                // Modified to prevent toggle in Guest Mode
+                document.getElementById('packing-list').innerHTML = window.PACKING_DATA.map(i => `<div class="p-4 mb-2 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center ${i.packed ? 'opacity-50' : ''}"><div class="flex items-center cursor-pointer flex-1" onclick="${window.IS_LOCKED ? '' : `window.updateDoc(window.doc(window.db, 'packinglist', '${i.id}'), {packed: !${i.packed}})`}"><i class="fa-solid ${i.packed ? 'fa-circle-check text-[#4ECDC4]' : 'fa-circle text-gray-200'} text-xl mr-3"></i><div><p class="font-bold text-gray-700 ${i.packed ? 'line-through' : ''}">${i.name}</p><p class="text-xs text-gray-400">${i.category}</p></div></div><button onclick="window.deleteDoc('packinglist', '${i.id}')" class="auth-only text-gray-300 hover:text-red-400"><i class="fa-solid fa-trash-can"></i></button></div>`).join('');
             }
             ;
             window.deleteDoc = async (c, id) => {
@@ -2033,7 +2107,7 @@
             }
         </script>
     </head>
-    <body class="bg-gray-50 font-sans">
+    <body class="bg-gray-50 font-sans guest-mode">
         <div id="imagePreviewModal" class="fixed inset-0 z-[100] bg-black/90 hidden flex items-center justify-center p-4 backdrop-blur-sm" onclick="window.closeImagePreview()">
             <img id="preview-full-image" src="" class="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain">
         </div>
@@ -2053,6 +2127,9 @@
         </div>
         <!-- 2. DASHBOARD -->
         <div id="trip-dashboard-view" class="max-w-xl md:max-w-5xl mx-auto bg-white min-h-screen shadow-2xl overflow-hidden rounded-none sm:rounded-3xl border border-gray-100 relative hidden">
+            <div class="bg-blue-100 text-blue-600 text-xs font-bold text-center py-1 guest-banner">
+                <i class="fa-solid fa-eye mr-1"></i> 訪客模式 (無法編輯) - 請按鎖頭解鎖
+            </div>
             <header class="p-4 bg-white sticky top-0 z-20 border-b border-gray-100 flex items-center justify-between">
                 <div class="flex items-center overflow-hidden">
                     <button onclick="window.exitTrip()" class="mr-3 text-gray-400 hover:text-custom-primary flex-shrink-0">
@@ -2060,16 +2137,21 @@
                     </button>
                     <h1 id="trip-title-display" class="text-xl font-bold text-gray-700 tracking-wide truncate">Trip Name</h1>
                 </div>
-                <!-- Currency Widget -->
-                <div class="flex items-center bg-gray-50 px-2 py-1 rounded-lg text-xs flex-shrink-0 ml-2">
-                    <select id="currency-selector" onchange="window.saveTripCurrency()" class="bg-transparent font-bold text-custom-secondary border-none outline-none mr-1 appearance-none cursor-pointer">
-                        <option value="JPY">JPY</option>
-                        <option value="KRW">KRW</option>
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                        <option value="THB">THB</option>
-                    </select>
-                    <span id="exchange-rate-display" class="font-bold text-gray-600 ml-1">...</span>
+                <!-- Currency Widget & Lock -->
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center bg-gray-50 px-2 py-1 rounded-lg text-xs flex-shrink-0">
+                        <select id="currency-selector" onchange="window.saveTripCurrency()" class="bg-transparent font-bold text-custom-secondary border-none outline-none mr-1 appearance-none cursor-pointer">
+                            <option value="JPY">JPY</option>
+                            <option value="KRW">KRW</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="THB">THB</option>
+                        </select>
+                        <span id="exchange-rate-display" class="font-bold text-gray-600 ml-1">...</span>
+                    </div>
+                    <button onclick="window.toggleLock()" class="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center transition hover:bg-gray-100">
+                        <i id="lock-icon-display" class="fa-solid fa-lock text-red-400"></i>
+                    </button>
                 </div>
             </header>
             <nav class="flex border-b border-gray-100 text-sm sticky top-[60px] bg-white z-20">
@@ -2083,7 +2165,7 @@
                 <!-- Expense -->
                 <div id="expense-tab" class="main-tab-content hidden p-4">
                     <div class="flex bg-gray-100 p-1.5 rounded-2xl mb-4">
-                        <button id="tab-add-expense-btn" onclick="window.switchExpenseView('add')" class="flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all">
+                        <button id="tab-add-expense-btn" onclick="window.switchExpenseView('add')" class="auth-only flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all">
                             <i class="fa-solid fa-pen mr-1"></i>
                             記一筆
                         </button>
@@ -2092,7 +2174,7 @@
                             查明細
                         </button>
                     </div>
-                    <div id="add-expense-container">
+                    <div id="add-expense-container" class="auth-only">
                         <div class="bg-white p-3 md:p-6 rounded-[20px] shadow-sm border border-pink-50">
                             <form onsubmit="event.preventDefault(); window.addExpense();">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
@@ -2166,7 +2248,7 @@
                             </form>
                         </div>
                     </div>
-                    <div id="expense-details-container" class="hidden">
+                    <div id="expense-details-container" class="">
                         <div class="space-y-4">
                             <!-- Export Button for Expenses (Moved to TOP) -->
                             <button onclick="window.exportExpensesToExcel()" class="w-full py-3 rounded-2xl bg-white border-2 border-[#4ECDC4] text-[#4ECDC4] font-bold shadow-sm hover:bg-[#E0F7FA] transition flex items-center justify-center mb-4">
@@ -2181,7 +2263,7 @@
                                         <p class="text-2xl font-bold text-gray-800 tracking-wide">
                                             $ <span id="total-budget-display">0</span>
                                         </p>
-                                        <button onclick="window.enableBudgetEdit()" class="text-gray-300 hover:text-custom-primary">
+                                        <button onclick="window.enableBudgetEdit()" class="auth-only text-gray-300 hover:text-custom-primary">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
                                     </div>
@@ -2268,13 +2350,13 @@
                         <div id="date-buttons-container" class="flex overflow-x-auto no-scrollbar p-1 gap-2"></div>
                     </div>
                     <div id="itinerary-container"></div>
-                    <button onclick="window.openAddItineraryModal()" class="fixed right-6 bottom-24 w-14 h-14 rounded-full bg-[#FF8BA7] text-white shadow-xl flex items-center justify-center text-2xl hover:scale-110 transition z-20">
+                    <button onclick="window.openAddItineraryModal()" class="auth-only fixed right-6 bottom-24 w-14 h-14 rounded-full bg-[#FF8BA7] text-white shadow-xl flex items-center justify-center text-2xl hover:scale-110 transition z-20">
                         <i class="fa-solid fa-plus"></i>
                     </button>
                 </div>
                 <!-- Wishlist -->
                 <div id="wishlist-tab" class="main-tab-content hidden p-4">
-                    <div class="bg-white p-6 rounded-[30px] shadow-lg border border-pink-100 mb-6">
+                    <div class="auth-only bg-white p-6 rounded-[30px] shadow-lg border border-pink-100 mb-6">
                         <h3 class="flex items-center mb-4 text-xl font-bold text-gray-700">
                             <i class="fa-solid fa-cart-shopping text-[#FF8BA7] mr-2"></i>
                             新增慾望
@@ -2309,7 +2391,7 @@
                 </div>
                 <!-- Packing -->
                 <div id="packing-tab" class="main-tab-content hidden p-4">
-                    <div class="bg-white p-6 rounded-[30px] shadow-sm border border-blue-50 mb-6">
+                    <div class="auth-only bg-white p-6 rounded-[30px] shadow-sm border border-blue-50 mb-6">
                         <h3 class="flex items-center mb-4 text-xl font-bold text-gray-700">
                             <i class="fa-solid fa-shirt text-[#4ECDC4] mr-2"></i>
                             新增行李
@@ -2352,7 +2434,7 @@
                                 <i class="fa-solid fa-user-group text-blue-400 text-xl mr-2"></i>
                                 旅伴設定
                             </h3>
-                            <div class="flex gap-2 mb-3">
+                            <div class="auth-only flex gap-2 mb-3">
                                 <input type="text" id="new-participant-name" placeholder="輸入名字..." class="flex-1 min-w-0 p-3 bg-blue-50 border-0 rounded-xl font-bold outline-none">
                                 <button onclick="window.addParticipant()" class="w-12 flex-shrink-0 flex items-center justify-center bg-blue-400 text-white font-bold rounded-xl shadow-md">
                                     <i class="fa-solid fa-plus"></i>
@@ -2405,30 +2487,35 @@
                                 想去地點清單
                             </h3>
                             <div class="space-y-3">
-                                <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
-                                <input type="text" id="new-spot-desc" placeholder="簡單附註 (選填)" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
-                                <input type="text" id="new-spot-link" placeholder="Google Map 連結" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
-                                <button type="button" onclick="document.getElementById('spot-camera-input').click()" class="flex items-center justify-center w-full gap-2 p-3 font-bold text-gray-500 transition bg-gray-100 rounded-xl hover:bg-gray-200">
-                                    <i class="fa-solid fa-camera"></i>
-                                    點我拍照或選照片
-                                </button>
-                                <input type="file" id="spot-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'spot-preview-img', 'spot-preview-container')">
-                                <div id="spot-preview-container" class="hidden mb-2 text-center">
-                                    <img id="spot-preview-img" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl">
+                                <div class="auth-only">
+                                    <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="w-full p-3 mb-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
+                                    <input type="text" id="new-spot-desc" placeholder="簡單附註 (選填)" class="w-full p-3 mb-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
+                                    <input type="text" id="new-spot-link" placeholder="Google Map 連結" class="w-full p-3 mb-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
+                                    <button type="button" onclick="document.getElementById('spot-camera-input').click()" class="flex items-center justify-center w-full gap-2 p-3 mb-3 font-bold text-gray-500 transition bg-gray-100 rounded-xl hover:bg-gray-200">
+                                        <i class="fa-solid fa-camera"></i>
+                                        點我拍照或選照片
+                                    </button>
+                                    <input type="file" id="spot-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'spot-preview-img', 'spot-preview-container')">
+                                    <div id="spot-preview-container" class="hidden mb-2 text-center">
+                                        <img id="spot-preview-img" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl">
+                                    </div>
+                                    <button onclick="window.addSpot()" class="w-full p-3 font-bold text-white bg-[#FF8BA7] rounded-xl shadow-md active:scale-95">新增景點</button>
                                 </div>
-                                <button onclick="window.addSpot()" class="w-full p-3 font-bold text-white bg-[#FF8BA7] rounded-xl shadow-md active:scale-95">新增景點</button>
+                                <div class="hidden guest-banner text-center text-gray-400 py-4" style="display: ${window.IS_LOCKED ? 'block' : 'none'}">
+                                    <i class="fa-solid fa-lock mr-1"></i> 請先解鎖以新增景點
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div id="spots-list" class="space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                     <!-- Data Binding Button (Only for Legacy Trip) -->
                     <div id="legacy-import-container" class="mt-8 text-center hidden">
-                        <button id="bind-data-btn" onclick="window.bindLegacyData()" class="px-6 py-3 bg-gray-100 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition text-sm">
+                        <button id="bind-data-btn" onclick="window.bindLegacyData()" class="auth-only px-6 py-3 bg-gray-100 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition text-sm">
                             <i class="fa-solid fa-wrench mr-2"></i>
                             匯入/綁定舊資料
                     
                         </button>
-                        <p class="text-[10px] text-gray-400 mt-2">將所有未分類的資料歸檔至此旅程</p>
+                        <p class="auth-only text-[10px] text-gray-400 mt-2">將所有未分類的資料歸檔至此旅程</p>
                     </div>
                 </div>
             </main>
@@ -2455,9 +2542,14 @@
                             <input type="date" id="new-trip-end" class="w-full p-3 border-0 bg-gray-50 rounded-xl" required onchange="window.calculateTripDays()">
                         </div>
                     </div>
-                    <div class="mb-6">
+                    <div class="mb-3">
                         <label class="block mb-1 text-sm font-bold text-gray-500">預計天數</label>
                         <input type="number" id="new-trip-days" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center font-bold text-custom-primary" readonly>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block mb-1 text-sm font-bold text-gray-500">設定編輯密碼</label>
+                        <input type="text" id="new-trip-pin" class="w-full p-3 border-0 bg-gray-50 rounded-xl font-bold tracking-widest text-center" value="8888" placeholder="預設: 8888">
+                        <p class="text-[10px] text-gray-400 mt-1">* 只有輸入此密碼的人才能編輯行程</p>
                     </div>
                     
                     <div class="mb-6">
@@ -2482,32 +2574,6 @@
                 </form>
             </div>
         </div>
-        <!-- Edit Trip Dates -->
-        <div id="editTripDateModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripDateModal')">
-            <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
-                <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
-                    調整旅程日期
-                    <button onclick="window.closeModal('editTripDateModal')" class="flex items-center justify-center w-8 h-8 text-gray-400 bg-gray-100 rounded-full">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </h3>
-                <div class="flex gap-2 mb-3">
-                    <div class="flex-1">
-                        <label class="block mb-1 text-sm font-bold text-gray-500">開始日期</label>
-                        <input type="date" id="edit-trip-start" class="w-full p-3 border-0 bg-gray-50 rounded-xl" onchange="window.calculateEditTripDays()">
-                    </div>
-                    <div class="flex-1">
-                        <label class="block mb-1 text-sm font-bold text-gray-500">結束日期</label>
-                        <input type="date" id="edit-trip-end" class="w-full p-3 border-0 bg-gray-50 rounded-xl" onchange="window.calculateEditTripDays()">
-                    </div>
-                </div>
-                <div class="mb-6">
-                    <label class="block mb-1 text-sm font-bold text-gray-500">天數</label>
-                    <input type="number" id="edit-trip-days" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center font-bold text-custom-primary" readonly>
-                </div>
-                <button onclick="window.saveTripDates()" id="save-trip-date-btn" class="w-full p-3 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl">確認修改</button>
-            </div>
-        </div>
         <!-- Edit Trip Info (New) -->
         <div id="editTripInfoModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripInfoModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
@@ -2519,8 +2585,11 @@
                 </h3>
                 <form onsubmit="window.saveTripInfo(event)">
                     <label class="block mb-1 text-sm font-bold text-gray-500">旅程名稱</label>
-                    <input type="text" id="edit-trip-info-name" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl" required>
+                    <input type="text" id="edit-trip-info-name" class="w-full p-3 mb-4 border-0 bg-gray-50 rounded-xl" required>
                     
+                    <label class="block mb-1 text-sm font-bold text-gray-500">旅程密碼</label>
+                    <input type="text" id="edit-trip-info-pin" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl tracking-widest font-bold" required>
+
                     <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色</label>
                     <div class="flex gap-3 justify-center mb-6 flex-wrap">
                         <label class="cursor-pointer group">
@@ -2618,9 +2687,9 @@
                         </div>
                          <div id="edit-expense-preview-container" class="relative hidden mb-3 text-center">
                             <img id="edit-expense-preview" src="" class="object-cover w-full h-40 border-2 border-pink-100 rounded-xl mb-2">
-                            <button type="button" onclick="window.removeEditExpensePhoto()" class="text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
+                            <button type="button" onclick="window.removeEditExpensePhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                         </div>
-                        <button type="button" onclick="document.getElementById('edit-expense-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
+                        <button type="button" onclick="document.getElementById('edit-expense-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
                             <i class="fa-solid fa-camera"></i>
                             更換照片
                         </button>
@@ -2663,9 +2732,12 @@
                     </div>
                 </div>
                
-                <div class="flex gap-3 mt-4">
+                <div class="flex gap-3 mt-4 auth-only">
                     <button onclick="window.deleteExpense()" class="flex-1 p-3 font-bold text-red-400 border-2 border-red-100 rounded-2xl">刪除</button>
                     <button onclick="window.saveExpenseUpdate()" class="flex-[2] p-3 font-bold text-white bg-custom-primary rounded-2xl shadow-lg">儲存</button>
+                </div>
+                <div class="hidden mt-4 text-center guest-banner">
+                    <p class="text-sm font-bold text-gray-400"><i class="fa-solid fa-lock mr-1"></i> 訪客模式僅供檢視</p>
                 </div>
             </div>
         </div>
@@ -2699,14 +2771,14 @@
                 </div>
                 <div id="edit-wishlist-preview-container" class="relative hidden mb-3 text-center">
                     <img id="edit-wishlist-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
-                    <button type="button" onclick="window.removeEditWishlistPhoto()" class="text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
+                    <button type="button" onclick="window.removeEditWishlistPhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                 </div>
-                <button type="button" onclick="document.getElementById('edit-wishlist-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
+                <button type="button" onclick="document.getElementById('edit-wishlist-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
                     <i class="fa-solid fa-camera"></i>
                     更換照片
                 </button>
                 <input type="file" id="edit-wishlist-file" accept="image/*" class="hidden" onchange="window.previewImage(this, 'edit-wishlist-preview', 'edit-wishlist-preview-container')">
-                <div class="flex gap-3">
+                <div class="flex gap-3 auth-only">
                     <button onclick="window.deleteWishlistItem()" class="flex-1 p-3 font-bold text-red-400 border-2 border-red-100 rounded-2xl">刪除</button>
                     <button onclick="window.saveWishlistUpdate()" class="flex-[2] p-3 font-bold text-white bg-custom-primary rounded-2xl shadow-lg">儲存</button>
                 </div>
@@ -2763,9 +2835,12 @@
                     <input type="text" id="edit-itinerary-title" placeholder="行程標題" class="w-full p-4 mb-3 bg-white border-2 border-gray-100 rounded-2xl font-bold text-gray-700 shadow-sm" required>
                     <input type="text" id="edit-itinerary-link" placeholder="地圖連結" class="w-full p-4 mb-3 bg-white border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-700 shadow-sm">
                     <textarea id="edit-itinerary-note" rows="3" placeholder="備註事項" class="w-full p-4 mb-6 bg-white border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-700 shadow-sm resize-none"></textarea>
-                    <div class="flex gap-3">
+                    <div class="flex gap-3 auth-only">
                         <button type="button" onclick="window.deleteItineraryItem()" class="flex-1 py-3 bg-white border-2 border-red-100 text-red-400 font-bold rounded-2xl hover:bg-red-50 transition">刪除</button>
                         <button type="submit" class="flex-[2] py-3 bg-[#FF8BA7] text-white font-bold rounded-2xl shadow-lg hover:bg-[#ff7596] transition">儲存</button>
+                    </div>
+                    <div class="hidden mt-4 text-center guest-banner">
+                        <p class="text-sm font-bold text-gray-400"><i class="fa-solid fa-lock mr-1"></i> 訪客模式僅供檢視</p>
                     </div>
                 </form>
             </div>
@@ -2793,14 +2868,14 @@
                     <input type="text" id="edit-spot-link" class="w-full p-3 mb-4 text-sm border-0 bg-gray-50 rounded-xl">
                     <div id="edit-spot-preview-container" class="relative hidden mb-3 text-center">
                         <img id="edit-spot-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
-                        <button type="button" onclick="window.removeEditSpotPhoto()" class="text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
+                        <button type="button" onclick="window.removeEditSpotPhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                     </div>
-                    <button type="button" onclick="document.getElementById('edit-spot-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
+                    <button type="button" onclick="document.getElementById('edit-spot-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
                         <i class="fa-solid fa-camera"></i>
                         更換照片
                     </button>
                     <input type="file" id="edit-spot-file" accept="image/*" class="hidden" onchange="window.previewEditImage(this, 'edit-spot-preview', 'edit-spot-preview-container')">
-                    <button type="submit" class="w-full p-3 mt-4 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
+                    <button type="submit" class="auth-only w-full p-3 mt-4 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
                 </form>
             </div>
         </div>
@@ -2828,7 +2903,7 @@
                         </select>
                         <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none text-xs"></i>
                     </div>
-                    <button type="submit" id="save-packing-btn" class="w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
+                    <button type="submit" id="save-packing-btn" class="auth-only w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
                 </form>
             </div>
         </div>
