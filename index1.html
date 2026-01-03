@@ -221,6 +221,10 @@
               , EDIT_PAYMENT = ''
               , EDIT_SPLIT_TYPE = 'shared'
               , EDIT_BENEFICIARIES = [];
+            
+            // Wishlist State
+            let ACTIVE_WISHLIST_CATEGORY = '伴手禮';
+            let EDIT_WISHLIST_CATEGORY = '';
 
             window.openModal = (id) => document.getElementById(id).classList.remove('hidden');
             window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
@@ -523,7 +527,10 @@
                         window.renderPaymentMethodsSelect('edit-expense-payment-select-container', true);
                         window.renderCategorySelection('expense-category-options');
                         window.renderCategorySelection('edit-expense-category-options', true);
+                        // Initial Render
                         window.renderWishlistCategoryOptions();
+                        window.renderWishlistCategoryOptions(true);
+                        
                         window.renderExpenseDashboard();
                         window.renderParticipantsList();
                     }
@@ -750,7 +757,24 @@
                 }
             };
 
-            window.renderWishlistCategoryOptions = () => {
+            window.selectWishlistCategory = (c, isEdit=false) => {
+                if (isEdit) {
+                    EDIT_WISHLIST_CATEGORY = c;
+                    document.getElementById('edit-wishlist-category').value = c;
+                    window.renderWishlistCategoryOptions(true);
+                } else {
+                    ACTIVE_WISHLIST_CATEGORY = c;
+                    document.getElementById('wishlist-cat').value = c;
+                    window.renderWishlistCategoryOptions(false);
+                }
+            };
+
+            window.renderWishlistCategoryOptions = (isEdit = false) => {
+                const containerId = isEdit ? 'edit-wishlist-category-options' : 'wishlist-category-options';
+                const container = document.getElementById(containerId);
+                if (!container) return;
+
+                const currentCat = isEdit ? EDIT_WISHLIST_CATEGORY : ACTIVE_WISHLIST_CATEGORY;
                 const emojiMap = {
                     '伴手禮': '🎁',
                     '藥妝': '💊',
@@ -758,23 +782,29 @@
                     '電器': '⚡',
                     '其他': '✨'
                 };
-                
-                const optionsHtml = window.TRIP_WISHLIST_CATEGORIES.map(c => {
+
+                // Add current if missing
+                let displayList = [...window.TRIP_WISHLIST_CATEGORIES];
+                if (currentCat && !displayList.includes(currentCat)) displayList.push(currentCat);
+
+                let html = displayList.map(c => {
                    const icon = emojiMap[c] || '🏷️';
-                   return `<option value="${c}">${icon} ${c}</option>`;
+                   const isActive = currentCat === c;
+                   const activeClass = isActive ? 'active-category' : '';
+                   const clickFn = `window.selectWishlistCategory('${c}', ${isEdit})`;
+                   return `<button type="button" onclick="${clickFn}" class="block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass}">${icon} ${c}</button>`;
                 }).join('');
 
-                const addSelect = document.getElementById('wishlist-cat');
-                const editSelect = document.getElementById('edit-wishlist-category');
-                
-                if(addSelect) addSelect.innerHTML = optionsHtml;
-                
-                if(editSelect) {
-                    const currentVal = editSelect.value;
-                    editSelect.innerHTML = optionsHtml;
-                    // If current item has a category not in list anymore (or was default), select it
-                    if(currentVal) editSelect.value = currentVal;
+                // Add Button
+                html += `<button type="button" onclick="window.addWishlistCategory()" class="block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
+
+                if(isEdit) {
+                    container.className = "grid grid-cols-3 gap-2 mb-3";
+                } else {
+                    container.className = "flex flex-wrap gap-2";
                 }
+                
+                container.innerHTML = html;
             };
 
             window.selectPayment = (p, isEdit=false) => {
@@ -1765,8 +1795,11 @@
                 document.getElementById('edit-wishlist-name').value = item.name;
                 document.getElementById('edit-wishlist-price').value = item.price;
                 document.getElementById('edit-wishlist-qty').value = item.quantity;
-                document.getElementById('edit-wishlist-category').value = item.category;
                 document.getElementById('edit-wishlist-old-image').value = item.imageUrl || '';
+                
+                // Set Category State
+                window.selectWishlistCategory(item.category || '其他', true);
+
                 if (item.imageUrl) {
                     document.getElementById('edit-wishlist-preview').src = item.imageUrl;
                     document.getElementById('edit-wishlist-preview-container').classList.remove('hidden');
@@ -1784,11 +1817,15 @@
                     const snap = await uploadBytes(ref(storage, `wishlist/updated_${Date.now()}_${fileIn.files[0].name}`), fileIn.files[0]);
                     imgUrl = await getDownloadURL(snap.ref);
                 }
+                
+                // Get value from hidden input now
+                const cat = document.getElementById('edit-wishlist-category').value;
+
                 await updateDoc(doc(db, "wishlists", id), {
                     name: document.getElementById('edit-wishlist-name').value,
                     price: parseFloat(document.getElementById('edit-wishlist-price').value),
                     quantity: parseInt(document.getElementById('edit-wishlist-qty').value),
-                    category: document.getElementById('edit-wishlist-category').value,
+                    category: cat,
                     imageUrl: imgUrl
                 });
                 window.closeModal('editWishlistModal');
@@ -2113,7 +2150,7 @@
                                         <!-- Category (Horizontal Scroll) -->
                                         <div class="mb-2">
                                             <label class="text-xs font-bold text-gray-400 block mb-1">類別</label>
-                                            <div id="expense-category-options" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                            <div id="expense-category-options" class="flex flex-wrap gap-2">
                                                 <!-- Dynamic -->
                                             </div>
                                         </div>
@@ -2186,7 +2223,7 @@
                 <!-- Itinerary -->
                 <div id="itinerary-tab" class="main-tab-content p-4">
                     <!-- Weather Widget -->
-                    <div class="bg-blue-50 p-6 rounded-3xl shadow-sm border-2 border-white mb-6 relative overflow-hidden ring-1 ring-blue-100">
+                    <div class="bg-blue-50 p-4 md:p-6 rounded-3xl shadow-sm border-2 border-white mb-6 relative overflow-hidden ring-1 ring-blue-100">
                         <!-- Header -->
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="font-bold text-gray-700 flex items-center text-lg">
@@ -2200,11 +2237,11 @@
                         <!-- Search -->
                         <div class="flex gap-2 relative z-10">
                             <input type="text" id="weather-city-input" 
-                                   placeholder="輸入城市 (如: Tokyo, Paris, Taipei)" 
-                                   class="flex-1 p-4 bg-white border-0 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm placeholder-gray-400"
+                                   placeholder="輸入城市 (如: Tokyo)" 
+                                   class="flex-1 min-w-0 p-3 bg-white border-0 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm placeholder-gray-400"
                                    onkeypress="if(event.key === 'Enter') window.searchWeather()">
                             <button onclick="window.searchWeather()" 
-                                    class="w-14 bg-blue-400 text-white font-bold rounded-2xl shadow-md hover:bg-blue-500 transition active:scale-95 flex items-center justify-center">
+                                    class="w-12 shrink-0 bg-blue-400 text-white font-bold rounded-2xl shadow-md hover:bg-blue-500 transition active:scale-95 flex items-center justify-center">
                                 <i class="fa-solid fa-magnifying-glass"></i>
                             </button>
                         </div>
@@ -2245,16 +2282,10 @@
                         <form onsubmit="window.addWishlistItem(event)">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <input type="text" id="wishlist-name" placeholder="商品名稱" class="w-full p-4 mb-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
-                                <div class="flex gap-2 mb-3">
-                                    <div class="relative flex-1">
-                                        <select id="wishlist-cat" class="w-full p-4 border-0 bg-gray-50 rounded-2xl font-bold appearance-none">
-                                            <!-- Dynamic -->
-                                        </select>
-                                        <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
-                                    </div>
-                                    <button type="button" onclick="window.addWishlistCategory()" class="w-14 bg-gray-100 text-gray-400 rounded-2xl font-bold hover:bg-gray-200 text-xl flex items-center justify-center">
-                                        +
-                                    </button>
+                                <div class="mb-3">
+                                    <label class="block mb-1 text-sm font-bold text-gray-500">分類</label>
+                                    <div id="wishlist-category-options" class="flex flex-wrap gap-2"></div>
+                                    <input type="hidden" id="wishlist-cat" value="伴手禮">
                                 </div>
                                 <div class="flex gap-2 mb-3">
                                     <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
@@ -2661,16 +2692,10 @@
                         <input type="number" id="edit-wishlist-qty" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center" min="1">
                     </div>
                 </div>
-                <div class="flex gap-2 mb-3">
-                    <div class="relative flex-1">
-                        <select id="edit-wishlist-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
-                            <!-- Dynamic -->
-                        </select>
-                        <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
-                    </div>
-                    <button type="button" onclick="window.addWishlistCategory()" class="w-14 bg-gray-100 text-gray-400 rounded-2xl font-bold hover:bg-gray-200 text-xl flex items-center justify-center">
-                        +
-                    </button>
+                <div class="mb-3">
+                    <label class="block mb-1 text-sm font-bold text-gray-500">分類</label>
+                    <div id="edit-wishlist-category-options" class="grid grid-cols-3 gap-2"></div>
+                    <input type="hidden" id="edit-wishlist-category">
                 </div>
                 <div id="edit-wishlist-preview-container" class="relative hidden mb-3 text-center">
                     <img id="edit-wishlist-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
