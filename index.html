@@ -986,13 +986,13 @@
             }
             ;
 
-            window.saveTripDates = async () => {
+                        window.saveTripDates = async () => {
                 const startStr = document.getElementById('edit-trip-start').value;
                 const days = parseInt(document.getElementById('edit-trip-days').value);
                 if (!startStr || !days)
                     return alert("請輸入完整日期");
 
-                if (!confirm(`即將更新旅程日期：${startStr} 起，共 ${days} 天。\n(這將清除並重新建立行程表日期格子)`))
+                if (!confirm(`即將更新旅程日期：${startStr} 起，共 ${days} 天。\n(行程將會保留並依序移動到新日期)`))
                     return;
 
                 const btn = document.getElementById('save-trip-date-btn');
@@ -1000,44 +1000,64 @@
                 btn.disabled = true;
 
                 try {
-                    // 1. Delete Old Dates
-                    const oldDocs = await getDocs(query(collection(db, "itineraries"), where("tripId", "==", window.CURRENT_TRIP_ID)));
-                    const deleteBatch = writeBatch(db);
-                    oldDocs.forEach(doc => deleteBatch.delete(doc.ref));
-                    await deleteBatch.commit();
+                    // 1. Get Old Data to preserve it
+                    const q = query(collection(db, "itineraries"), where("tripId", "==", window.CURRENT_TRIP_ID));
+                    const snapshot = await getDocs(q);
+                    // Sort by date so we map Day 1 -> New Day 1, Day 2 -> New Day 2, etc.
+                    const oldItineraries = snapshot.docs
+                        .map(d => ({id: d.id, ...d.data()}))
+                        .sort((a, b) => a.date.localeCompare(b.date));
 
-                    // 2. Update Meta (even for legacy)
+                    const batch = writeBatch(db);
+
+                    // 2. Delete all old documents (to avoid ID collisions or orphans)
+                    snapshot.docs.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+
+                    // 3. Update Meta
                     const metaRef = doc(db, "trips_meta", window.CURRENT_TRIP_ID);
-                    await setDoc(metaRef, {
+                    batch.set(metaRef, {
                         startDate: startStr,
                         days: days
                     }, {
                         merge: true
                     });
 
-                    // 3. Generate New Dates
+                    // 4. Generate New Dates and Map Data
                     const startDate = new Date(startStr);
                     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                    const createBatch = writeBatch(db);
 
                     for (let i = 0; i < days; i++) {
                         const d = new Date(startDate);
                         d.setDate(startDate.getDate() + i);
                         const dateId = d.toISOString().split('T')[0];
+                        // Ensure we use a unique ID format if possible, or fallback to dateId if that was the convention
+                        // The previous code used `${window.CURRENT_TRIP_ID}_${dateId}` for saveTripDates, so we stick to that.
                         const docId = `${window.CURRENT_TRIP_ID}_${dateId}`;
                         const ref = doc(db, "itineraries", docId);
-                        createBatch.set(ref, {
+
+                        // Extract data from the corresponding old day (index i)
+                        let preservedData = {};
+                        if (i < oldItineraries.length) {
+                            preservedData = oldItineraries[i];
+                        }
+
+                        batch.set(ref, {
                             tripId: window.CURRENT_TRIP_ID,
                             date: dateId,
                             day_of_week: dayNames[d.getDay()],
-                            city: `Day ${i + 1}`
+                            city: preservedData.city || `Day ${i + 1}`,
+                            activities: preservedData.activities || []
                         });
                     }
-                    await createBatch.commit();
+                    
+                    await batch.commit();
 
-                    alert("日期已更新！");
+                    alert("日期已更新，行程資料已保留並遷移！");
                     window.closeModal('editTripDateModal');
-                    window.enterTrip(window.CURRENT_TRIP_ID);
+                    // We don't call enterTrip here because onSnapshot listeners are already active 
+                    // and will pick up the changes (delete + create) automatically.
 
                 } catch (e) {
                     console.error(e);
