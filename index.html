@@ -727,7 +727,7 @@
             window.switchExpenseView = (v) => {
                 document.getElementById('add-expense-container').classList.toggle('hidden', v !== 'add');
                 document.getElementById('expense-details-container').classList.toggle('hidden', v !== 'details');
-                document.getElementById('tab-add-expense-btn').className = v === 'add' ? 'auth-only flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all' : 'auth-only flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
+                document.getElementById('tab-add-expense-btn').className = v === 'add' ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all' : 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
                 document.getElementById('tab-view-details-btn').className = v === 'details' ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all' : 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
                 if (v === 'add') {
                     ACTIVE_BENEFICIARIES = [...window.TRIP_PARTICIPANTS];
@@ -2487,65 +2487,72 @@
                 <!-- Expense -->
                 <div id="expense-tab" class="main-tab-content hidden p-4">
                     <div class="flex bg-gray-100 p-1.5 rounded-2xl mb-4">
-                        <button id="tab-add-expense-btn" onclick="window.switchExpenseView('add')" class="auth-only flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all">
+                        <button id="tab-add-expense-btn" onclick="window.switchExpenseView('add')" class="flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50">
                             <i class="fa-solid fa-pen mr-1"></i>
                             記一筆
                         </button>
-                        <button id="tab-view-details-btn" onclick="window.switchExpenseView('details')" class="flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50">
+                        <button id="tab-view-details-btn" onclick="window.switchExpenseView('details')" class="flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all">
                             <i class="fa-solid fa-list mr-1"></i>
                             查明細
                         </button>
                     </div>
-                    <div id="add-expense-container" class="auth-only">
-                        <div class="bg-white p-3 md:p-6 rounded-[20px] shadow-sm border border-pink-50">
+                    
+                    <!-- Add Expense Form (Default Hidden if in Details mode) -->
+                    <div id="add-expense-container" class="auth-only hidden">
+                        <div class="bg-white p-4 md:p-6 rounded-[30px] shadow-sm border border-pink-50">
                             <form onsubmit="event.preventDefault(); window.addExpense();">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <!-- LEFT COLUMN -->
                                     <div>
-                                        <!-- Row 1: Date & Amount & Currency Combined -->
-                                        <div class="flex flex-wrap gap-2 mb-2">
-                                            <!-- Date (Compact) -->
-                                            <div class="relative flex-1 min-w-[140px]">
-                                                <input type="date" id="expense-date" class="w-full py-3 px-3 text-sm bg-gray-50 rounded-xl font-bold text-gray-700">
-                                            </div>
-                                            <!-- Amount & Currency -->
-                                            <div class="flex-[2] flex gap-1 min-w-0">
-                                                <input type="number" id="expense-amount" placeholder="0" class="flex-1 min-w-0 p-2 bg-gray-50 rounded-xl text-lg font-bold text-gray-700">
-                                                <div id="add-currency-container" class="flex bg-gray-100 rounded-xl p-1 items-center shrink-0">
-                                                    <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-2 py-1.5 rounded-lg text-xs font-bold text-gray-400 transition-all">TWD</button>
-                                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-2 py-1.5 rounded-lg text-xs font-bold bg-[#FF7596] text-white shadow-md transition-all">JPY</button>
+                                        <!-- Row 1: Date (Full Width) -->
+                                        <div class="mb-4">
+                                            <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">日期</label>
+                                            <input type="date" id="expense-date" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 text-lg shadow-sm border-2 border-transparent focus:border-pink-200">
+                                        </div>
+
+                                        <!-- Row 2: Amount & Currency (Full Width) -->
+                                        <div class="mb-4">
+                                            <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">金額</label>
+                                            <div class="flex gap-2 items-center">
+                                                <input type="number" id="expense-amount" placeholder="0" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl text-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-pink-200">
+                                                <div id="add-currency-container" class="flex bg-gray-100 rounded-xl p-1 items-center shrink-0 h-[56px]">
+                                                    <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold text-gray-400 transition-all">TWD</button>
+                                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold bg-[#FF7596] text-white shadow-md transition-all">JPY</button>
                                                     <input type="hidden" id="expense-currency" value="JPY">
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <!-- Row 2: Description & Camera -->
-                                        <div class="flex gap-2 mb-2">
-                                            <input type="text" id="expense-description" placeholder="用途 (例如: 拉麵)" class="flex-1 min-w-0 p-2 bg-gray-50 rounded-xl font-bold text-gray-700">
-                                            <button type="button" onclick="document.getElementById('expense-camera-input').click()" class="w-10 h-10 shrink-0 bg-pink-50 text-pink-400 rounded-xl border border-pink-100 flex items-center justify-center">
-                                                <i class="fa-solid fa-camera"></i>
-                                            </button>
-                                        </div>
-                                        <input type="file" id="expense-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'expense-preview-img', 'expense-preview-container')">
-                                        <div id="expense-preview-container" class="hidden mb-2 text-center">
-                                            <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover">
+                                        <!-- Row 3: Description & Camera -->
+                                        <div class="mb-4">
+                                            <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">用途 & 照片</label>
+                                            <div class="flex gap-2">
+                                                <input type="text" id="expense-description" placeholder="例如: 一蘭拉麵" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-pink-200">
+                                                <button type="button" onclick="document.getElementById('expense-camera-input').click()" class="w-12 h-[52px] shrink-0 bg-pink-50 text-pink-400 rounded-2xl border-2 border-pink-100 flex items-center justify-center hover:bg-pink-100 transition">
+                                                    <i class="fa-solid fa-camera text-lg"></i>
+                                                </button>
+                                            </div>
+                                            <input type="file" id="expense-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'expense-preview-img', 'expense-preview-container')">
+                                            <div id="expense-preview-container" class="hidden mt-2 text-center">
+                                                <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover shadow-sm">
+                                            </div>
                                         </div>
                                     </div>
                                     
                                     <!-- RIGHT COLUMN -->
                                     <div>
                                         <!-- Payer & Split & Benficiaries -->
-                                        <div class="mb-2">
-                                            <div class="flex justify-between items-center mb-1">
-                                                <label class="text-xs font-bold text-gray-400">付款 & 分帳</label>
+                                        <div class="mb-4">
+                                            <div class="flex justify-between items-center mb-2">
+                                                <label class="text-xs font-bold text-gray-400 ml-1">付款 & 分帳</label>
                                             </div>
-                                            <div class="flex gap-2 items-center mb-2 overflow-x-auto no-scrollbar">
+                                            <div class="flex gap-2 items-center mb-3 overflow-x-auto no-scrollbar pb-1">
                                                 <div id="expense-payer-select" class="flex gap-1 shrink-0"></div> 
                                                 <input type="hidden" id="expense-payer" value="Josh">
                                                 
                                                 <!-- SWAP BUTTON -->
-                                                <button type="button" id="btn-swap-payer" onclick="window.swapPayerBeneficiary()" class="hidden mx-1 text-gray-300 hover:text-custom-primary transition transform active:scale-95 flex-shrink-0" title="交換付款人與受益人">
-                                                    <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
+                                                <button type="button" id="btn-swap-payer" onclick="window.swapPayerBeneficiary()" class="hidden mx-1 w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:text-custom-primary hover:bg-pink-50 flex items-center justify-center transition flex-shrink-0" title="交換付款人與受益人">
+                                                    <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
                                                 </button>
 
                                                 <div class="flex bg-gray-50 rounded-xl p-0.5 shrink-0">
@@ -2557,27 +2564,29 @@
                                         </div>
 
                                         <!-- Category (Horizontal Scroll) -->
-                                        <div class="mb-2">
-                                            <label class="text-xs font-bold text-gray-400 block mb-1">類別</label>
+                                        <div class="mb-4">
+                                            <label class="text-xs font-bold text-gray-400 block mb-2 ml-1">類別</label>
                                             <div id="expense-category-options" class="flex flex-wrap gap-2">
                                                 <!-- Dynamic -->
                                             </div>
                                         </div>
 
                                         <!-- Payment (Horizontal Scroll) -->
-                                        <div class="mb-2">
-                                             <label class="text-xs font-bold text-gray-400 block mb-1">支付方式</label>
+                                        <div class="mb-4">
+                                             <label class="text-xs font-bold text-gray-400 block mb-2 ml-1">支付方式</label>
                                              <div id="expense-payment-select-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="flex gap-2 mt-2">
-                                     <button type="button" onclick="window.cancelAddExpense()" class="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-400 font-bold text-lg hover:bg-gray-200 transition-all">取消</button>
-                                     <button type="submit" class="flex-[2] py-3 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all">確認紀錄</button>
+                                <div class="flex gap-3 mt-4">
+                                     <button type="button" onclick="window.cancelAddExpense()" class="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-400 font-bold text-lg hover:bg-gray-200 transition-all">取消</button>
+                                     <button type="submit" class="flex-[2] py-4 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all">確認紀錄</button>
                                 </div>
                             </form>
                         </div>
                     </div>
+                    
+                    <!-- Expense Details (Search, Summary, List) -->
                     <div id="expense-details-container" class="">
                         <div class="space-y-4">
                             <!-- SEARCH BAR -->
