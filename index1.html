@@ -734,7 +734,7 @@
                     container.className = "grid grid-cols-3 gap-2 mb-6";
                 } else {
                     // Force horizontal scroll for non-edit mode (Add Expense)
-                    container.className = "flex gap-2 overflow-x-auto no-scrollbar pb-1";
+                    container.className = "flex flex-wrap gap-2";
                 }
                 
                 container.innerHTML = html;
@@ -2064,8 +2064,8 @@
                                         <!-- Row 1: Date & Amount & Currency Combined -->
                                         <div class="flex gap-2 mb-2">
                                             <!-- Date (Compact) -->
-                                            <div class="relative w-[35%] shrink-0">
-                                                <input type="date" id="expense-date" class="w-full p-2 text-xs md:text-sm bg-gray-50 rounded-xl font-bold text-gray-700 h-full">
+                                            <div class="relative shrink-0">
+                                                <input type="date" id="expense-date" class="w-[135px] p-2 text-xs md:text-sm bg-gray-50 rounded-xl font-bold text-gray-700 h-full">
                                             </div>
                                             <!-- Amount & Currency -->
                                             <div class="flex-1 flex gap-1 min-w-0">
