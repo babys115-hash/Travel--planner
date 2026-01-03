@@ -245,6 +245,8 @@
               , CATEGORY_FILTER = 'All'
               , SPLIT_FILTER = 'All';
 
+            let EXPENSE_SEARCH_TERM = '';
+
             let EDIT_PAYER = ''
               , EDIT_CATEGORY = ''
               , EDIT_PAYMENT = ''
@@ -765,10 +767,22 @@
                     EDIT_PAYER = p;
                     window.renderEditExpensePayerButtons();
                     document.getElementById('edit-expense-payer').value = p;
+                    
+                    // Logic Update: If in Personal mode, changing payer also changes beneficiary default
+                    if (EDIT_SPLIT_TYPE === 'personal') {
+                        EDIT_BENEFICIARIES = [p];
+                        window.renderEditBeneficiaryButtons();
+                    }
                 } else {
                     ACTIVE_PAYER = p;
                     window.renderExpensePayerButtons();
                     document.getElementById('expense-payer').value = p;
+
+                    // Logic Update: If in Personal mode, changing payer also changes beneficiary default
+                    if (ACTIVE_SPLIT_TYPE === 'personal') {
+                        ACTIVE_BENEFICIARIES = [p];
+                        window.renderBeneficiaryButtons();
+                    }
                 }
             }
             ;
@@ -1138,94 +1152,27 @@
                 document.getElementById('edit-expense-payer-select').innerHTML = window.TRIP_PARTICIPANTS.map(p => `<button type="button" class="edit-payer-btn flex-1 block-select-btn ${p === EDIT_PAYER ? 'active-payer' : ''}" onclick="window.selectPayer('${p}', true)">${p}</button>`).join('');
             }
             ;
-            window.addExpense = async () => {
-                const date = document.getElementById('expense-date').value
-                  , amount = parseFloat(document.getElementById('expense-amount').value)
-                  , desc = document.getElementById('expense-description').value
-                  , currency = document.getElementById('expense-currency').value;
-                const fileIn = document.getElementById('expense-camera-input');
-                if (!date || !amount || !desc)
-                    return alert('請填寫完整');
-                let imgUrl = '';
-                if (fileIn.files[0]) {
-                    const snap = await uploadBytes(ref(storage, `expenses/${Date.now()}_${fileIn.files[0].name}`), fileIn.files[0]);
-                    imgUrl = await getDownloadURL(snap.ref);
+            window.getParticipantStyle = (name) => {
+                const styles = [
+                    'bg-purple-50 text-purple-500 border-purple-200',
+                    'bg-pink-50 text-pink-500 border-pink-200', 
+                    'bg-blue-50 text-blue-500 border-blue-200',
+                    'bg-orange-50 text-orange-500 border-orange-200',
+                    'bg-emerald-50 text-emerald-500 border-emerald-200',
+                    'bg-cyan-50 text-cyan-500 border-cyan-200'
+                ];
+                let hash = 0;
+                for (let i = 0; i < name.length; i++) {
+                    hash = name.charCodeAt(i) + ((hash << 5) - hash);
                 }
-                await window.addDocWithTripId('expenses', {
-                    date,
-                    amount,
-                    description: desc,
-                    currency,
-                    payer: ACTIVE_PAYER,
-                    category: ACTIVE_CATEGORY,
-                    payment: ACTIVE_PAYMENT,
-                    splitType: ACTIVE_SPLIT_TYPE,
-                    beneficiaries: ACTIVE_BENEFICIARIES,
-                    imageUrl: imgUrl,
-                    timestamp: serverTimestamp()
-                });
-                // alert('記帳成功'); // Removed alert for smoother flow
-                
-                // Clear Form
-                document.getElementById('expense-description').value = '';
-                document.getElementById('expense-amount').value = '';
-                document.getElementById('expense-preview-container').classList.add('hidden');
-                
-                // Reset Filters to All so user sees the new item
-                PAYER_FILTER = 'All';
-                PAYMENT_FILTER = 'All';
-                CATEGORY_FILTER = 'All';
-                SPLIT_FILTER = 'All';
-                
-                // Switch to Details View and Scroll to List
-                window.switchExpenseView('details');
-                setTimeout(() => {
-                    const list = document.getElementById('expense-list');
-                    if(list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 300);
-            }
-            ;
-            window.togglePayerFilter = (p) => {
-                PAYER_FILTER = (PAYER_FILTER === p) ? 'All' : p;
-                window.renderExpenseDashboard();
-            }
-            ;
-            window.togglePaymentFilter = (p) => {
-                PAYMENT_FILTER = (PAYMENT_FILTER === p) ? 'All' : p;
-                window.renderExpenseDashboard();
-            }
-            ;
-            window.toggleCategoryFilter = (c) => {
-                CATEGORY_FILTER = (CATEGORY_FILTER === c) ? 'All' : c;
-                window.renderExpenseDashboard();
-            }
-            ;
-
-            window.toggleSplitFilter = (type) => {
-                SPLIT_FILTER = type;
-                window.renderExpenseDashboard();
+                return styles[Math.abs(hash) % styles.length];
             };
 
-            window.enableBudgetEdit = () => {
-                document.getElementById('budget-display-area').classList.add('hidden');
-                document.getElementById('budget-edit-area').classList.remove('hidden');
-                document.getElementById('budget-edit-input').value = window.TOTAL_BUDGET;
-            }
-            ;
-            window.saveBudget = async () => {
-                const val = parseFloat(document.getElementById('budget-edit-input').value);
-                if (!isNaN(val)) {
-                    const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
-                    await setDoc(ref, {
-                        totalBudget: val
-                    }, {
-                        merge: true
-                    });
-                }
-                document.getElementById('budget-display-area').classList.remove('hidden');
-                document.getElementById('budget-edit-area').classList.add('hidden');
-            }
-            ;
+            window.updateSearchTerm = (val) => {
+                EXPENSE_SEARCH_TERM = val.toLowerCase();
+                window.renderExpenseList();
+            };
+
             window.renderExpenseDashboard = () => {
                 let total = 0
                   , cash = 0
@@ -1256,8 +1203,16 @@
                 document.getElementById('total-budget-display').innerText = (window.TOTAL_BUDGET || 0).toLocaleString();
                 document.getElementById('total-spent').innerText = Math.round(total).toLocaleString();
                 document.getElementById('overview-budget-display').innerText = (window.TOTAL_BUDGET || 0).toLocaleString();
-                const colors = ['text-blue-500', 'text-pink-500', 'text-orange-500'];
-                document.getElementById('payer-cards-container').innerHTML = window.TRIP_PARTICIPANTS.map( (p, i) => `<div onclick="window.togglePayerFilter('${p}')" class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 cursor-pointer transition ${PAYER_FILTER === p ? 'filter-card-active blue' : 'hover:bg-gray-50'}"><p class="text-xs font-bold mb-1 ${colors[i % 3]} flex justify-between">${p} 付 ${PAYER_FILTER === p ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`).join('');
+                
+                document.getElementById('payer-cards-container').innerHTML = window.TRIP_PARTICIPANTS.map( (p, i) => {
+                    // Extract text color from style for the title
+                    const style = window.getParticipantStyle(p);
+                    // Extract text-color class specifically or just use the whole style for a dot/indicator
+                    // Let's parse the text color class roughly
+                    const textColor = style.split(' ').find(c => c.startsWith('text-')) || 'text-gray-500';
+                    
+                    return `<div onclick="window.togglePayerFilter('${p}')" class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 cursor-pointer transition ${PAYER_FILTER === p ? 'filter-card-active blue' : 'hover:bg-gray-50'}"><p class="text-xs font-bold mb-1 ${textColor} flex justify-between">${p} 付 ${PAYER_FILTER === p ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`;
+                }).join('');
                 
                 // Dynamic Payment Cards
                 const paymentColors = ['green', 'purple', 'orange', 'cyan', 'rose'];
@@ -1265,9 +1220,6 @@
                      const colorName = paymentColors[i % paymentColors.length];
                      const isActive = PAYMENT_FILTER === pm;
                      const activeClass = isActive ? `filter-card-active ${colorName}` : 'hover:bg-gray-50';
-                     // Map tailwind classes manually for safety since dynamic class construction can be tricky with purgers, 
-                     // but simplified here assuming standard palette is available or just using inline style for border if needed.
-                     // Using specific border colors
                      const borderColor = `border-${colorName}-100`;
                      const textColor = `text-${colorName}-500`;
                      
@@ -1381,7 +1333,7 @@
                 }, 500);
             };
 
-                       window.renderExpenseList = () => {
+            window.renderExpenseList = () => {
                 // Use TRIP_CATEGORIES instead of deriving from data to ensure custom ones show up even if empty
                 // But for filters, we might want to show all used + all configured. 
                 // Let's merge them.
@@ -1415,7 +1367,14 @@
                         matchSplit = isPersonal && isBeneficiary;
                     }
 
-                    return matchPayer && matchPayment && matchCategory && matchSplit;
+                    // Search Filter
+                    const searchLower = EXPENSE_SEARCH_TERM.toLowerCase();
+                    const matchSearch = !searchLower || 
+                                        (e.description && e.description.toLowerCase().includes(searchLower)) ||
+                                        (e.category && e.category.toLowerCase().includes(searchLower)) ||
+                                        (e.amount && e.amount.toString().includes(searchLower));
+
+                    return matchPayer && matchPayment && matchCategory && matchSplit && matchSearch;
                 });
 
                 // Calculate Total for displayed list
@@ -1456,9 +1415,10 @@
                     if (isPersonal) {
                         // If personal, show who it's for
                         const ben = e.beneficiaries && e.beneficiaries.length > 0 ? e.beneficiaries[0] : '個人';
-                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-400 border border-purple-100">👤 ${ben}</span>`;
+                        const style = window.getParticipantStyle(ben);
+                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold ${style} border">👤 ${ben}</span>`;
                     } else {
-                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-400 border border-blue-100">👥 分擔</span>`;
+                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#E0F7FA] text-[#006064] border border-[#B2EBF2]">👥 共同</span>`;
                     }
                     
                     // Payment Method Tag
@@ -2489,6 +2449,12 @@
                     </div>
                     <div id="expense-details-container" class="">
                         <div class="space-y-4">
+                            <!-- SEARCH BAR -->
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-400"></i>
+                                <input type="text" placeholder="搜尋記帳 (說明、金額、類別)..." oninput="window.updateSearchTerm(this.value)" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-gray-100 shadow-sm focus:border-pink-300 font-bold text-gray-600 transition-all">
+                            </div>
+
                             <!-- Export Button for Expenses (Moved to TOP) -->
                             <button onclick="window.exportExpensesToExcel()" class="w-full py-3 rounded-2xl bg-white border-2 border-[#4ECDC4] text-[#4ECDC4] font-bold shadow-sm hover:bg-[#E0F7FA] transition flex items-center justify-center mb-4">
                                 <i class="fa-solid fa-file-excel mr-2 text-xl"></i>
