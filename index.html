@@ -774,13 +774,28 @@
             window.renderExpenseList = () => {
                 const cats = ['All', ...new Set(window.EXPENSES_DATA.map(e => e.category))];
                 document.getElementById('category-filter-container').innerHTML = cats.map(c => `<button onclick="window.toggleCategoryFilter('${c}')" class="block-select-btn px-3 py-1 text-xs rounded-full ${CATEGORY_FILTER === c ? 'active-filter' : ''}">${c === 'All' ? '全部' : c}</button>`).join('');
+                
                 const filteredData = window.EXPENSES_DATA.filter(e => {
                     const matchPayer = PAYER_FILTER === 'All' || e.payer === PAYER_FILTER;
                     const matchPayment = PAYMENT_FILTER === 'All' || (PAYMENT_FILTER === 'Cash' ? e.payment === 'Cash' : e.payment !== 'Cash');
                     const matchCategory = CATEGORY_FILTER === 'All' || e.category === CATEGORY_FILTER;
                     return matchPayer && matchPayment && matchCategory;
+                });
+
+                // Calculate Total for displayed list
+                let currentTotal = 0;
+                filteredData.forEach(e => {
+                     const val = e.currency === 'TWD' ? e.amount : e.amount * window.EXCHANGE_RATE;
+                     currentTotal += val;
+                });
+                
+                // Update Display
+                const totalDisplay = document.getElementById('category-total-display');
+                if(totalDisplay) {
+                    const prefix = CATEGORY_FILTER === 'All' ? '總計' : CATEGORY_FILTER;
+                    totalDisplay.innerHTML = `${prefix}: <span class="text-lg">$${Math.round(currentTotal).toLocaleString()}</span>`;
                 }
-                );
+
                 const iconMap = {
                     Food: 'fa-utensils',
                     Transport: 'fa-train',
@@ -793,8 +808,7 @@
                     const twd = e.currency !== 'TWD' ? Math.round(e.amount * window.EXCHANGE_RATE) : e.amount;
                     const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center mr-3 text-custom-primary"><i class="fa-solid ${iconMap[e.category] || 'fa-shapes'}"></i></div>`;
                     return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm">${e.description}</p><p class="text-xs text-gray-400">${e.date} · ${e.payer} · ${e.category}</p></div></div><div class="text-right"><p class="font-bold text-[#FF6B6B]">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
-                }
-                ).join('');
+                }).join('');
             }
             ;
             window.openEditExpenseModal = (id) => {
@@ -1704,8 +1718,9 @@
                             </div>
                         </div>
                         <div class="mt-6">
-                            <div class="mb-2">
-                                <span class="text-xs font-bold text-gray-400 ml-1">消費類別</span>
+                            <div class="mb-2 flex justify-between items-center px-1">
+                                <span class="text-xs font-bold text-gray-400">消費類別</span>
+                                <span id="category-total-display" class="text-sm font-bold text-[#FF8BA7]"></span>
                             </div>
                             <div id="category-filter-container" class="flex flex-wrap gap-2 mb-4 overflow-x-auto no-scrollbar"></div>
                             <div id="expense-list" class="space-y-3 pb-24"></div>
