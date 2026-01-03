@@ -1145,9 +1145,12 @@
                             <i class="fa-regular fa-calendar-days mr-2"></i> ${dateStr}
                             <button onclick="window.openEditTripDateModal('${startDate}', '${endDate}')" class="ml-2 text-gray-400 hover:text-custom-primary"><i class="fa-solid fa-pen"></i></button>
                         </p>
-                        <h3 id="summary-trip-name" class="text-2xl font-bold text-gray-700 tracking-wide">${window.CURRENT_TRIP_NAME}</h3>
+                        <h3 id="summary-trip-name" class="text-2xl font-bold text-gray-700 tracking-wide flex items-center">
+                            ${window.CURRENT_TRIP_NAME}
+                            <button onclick="window.openEditTripInfoModal()" class="ml-3 text-sm text-gray-300 hover:text-custom-primary bg-gray-50 w-8 h-8 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-gear"></i></button>
+                        </h3>
                     </div>
-                    <div class="w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm"><i class="fa-solid ${icon}"></i></div>
+                    <div onclick="window.openEditTripInfoModal()" class="cursor-pointer w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm hover:scale-110 transition"><i class="fa-solid ${icon}"></i></div>
                 </div>`;
                 
                 // Update container border color dynamically
@@ -1165,6 +1168,56 @@
                 window.openModal('editTripDateModal');
             }
             ;
+
+            window.openEditTripInfoModal = () => {
+                // Get current trip meta
+                const trip = window.TRIP_LIST.find(t => t.id === window.CURRENT_TRIP_ID);
+                if (!trip) return;
+
+                document.getElementById('edit-trip-info-name').value = window.CURRENT_TRIP_NAME;
+                
+                // Set Color Radio
+                const color = trip.color || 'pink';
+                const colorRadio = document.querySelector(`input[name="edit-trip-color"][value="${color}"]`);
+                if(colorRadio) colorRadio.checked = true;
+
+                // Set Icon Radio
+                const icon = trip.icon || 'fa-suitcase';
+                const iconRadio = document.querySelector(`input[name="edit-trip-icon"][value="${icon}"]`);
+                if(iconRadio) iconRadio.checked = true;
+
+                window.openModal('editTripInfoModal');
+            };
+
+            window.saveTripInfo = async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('edit-trip-info-name').value;
+                const color = document.querySelector('input[name="edit-trip-color"]:checked')?.value || 'pink';
+                const icon = document.querySelector('input[name="edit-trip-icon"]:checked')?.value || 'fa-suitcase';
+
+                // Update Meta (for List view)
+                await updateDoc(doc(db, "trips_meta", window.CURRENT_TRIP_ID), {
+                    name,
+                    color,
+                    icon
+                });
+
+                // Update Settings (for Dashboard title view - keeping legacy consistency)
+                const settingsRef = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
+                await setDoc(settingsRef, {
+                    tripName: name
+                }, { merge: true });
+
+                // Update local visual state immediately for better UX
+                window.CURRENT_TRIP_NAME = name;
+                document.getElementById('trip-title-display').innerText = name;
+                document.getElementById('trip-name-input').value = name;
+                
+                // Re-render summary block with new color/icon
+                // We need date/days from existing logic, we can cheat a bit and re-fetch or just wait for listener. 
+                // But listener is fast. Let's just close modal.
+                window.closeModal('editTripInfoModal');
+            };
 
             window.calculateEditTripDays = () => {
                 const start = new Date(document.getElementById('edit-trip-start').value);
@@ -2310,6 +2363,81 @@
                 <button onclick="window.saveTripDates()" id="save-trip-date-btn" class="w-full p-3 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl">確認修改</button>
             </div>
         </div>
+        <!-- Edit Trip Info (New) -->
+        <div id="editTripInfoModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripInfoModal')">
+            <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
+                <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
+                    編輯旅程資訊
+                    <button onclick="window.closeModal('editTripInfoModal')" class="flex items-center justify-center w-8 h-8 text-gray-400 bg-gray-100 rounded-full">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </h3>
+                <form onsubmit="window.saveTripInfo(event)">
+                    <label class="block mb-1 text-sm font-bold text-gray-500">旅程名稱</label>
+                    <input type="text" id="edit-trip-info-name" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl" required>
+                    
+                    <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色</label>
+                    <div class="flex gap-3 justify-center mb-6 flex-wrap">
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="edit-trip-color" value="pink" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full bg-pink-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-pink-400 group-hover:scale-110 transition"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="edit-trip-color" value="blue" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full bg-blue-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-blue-400 group-hover:scale-110 transition"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="edit-trip-color" value="purple" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full bg-purple-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-purple-400 group-hover:scale-110 transition"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="edit-trip-color" value="orange" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full bg-orange-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-orange-400 group-hover:scale-110 transition"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="edit-trip-color" value="green" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full bg-green-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-green-400 group-hover:scale-110 transition"></div>
+                        </label>
+                    </div>
+
+                    <label class="block mb-2 text-sm font-bold text-gray-500">圖標</label>
+                    <div class="grid grid-cols-5 gap-2 mb-6">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="edit-trip-icon" value="fa-suitcase" class="hidden peer">
+                            <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center peer-checked:bg-gray-800 peer-checked:text-white transition">
+                                <i class="fa-solid fa-suitcase"></i>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="edit-trip-icon" value="fa-plane" class="hidden peer">
+                            <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center peer-checked:bg-gray-800 peer-checked:text-white transition">
+                                <i class="fa-solid fa-plane"></i>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="edit-trip-icon" value="fa-earth-asia" class="hidden peer">
+                            <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center peer-checked:bg-gray-800 peer-checked:text-white transition">
+                                <i class="fa-solid fa-earth-asia"></i>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="edit-trip-icon" value="fa-map-location-dot" class="hidden peer">
+                            <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center peer-checked:bg-gray-800 peer-checked:text-white transition">
+                                <i class="fa-solid fa-map-location-dot"></i>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="edit-trip-icon" value="fa-umbrella-beach" class="hidden peer">
+                            <div class="w-10 h-10 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center peer-checked:bg-gray-800 peer-checked:text-white transition">
+                                <i class="fa-solid fa-umbrella-beach"></i>
+                            </div>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="w-full p-3 font-bold text-white shadow-lg bg-custom-primary rounded-2xl">儲存設定</button>
+                </form>
+            </div>
+        </div>
         <!-- Edit Expense -->
         <div id="editExpenseModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editExpenseModal')">
             <div class="w-full max-w-sm md:max-w-2xl p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[85vh]" onclick="event.stopPropagation()">
@@ -2443,14 +2571,14 @@
                     <i class="fa-solid fa-camera"></i>
                     更換照片
                 </button>
-                <input type="file" id="edit-wishlist-file" accept="image/*" class="hidden" onchange="window.previewEditWishlistImage(this)">
+                <input type="file" id="edit-wishlist-file" accept="image/*" class="hidden" onchange="window.previewImage(this, 'edit-wishlist-preview', 'edit-wishlist-preview-container')">
                 <div class="flex gap-3">
                     <button onclick="window.deleteWishlistItem()" class="flex-1 p-3 font-bold text-red-400 border-2 border-red-100 rounded-2xl">刪除</button>
                     <button onclick="window.saveWishlistUpdate()" class="flex-[2] p-3 font-bold text-white bg-custom-primary rounded-2xl shadow-lg">儲存</button>
                 </div>
             </div>
         </div>
-        <!-- Add Itinerary -->
+       <!-- Add Itinerary -->
         <div id="addItineraryModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('addItineraryModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl max-h-[85vh] overflow-y-auto" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
