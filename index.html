@@ -929,12 +929,24 @@
             }
             ;
 
-            window.saveTripName = async () => {
+                        window.saveTripName = async () => {
+                const newName = document.getElementById('trip-name-input').value;
+                
+                // Update settings (for internal usage)
                 await setDoc(doc(db, "trips_settings", window.CURRENT_TRIP_ID), {
-                    tripName: document.getElementById('trip-name-input').value
+                    tripName: newName
                 }, {
                     merge: true
                 });
+
+                // Update meta (for the Trip List view)
+                await setDoc(doc(db, "trips_meta", window.CURRENT_TRIP_ID), {
+                    name: newName
+                }, {
+                    merge: true
+                });
+                
+                window.CURRENT_TRIP_NAME = newName;
             }
             ;
             window.updateTripNamePreview = () => {
