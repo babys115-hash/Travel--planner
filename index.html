@@ -1435,6 +1435,102 @@
                 XLSX.utils.book_append_sheet(wb, ws, "Itinerary");
                 XLSX.writeFile(wb, `${window.CURRENT_TRIP_NAME}_行程.xlsx`);
             }
+
+            // Weather Search Function
+            window.searchWeather = async () => {
+                const city = document.getElementById('weather-city-input').value.trim();
+                if (!city) return alert('請輸入城市名稱');
+
+                const loader = document.getElementById('weather-loading');
+                const container = document.getElementById('weather-result-container');
+                
+                loader.classList.remove('hidden');
+                container.classList.add('hidden');
+                container.innerHTML = '';
+
+                try {
+                    // 1. Geocoding
+                    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=zh&format=json`;
+                    const geoRes = await fetch(geoUrl);
+                    const geoData = await geoRes.json();
+
+                    if (!geoData.results || geoData.results.length === 0) {
+                        alert('找不到該城市，請嘗試輸入英文名稱 (如: Tokyo, Fukuoka)');
+                        loader.classList.add('hidden');
+                        return;
+                    }
+
+                    const { latitude, longitude, name, country } = geoData.results[0];
+
+                    // 2. Weather Forecast (7 days)
+                    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
+                    const weatherRes = await fetch(weatherUrl);
+                    const weatherData = await weatherRes.json();
+
+                    // 3. Render
+                    const daily = weatherData.daily;
+                    let html = `<div class="mb-2 text-xs font-bold text-gray-400 text-center">📍 ${name}, ${country}</div>`;
+                    html += `<div class="flex overflow-x-auto no-scrollbar gap-2 pb-2">`;
+                    
+                    const weatherCodeMap = {
+                        0: { icon: 'fa-sun', color: 'text-orange-400' },
+                        1: { icon: 'fa-cloud-sun', color: 'text-yellow-400' },
+                        2: { icon: 'fa-cloud-sun', color: 'text-gray-400' },
+                        3: { icon: 'fa-cloud', color: 'text-gray-500' },
+                        45: { icon: 'fa-smog', color: 'text-gray-400' },
+                        48: { icon: 'fa-smog', color: 'text-gray-400' },
+                        51: { icon: 'fa-cloud-rain', color: 'text-blue-300' },
+                        53: { icon: 'fa-cloud-rain', color: 'text-blue-400' },
+                        55: { icon: 'fa-cloud-showers-heavy', color: 'text-blue-500' },
+                        61: { icon: 'fa-cloud-rain', color: 'text-blue-400' },
+                        63: { icon: 'fa-cloud-showers-heavy', color: 'text-blue-500' },
+                        65: { icon: 'fa-cloud-showers-water', color: 'text-blue-600' },
+                        80: { icon: 'fa-cloud-showers-heavy', color: 'text-blue-500' },
+                        81: { icon: 'fa-cloud-showers-heavy', color: 'text-blue-600' },
+                        82: { icon: 'fa-cloud-showers-water', color: 'text-blue-700' },
+                        95: { icon: 'fa-bolt', color: 'text-yellow-500' },
+                        96: { icon: 'fa-bolt', color: 'text-yellow-600' },
+                        99: { icon: 'fa-bolt', color: 'text-red-500' },
+                    };
+
+                    for(let i=0; i<daily.time.length; i++) {
+                        const date = new Date(daily.time[i]);
+                        const dayName = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+                        const code = daily.weather_code[i];
+                        const maxT = Math.round(daily.temperature_2m_max[i]);
+                        const minT = Math.round(daily.temperature_2m_min[i]);
+                        const rainProb = daily.precipitation_probability_max[i]; 
+                        
+                        // Default icon
+                        let iconObj = weatherCodeMap[code] || { icon: 'fa-cloud', color: 'text-gray-400' };
+                        // Simple grouping for unmapped codes (Snow etc)
+                        if (code >= 71 && code <= 77) iconObj = { icon: 'fa-snowflake', color: 'text-cyan-300' };
+
+                        html += `
+                            <div class="min-w-[70px] bg-white rounded-2xl p-2 flex flex-col items-center justify-between border border-gray-100 flex-shrink-0 shadow-sm">
+                                <span class="text-[10px] font-bold text-gray-400 mb-1">${date.getMonth()+1}/${date.getDate()}</span>
+                                <span class="text-xs font-bold text-gray-500 mb-1">(${dayName})</span>
+                                <i class="fa-solid ${iconObj.icon} ${iconObj.color} text-xl my-1"></i>
+                                <div class="text-center mt-1">
+                                    <span class="block text-sm font-bold text-gray-700">${maxT}°</span>
+                                    <span class="block text-[10px] font-bold text-gray-400">${minT}°</span>
+                                </div>
+                                ${rainProb !== null && rainProb > 0 ? `<span class="text-[9px] font-bold text-[#4ECDC4] mt-1"><i class="fa-solid fa-umbrella"></i> ${rainProb}%</span>` : ''}
+                            </div>
+                        `;
+                    }
+                    html += `</div>`;
+                    
+                    container.innerHTML = html;
+                    container.classList.remove('hidden');
+
+                } catch (e) {
+                    console.error(e);
+                    alert('取得天氣失敗，請檢查網路或輸入的城市名稱 (建議輸入英文)');
+                } finally {
+                    loader.classList.add('hidden');
+                }
+            }
         </script>
     </head>
     <body class="bg-gray-50 font-sans">
@@ -1618,17 +1714,39 @@
                 </div>
                 <!-- Itinerary -->
                 <div id="itinerary-tab" class="main-tab-content p-4">
-                    <div class="bg-white p-4 rounded-3xl shadow-sm border-2 border-pink-100 mb-4 flex items-center justify-between bg-pink-50/50 cursor-pointer" onclick="window.open('https://tenki.jp/', '_blank')">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center text-pink-400 text-xl">
-                                <i class="fa-solid fa-cloud-sun"></i>
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-gray-700">行程天氣 (tenki.jp)</h3>
-                                <p class="text-xs text-gray-400 font-bold">
-                                    點擊查看詳細預報 <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
-                                </p>
-                            </div>
+                    <!-- Weather Widget -->
+                    <div class="bg-blue-50 p-6 rounded-3xl shadow-sm border-2 border-white mb-6 relative overflow-hidden ring-1 ring-blue-100">
+                        <!-- Header -->
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-gray-700 flex items-center text-lg">
+                                <span class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-400 mr-2 text-sm">
+                                    <i class="fa-solid fa-earth-americas"></i>
+                                </span>
+                                全球城市天氣
+                            </h3>
+                        </div>
+                        
+                        <!-- Search -->
+                        <div class="flex gap-2 relative z-10">
+                            <input type="text" id="weather-city-input" 
+                                   placeholder="輸入城市 (如: Tokyo, Paris, Taipei)" 
+                                   class="flex-1 p-4 bg-white border-0 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm placeholder-gray-400"
+                                   onkeypress="if(event.key === 'Enter') window.searchWeather()">
+                            <button onclick="window.searchWeather()" 
+                                    class="w-14 bg-blue-400 text-white font-bold rounded-2xl shadow-md hover:bg-blue-500 transition active:scale-95 flex items-center justify-center">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </button>
+                        </div>
+
+                        <!-- Loading -->
+                        <div id="weather-loading" class="hidden mt-4 text-center">
+                            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+                            <p class="text-xs text-blue-300 font-bold mt-2">Searching...</p>
+                        </div>
+
+                        <!-- Results -->
+                        <div id="weather-result-container" class="hidden mt-6 animate-fade-in">
+                            <!-- Content injected via JS -->
                         </div>
                     </div>
                     
