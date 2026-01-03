@@ -130,6 +130,10 @@
                 color: white !important;
                 box-shadow: 0 4px 6px rgba(255, 117, 150, 0.2);
             }
+            
+            .delete-mode-btn {
+                @apply bg-red-50 border-red-200 text-red-400 animate-pulse !important;
+            }
 
             /* Updated Split Buttons */
             .split-type-btn {
@@ -222,6 +226,13 @@
             window.CURRENT_CURRENCY = 'JPY';
             window.EXCHANGE_RATE = 0.215;
             window.TOTAL_BUDGET = 0; 
+
+            // Delete Mode Flags
+            window.DELETE_MODE = {
+                expenseCat: false,
+                payment: false,
+                wishlist: false
+            };
 
             let ACTIVE_DATE = ''
               , ACTIVE_PAYER = 'Josh'
@@ -723,6 +734,16 @@
             }
             ;
 
+            window.cancelAddExpense = () => {
+                // Clear Form
+                document.getElementById('expense-description').value = '';
+                document.getElementById('expense-amount').value = '';
+                document.getElementById('expense-date').classList.remove('bg-yellow-100');
+                
+                // Return to details view
+                window.switchExpenseView('details');
+            };
+
             window.selectCurrency = (c, prefix='') => {
                 const id = prefix ? prefix + 'expense-currency' : 'expense-currency';
                 const container = prefix ? document.getElementById('edit-currency-container') : document.getElementById('add-currency-container');
@@ -751,13 +772,63 @@
                 }
             }
             ;
+            
+            // --- Global Delete Logic ---
+            window.toggleDeleteMode = (type) => {
+                // type: 'expenseCat', 'payment', 'wishlist'
+                window.DELETE_MODE[type] = !window.DELETE_MODE[type];
+                
+                // Re-render
+                if (type === 'expenseCat') {
+                    window.renderCategorySelection('expense-category-options');
+                    window.renderCategorySelection('edit-expense-category-options', true);
+                } else if (type === 'payment') {
+                    window.renderPaymentMethodsSelect('expense-payment-select-container');
+                    window.renderPaymentMethodsSelect('edit-expense-payment-select-container', true);
+                } else if (type === 'wishlist') {
+                    window.renderWishlistCategoryOptions();
+                    window.renderWishlistCategoryOptions(true);
+                }
+            };
+
+            window.deleteItem = async (type, value) => {
+                if(!confirm(`確定要刪除「${value}」嗎? (已存在的紀錄不會受影響)`)) return;
+
+                let ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
+                let updateData = {};
+
+                if (type === 'expenseCat') {
+                    const newCats = window.TRIP_CATEGORIES.filter(c => c !== value);
+                    updateData = { categories: newCats };
+                } else if (type === 'payment') {
+                     const newMethods = window.TRIP_PAYMENT_METHODS.filter(p => p !== value);
+                     updateData = { paymentMethods: newMethods };
+                } else if (type === 'wishlist') {
+                     const newCats = window.TRIP_WISHLIST_CATEGORIES.filter(c => c !== value);
+                     updateData = { wishlistCategories: newCats };
+                }
+
+                await setDoc(ref, updateData, { merge: true });
+                
+                // Toggle mode off after delete
+                if (type === 'expenseCat') window.DELETE_MODE.expenseCat = false;
+                if (type === 'payment') window.DELETE_MODE.payment = false;
+                if (type === 'wishlist') window.DELETE_MODE.wishlist = false;
+            };
+            // ---------------------------
+
+
             window.selectCategory = (c, isEdit=false) => {
+                // Check if delete mode is active
+                if (window.DELETE_MODE.expenseCat) {
+                    window.deleteItem('expenseCat', c);
+                    return;
+                }
+
                 if (isEdit) {
                     EDIT_CATEGORY = c;
-                    // Remove active class from all
                     const container = isEdit ? document.getElementById('edit-expense-category-options') : document.getElementById('expense-category-options');
                     container.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active-category'));
-                    // Add active class to target (using data attribute)
                     const btn = container.querySelector(`button[data-category="${c}"]`);
                     if(btn) btn.classList.add('active-category');
                 } else {
@@ -768,7 +839,6 @@
                     if(btn) btn.classList.add('active-category');
                 }
             };
-            // Alias for backward compatibility if HTML uses old name
             window.selectEditCategory = (c, isEdit) => window.selectCategory(c, isEdit);
 
             // --- Category Management (Expense) ---
@@ -786,8 +856,9 @@
                 if (!container) return;
 
                 const currentCat = isEdit ? EDIT_CATEGORY : ACTIVE_CATEGORY;
+                const isDeleteMode = window.DELETE_MODE.expenseCat;
                 
-                // If current category is not in list (legacy data), add it temporarily so it shows as selected
+                // If current category is not in list (legacy data), add it temporarily
                 let displayList = [...window.TRIP_CATEGORIES];
                 if (currentCat && !displayList.includes(currentCat)) {
                     displayList.push(currentCat);
@@ -795,19 +866,21 @@
 
                 let html = displayList.map(c => {
                     const isActive = currentCat === c;
-                    const activeClass = isActive ? 'active-category' : '';
+                    const activeClass = isActive && !isDeleteMode ? 'active-category' : '';
+                    const deleteClass = isDeleteMode ? 'delete-mode-btn' : '';
                     const clickFn = `window.selectCategory('${c}', ${isEdit})`;
-                    return `<button type="button" data-category="${c}" onclick="${clickFn}" class="category-btn block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass}">${c}</button>`;
+                    return `<button type="button" data-category="${c}" onclick="${clickFn}" class="category-btn block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass} ${deleteClass}">${c}</button>`;
                 }).join('');
 
                 // Add "Plus" button - AUTH ONLY
                 html += `<button type="button" onclick="window.addCategory()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
 
-                // Wrap for Edit Modal grid layout if needed, otherwise flex wrap
+                // Add "Trash" button - AUTH ONLY
+                html += `<button type="button" onclick="window.toggleDeleteMode('expenseCat')" class="auth-only block-select-btn bg-gray-100 ${isDeleteMode ? 'text-red-500 border-red-200' : 'text-gray-300'} border-dashed border-2 hover:border-red-400 hover:text-red-400 ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid ${isDeleteMode ? 'fa-check' : 'fa-trash-can'}"></i></button>`;
+
                 if (isEdit) {
                     container.className = "grid grid-cols-3 gap-2 mb-6";
                 } else {
-                    // Force horizontal scroll for non-edit mode (Add Expense)
                     container.className = "flex flex-wrap gap-2";
                 }
                 
@@ -825,6 +898,12 @@
             };
 
             window.selectWishlistCategory = (c, isEdit=false) => {
+                 // Check if delete mode is active
+                if (window.DELETE_MODE.wishlist) {
+                    window.deleteItem('wishlist', c);
+                    return;
+                }
+
                 if (isEdit) {
                     EDIT_WISHLIST_CATEGORY = c;
                     document.getElementById('edit-wishlist-category').value = c;
@@ -842,6 +921,8 @@
                 if (!container) return;
 
                 const currentCat = isEdit ? EDIT_WISHLIST_CATEGORY : ACTIVE_WISHLIST_CATEGORY;
+                const isDeleteMode = window.DELETE_MODE.wishlist;
+
                 const emojiMap = {
                     '伴手禮': '🎁',
                     '藥妝': '💊',
@@ -850,20 +931,24 @@
                     '其他': '✨'
                 };
 
-                // Add current if missing
                 let displayList = [...window.TRIP_WISHLIST_CATEGORIES];
                 if (currentCat && !displayList.includes(currentCat)) displayList.push(currentCat);
 
                 let html = displayList.map(c => {
                    const icon = emojiMap[c] || '🏷️';
                    const isActive = currentCat === c;
-                   const activeClass = isActive ? 'active-category' : '';
+                   const activeClass = isActive && !isDeleteMode ? 'active-category' : '';
+                   const deleteClass = isDeleteMode ? 'delete-mode-btn' : '';
                    const clickFn = `window.selectWishlistCategory('${c}', ${isEdit})`;
-                   return `<button type="button" onclick="${clickFn}" class="block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass}">${icon} ${c}</button>`;
+                   return `<button type="button" onclick="${clickFn}" class="block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass} ${deleteClass}">${icon} ${c}</button>`;
                 }).join('');
 
                 // Add Button - AUTH ONLY
                 html += `<button type="button" onclick="window.addWishlistCategory()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
+                
+                // Add "Trash" button - AUTH ONLY
+                html += `<button type="button" onclick="window.toggleDeleteMode('wishlist')" class="auth-only block-select-btn bg-gray-100 ${isDeleteMode ? 'text-red-500 border-red-200' : 'text-gray-300'} border-dashed border-2 hover:border-red-400 hover:text-red-400 ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid ${isDeleteMode ? 'fa-check' : 'fa-trash-can'}"></i></button>`;
+
 
                 if(isEdit) {
                     container.className = "grid grid-cols-3 gap-2 mb-3";
@@ -875,6 +960,12 @@
             };
 
             window.selectPayment = (p, isEdit=false) => {
+                 // Check if delete mode is active
+                if (window.DELETE_MODE.payment) {
+                    window.deleteItem('payment', p);
+                    return;
+                }
+
                 if (isEdit) {
                     EDIT_PAYMENT = p;
                     document.querySelectorAll('.edit-payment-btn').forEach(b => b.classList.remove('active-payment'));
@@ -905,7 +996,8 @@
                 
                 const currentSelection = isEdit ? EDIT_PAYMENT : ACTIVE_PAYMENT;
                 const btnClass = isEdit ? 'edit-payment-btn' : 'payment-btn';
-                
+                const isDeleteMode = window.DELETE_MODE.payment;
+
                 // Ensure selection matches something, default to first available if not
                 if (!window.TRIP_PAYMENT_METHODS.includes(currentSelection) && window.TRIP_PAYMENT_METHODS.length > 0) {
                      if(isEdit) EDIT_PAYMENT = window.TRIP_PAYMENT_METHODS[0];
@@ -914,13 +1006,17 @@
 
                 let html = window.TRIP_PAYMENT_METHODS.map(p => {
                     const isActive = (isEdit ? EDIT_PAYMENT : ACTIVE_PAYMENT) === p;
-                    const activeClass = isActive ? 'active-payment' : '';
+                    const activeClass = isActive && !isDeleteMode ? 'active-payment' : '';
+                    const deleteClass = isDeleteMode ? 'delete-mode-btn' : '';
                     const dataAttr = isEdit ? `data-edit-payment="${p}"` : `data-payment="${p}"`;
-                    return `<button type="button" ${dataAttr} onclick="window.selectPayment('${p}', ${isEdit})" class="${btnClass} block-select-btn ${activeClass}">${p}</button>`;
+                    return `<button type="button" ${dataAttr} onclick="window.selectPayment('${p}', ${isEdit})" class="${btnClass} block-select-btn ${activeClass} ${deleteClass}">${p}</button>`;
                 }).join('');
 
                 // AUTH ONLY
                 html += `<button type="button" onclick="window.addPaymentMethod()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary"><i class="fa-solid fa-plus"></i></button>`;
+
+                // Add "Trash" button - AUTH ONLY
+                html += `<button type="button" onclick="window.toggleDeleteMode('payment')" class="auth-only block-select-btn bg-gray-100 ${isDeleteMode ? 'text-red-500 border-red-200' : 'text-gray-300'} border-dashed border-2 hover:border-red-400 hover:text-red-400"><i class="fa-solid ${isDeleteMode ? 'fa-check' : 'fa-trash-can'}"></i></button>`;
                 
                 // Force horizontal scroll for non-edit mode
                 container.className = isEdit ? "flex flex-wrap gap-2" : "flex gap-2 overflow-x-auto no-scrollbar pb-1";
@@ -942,6 +1038,14 @@
                     document.getElementById('btn-split-personal').className = t === 'personal' ? 'split-type-btn active !text-xs !py-1 !px-2' : 'split-type-btn inactive !text-xs !py-1 !px-2';
                     ACTIVE_BENEFICIARIES = t === 'shared' ? [...window.TRIP_PARTICIPANTS] : [];
                     window.renderBeneficiaryButtons();
+                }
+
+                // Toggle Swap Button Visibility
+                const btnId = isEdit ? 'edit-btn-swap-payer' : 'btn-swap-payer';
+                const btn = document.getElementById(btnId);
+                if(btn) {
+                    if(t === 'personal') btn.classList.remove('hidden');
+                    else btn.classList.add('hidden');
                 }
             }
             ;
@@ -1273,7 +1377,7 @@
                 
                 setTimeout(() => {
                      alert(`已自動填入今天日期與結算金額。\n\n由 ${debtor} 支付 $${amount} 給 ${creditor} (個人支出)。\n\n確認無誤後，請點擊下方的「確認紀錄」，系統將自動重新計算餘額。`);
-                     dateInput.classList.remove('bg-yellow-100');
+                     // Removed background clear to keep visual indicator until cancel/submit
                 }, 500);
             };
 
@@ -2310,7 +2414,7 @@
                                         <!-- Row 1: Date & Amount & Currency Combined -->
                                         <div class="flex flex-wrap gap-2 mb-2">
                                             <!-- Date (Compact) -->
-                                            <div class="relative flex-1 min-w-[120px]">
+                                            <div class="relative flex-1 min-w-[130px]">
                                                 <input type="date" id="expense-date" class="w-full p-2 text-xs md:text-sm bg-gray-50 rounded-xl font-bold text-gray-700 h-full">
                                             </div>
                                             <!-- Amount & Currency -->
@@ -2349,7 +2453,7 @@
                                                 <input type="hidden" id="expense-payer" value="Josh">
                                                 
                                                 <!-- SWAP BUTTON -->
-                                                <button type="button" onclick="window.swapPayerBeneficiary()" class="mx-1 text-gray-300 hover:text-custom-primary transition transform active:scale-95 flex-shrink-0" title="交換付款人與受益人">
+                                                <button type="button" id="btn-swap-payer" onclick="window.swapPayerBeneficiary()" class="hidden mx-1 text-gray-300 hover:text-custom-primary transition transform active:scale-95 flex-shrink-0" title="交換付款人與受益人">
                                                     <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
                                                 </button>
 
@@ -2376,7 +2480,10 @@
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" class="w-full py-3 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all mt-2">確認紀錄</button>
+                                <div class="flex gap-2 mt-2">
+                                     <button type="button" onclick="window.cancelAddExpense()" class="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-400 font-bold text-lg hover:bg-gray-200 transition-all">取消</button>
+                                     <button type="submit" class="flex-[2] py-3 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all">確認紀錄</button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -2895,7 +3002,7 @@
                                     </button>
                                     
                                     <!-- SWAP BUTTON EDIT -->
-                                    <button type="button" onclick="window.swapPayerBeneficiary(true)" class="mx-1 text-gray-300 hover:text-custom-primary transition transform active:scale-95 flex-shrink-0" title="交換付款人與受益人">
+                                    <button type="button" id="edit-btn-swap-payer" onclick="window.swapPayerBeneficiary(true)" class="hidden mx-1 text-gray-300 hover:text-custom-primary transition transform active:scale-95 flex-shrink-0" title="交換付款人與受益人">
                                         <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
                                     </button>
 
