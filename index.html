@@ -191,9 +191,10 @@
             window.PACKING_DATA = [];
             window.SPOTS_DATA = [];
             window.TRIP_PARTICIPANTS = ['Josh', 'Candice'];
+            window.TRIP_PAYMENT_METHODS = ['Cash', 'Card']; // Default
             window.CURRENT_CURRENCY = 'JPY';
             window.EXCHANGE_RATE = 0.215;
-            window.TOTAL_BUDGET = 0; // Initialize to avoid undefined error
+            window.TOTAL_BUDGET = 0; 
 
             let ACTIVE_DATE = ''
               , ACTIVE_PAYER = 'Josh'
@@ -204,7 +205,7 @@
             let PAYER_FILTER = 'All'
               , PAYMENT_FILTER = 'All'
               , CATEGORY_FILTER = 'All'
-              , SPLIT_FILTER = 'All'; // New Filter Variable
+              , SPLIT_FILTER = 'All';
 
             let EDIT_PAYER = ''
               , EDIT_CATEGORY = ''
@@ -280,7 +281,6 @@
                 document.getElementById('trip-list-container').innerHTML = window.TRIP_LIST.map(t => {
                     let color = t.color || 'pink';
                     let icon = t.icon;
-                    // Fallback for older data
                     if (!icon) {
                         icon = (t.color === 'blue') ? 'fa-earth-asia' : 'fa-suitcase';
                     }
@@ -366,6 +366,7 @@
                 await setDoc(doc(db, "trips_settings", ref.id), {
                     totalBudget: 0,
                     participants: ['Josh', 'Candice'],
+                    paymentMethods: ['Cash', 'Card'],
                     tripName: name
                 });
                 window.closeModal('createTripModal');
@@ -479,14 +480,22 @@
                         window.TOTAL_BUDGET = data.totalBudget || 0;
                         if (data.participants)
                             window.TRIP_PARTICIPANTS = data.participants;
+                        
+                        // Sync Payment Methods
+                        if (data.paymentMethods) {
+                            window.TRIP_PAYMENT_METHODS = data.paymentMethods;
+                        } else {
+                            window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
+                        }
 
-                        // Apply currency from DB
                         if (window.applyCurrencySettings) {
                             window.applyCurrencySettings(data.currency || 'JPY');
                         }
 
                         window.renderExpensePayerButtons();
                         window.renderBeneficiaryButtons();
+                        window.renderPaymentMethodsSelect('expense-payment-select-container'); 
+                        window.renderPaymentMethodsSelect('edit-expense-payment-select-container', true);
                         window.renderExpenseDashboard();
                         window.renderParticipantsList();
                     }
@@ -673,6 +682,41 @@
             }
             ;
 
+            // --- Payment Method Management ---
+            window.addPaymentMethod = async () => {
+                const method = prompt("請輸入新的付款方式名稱 (例如: PayPay, Suica):");
+                if (method && !window.TRIP_PAYMENT_METHODS.includes(method)) {
+                    const newMethods = [...window.TRIP_PAYMENT_METHODS, method];
+                    const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
+                    await setDoc(ref, { paymentMethods: newMethods }, { merge: true });
+                }
+            };
+
+            window.renderPaymentMethodsSelect = (containerId, isEdit = false) => {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                
+                const currentSelection = isEdit ? EDIT_PAYMENT : ACTIVE_PAYMENT;
+                const btnClass = isEdit ? 'edit-payment-btn' : 'payment-btn';
+                
+                // Ensure selection matches something, default to first available if not
+                if (!window.TRIP_PAYMENT_METHODS.includes(currentSelection) && window.TRIP_PAYMENT_METHODS.length > 0) {
+                     if(isEdit) EDIT_PAYMENT = window.TRIP_PAYMENT_METHODS[0];
+                     else ACTIVE_PAYMENT = window.TRIP_PAYMENT_METHODS[0];
+                }
+
+                let html = window.TRIP_PAYMENT_METHODS.map(p => {
+                    const isActive = (isEdit ? EDIT_PAYMENT : ACTIVE_PAYMENT) === p;
+                    const activeClass = isActive ? 'active-payment' : '';
+                    const dataAttr = isEdit ? `data-edit-payment="${p}"` : `data-payment="${p}"`;
+                    return `<button type="button" ${dataAttr} onclick="window.selectPayment('${p}', ${isEdit})" class="${btnClass} block-select-btn ${activeClass}">${p}</button>`;
+                }).join('');
+
+                html += `<button type="button" onclick="window.addPaymentMethod()" class="block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary"><i class="fa-solid fa-plus"></i></button>`;
+
+                container.innerHTML = html;
+            };
+
             // ★★★ UPDATED SPLIT LOGIC ★★★
             window.selectSplitType = (t, isEdit=false) => {
                 if (isEdit) {
@@ -827,16 +871,21 @@
                   , cash = 0
                   , card = 0;
                 let payerTotals = {};
+                let paymentTotals = {}; // Dynamic payment totals
+
                 window.TRIP_PARTICIPANTS.forEach(p => payerTotals[p] = 0);
+                window.TRIP_PAYMENT_METHODS.forEach(pm => paymentTotals[pm] = 0);
+
                 window.EXPENSES_DATA.forEach(e => {
                     const v = e.currency !== 'TWD' ? e.amount * window.EXCHANGE_RATE : e.amount;
                     total += v;
                     if (e.payer && payerTotals[e.payer] !== undefined)
                         payerTotals[e.payer] += v;
-                    if (e.payment === 'Cash')
-                        cash += v;
-                    else
-                        card += v;
+                    
+                    // Count Payment Methods (Handle legacy or custom)
+                    const pMethod = e.payment || 'Cash';
+                    if (paymentTotals[pMethod] === undefined) paymentTotals[pMethod] = 0;
+                    paymentTotals[pMethod] += v;
                 }
                 );
                 document.getElementById('total-budget-display').innerText = (window.TOTAL_BUDGET || 0).toLocaleString();
@@ -844,9 +893,22 @@
                 document.getElementById('overview-budget-display').innerText = (window.TOTAL_BUDGET || 0).toLocaleString();
                 const colors = ['text-blue-500', 'text-pink-500', 'text-orange-500'];
                 document.getElementById('payer-cards-container').innerHTML = window.TRIP_PARTICIPANTS.map( (p, i) => `<div onclick="window.togglePayerFilter('${p}')" class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 cursor-pointer transition ${PAYER_FILTER === p ? 'filter-card-active blue' : 'hover:bg-gray-50'}"><p class="text-xs font-bold mb-1 ${colors[i % 3]} flex justify-between">${p} 付 ${PAYER_FILTER === p ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`).join('');
-                const cashActive = PAYMENT_FILTER === 'Cash' ? 'filter-card-active green' : 'hover:bg-gray-50';
-                const cardActive = PAYMENT_FILTER === 'Card' ? 'filter-card-active purple' : 'hover:bg-gray-50';
-                document.getElementById('payment-cards-container').innerHTML = `<div onclick="window.togglePaymentFilter('Cash')" class="bg-white p-4 rounded-3xl shadow-sm border border-green-100 cursor-pointer transition ${cashActive}"><p class="text-xs font-bold text-green-500 mb-1 flex justify-between">現金支付 ${PAYMENT_FILTER === 'Cash' ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(cash).toLocaleString()}</p></div><div onclick="window.togglePaymentFilter('Card')" class="bg-white p-4 rounded-3xl shadow-sm border border-purple-100 cursor-pointer transition ${cardActive}"><p class="text-xs font-bold text-purple-500 mb-1 flex justify-between">刷卡/PayPay ${PAYMENT_FILTER === 'Card' ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(card).toLocaleString()}</p></div>`;
+                
+                // Dynamic Payment Cards
+                const paymentColors = ['green', 'purple', 'orange', 'cyan', 'rose'];
+                document.getElementById('payment-cards-container').innerHTML = window.TRIP_PAYMENT_METHODS.map((pm, i) => {
+                     const colorName = paymentColors[i % paymentColors.length];
+                     const isActive = PAYMENT_FILTER === pm;
+                     const activeClass = isActive ? `filter-card-active ${colorName}` : 'hover:bg-gray-50';
+                     // Map tailwind classes manually for safety since dynamic class construction can be tricky with purgers, 
+                     // but simplified here assuming standard palette is available or just using inline style for border if needed.
+                     // Using specific border colors
+                     const borderColor = `border-${colorName}-100`;
+                     const textColor = `text-${colorName}-500`;
+                     
+                     return `<div onclick="window.togglePaymentFilter('${pm}')" class="bg-white p-4 rounded-3xl shadow-sm border ${borderColor} cursor-pointer transition ${activeClass}"><p class="text-xs font-bold ${textColor} mb-1 flex justify-between">${pm} ${PAYMENT_FILTER === pm ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(paymentTotals[pm] || 0).toLocaleString()}</p></div>`;
+                }).join('');
+
                 let balance = {};
                 window.TRIP_PARTICIPANTS.forEach(p => balance[p] = 0);
                 window.EXPENSES_DATA.forEach(e => {
@@ -875,11 +937,15 @@
                 // --- Render Split Filters ---
                 const splitContainer = document.getElementById('split-filter-container');
                 if(splitContainer) {
-                    splitContainer.innerHTML = `
+                    let html = `
                         <button onclick="window.toggleSplitFilter('All')" class="block-select-btn px-3 py-1 text-xs rounded-full ${SPLIT_FILTER === 'All' ? 'active-filter' : ''}">全部</button>
                         <button onclick="window.toggleSplitFilter('shared')" class="block-select-btn px-3 py-1 text-xs rounded-full ${SPLIT_FILTER === 'shared' ? 'active-filter' : ''}">👥 共同</button>
-                        <button onclick="window.toggleSplitFilter('personal')" class="block-select-btn px-3 py-1 text-xs rounded-full ${SPLIT_FILTER === 'personal' ? 'active-filter' : ''}">👤 個人</button>
                     `;
+                    window.TRIP_PARTICIPANTS.forEach(p => {
+                        const isActive = SPLIT_FILTER === p;
+                        html += `<button onclick="window.toggleSplitFilter('${p}')" class="block-select-btn px-3 py-1 text-xs rounded-full ${isActive ? 'active-filter' : ''}">👤 ${p}</button>`;
+                    });
+                    splitContainer.innerHTML = html;
                 }
 
                 window.renderExpenseList();
@@ -891,11 +957,24 @@
                 
                 const filteredData = window.EXPENSES_DATA.filter(e => {
                     const matchPayer = PAYER_FILTER === 'All' || e.payer === PAYER_FILTER;
-                    const matchPayment = PAYMENT_FILTER === 'All' || (PAYMENT_FILTER === 'Cash' ? e.payment === 'Cash' : e.payment !== 'Cash');
+                    const matchPayment = PAYMENT_FILTER === 'All' || e.payment === PAYMENT_FILTER; // Updated
                     const matchCategory = CATEGORY_FILTER === 'All' || e.category === CATEGORY_FILTER;
-                    // Split Filter
+                    
+                    // Split Filter Logic
+                    let matchSplit = true;
                     const currentSplit = e.splitType || 'shared'; 
-                    const matchSplit = SPLIT_FILTER === 'All' || currentSplit === SPLIT_FILTER;
+
+                    if (SPLIT_FILTER === 'All') {
+                        matchSplit = true;
+                    } else if (SPLIT_FILTER === 'shared') {
+                        matchSplit = currentSplit === 'shared';
+                    } else {
+                        // If SPLIT_FILTER is a specific person (e.g., 'Josh')
+                        // We show items that are 'personal' AND the beneficiary includes 'Josh'
+                        const isPersonal = currentSplit === 'personal';
+                        const isBeneficiary = e.beneficiaries && e.beneficiaries.includes(SPLIT_FILTER);
+                        matchSplit = isPersonal && isBeneficiary;
+                    }
 
                     return matchPayer && matchPayment && matchCategory && matchSplit;
                 });
@@ -927,11 +1006,21 @@
                     const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center mr-3 text-custom-primary"><i class="fa-solid ${iconMap[e.category] || 'fa-shapes'}"></i></div>`;
                     
                     const isPersonal = e.splitType === 'personal';
-                    const splitTag = isPersonal
-                        ? `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-400 border border-purple-100">👤 個人</span>`
-                        : `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-400 border border-blue-100">👥 分擔</span>`;
+                    // Tag Logic
+                    let splitTag = '';
+                    if (isPersonal) {
+                        // If personal, show who it's for
+                        const ben = e.beneficiaries && e.beneficiaries.length > 0 ? e.beneficiaries[0] : '個人';
+                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-400 border border-purple-100">👤 ${ben}</span>`;
+                    } else {
+                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-400 border border-blue-100">👥 分擔</span>`;
+                    }
+                    
+                    // Payment Method Tag
+                    const pMethod = e.payment || 'Cash';
+                    const pTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200">${pMethod}</span>`;
 
-                    return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm">${e.description}</p><p class="text-xs text-gray-400 mt-0.5 flex items-center">${e.date} · ${e.payer} ${splitTag}</p><p class="text-[10px] text-gray-300 mt-0.5">${e.category}</p></div></div><div class="text-right"><p class="font-bold text-[#FF6B6B]">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
+                    return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm">${e.description}</p><p class="text-xs text-gray-400 mt-0.5 flex items-center flex-wrap gap-1">${e.date} · ${e.payer} ${splitTag} ${pTag}</p><p class="text-[10px] text-gray-300 mt-0.5">${e.category}</p></div></div><div class="text-right"><p class="font-bold text-[#FF6B6B]">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
                 }).join('');
             }
             ;
@@ -950,8 +1039,14 @@
                 window.selectSplitType(EDIT_SPLIT_TYPE, true);
                 EDIT_CATEGORY = e.category || 'Food';
                 window.selectCategory(EDIT_CATEGORY, true);
+                
+                // Dynamic Payment
                 EDIT_PAYMENT = e.payment || 'Cash';
+                // Ensure payment exists in list, if not add it temporarily or handle it? 
+                // Currently just selecting it.
+                window.renderPaymentMethodsSelect('edit-expense-payment-select-container', true);
                 window.selectPayment(EDIT_PAYMENT, true);
+
                 const img = document.getElementById('edit-expense-preview');
                 if (e.imageUrl) {
                     img.src = e.imageUrl;
@@ -1727,7 +1822,7 @@
             <img id="preview-full-image" src="" class="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain">
         </div>
         <!-- 1. LIST VIEW -->
-        <div id="trip-list-view" class="max-w-xl mx-auto bg-white min-h-screen shadow-2xl overflow-hidden rounded-none sm:rounded-3xl border border-gray-100 relative p-6">
+        <div id="trip-list-view" class="max-w-xl md:max-w-5xl mx-auto bg-white min-h-screen shadow-2xl overflow-hidden rounded-none sm:rounded-3xl border border-gray-100 relative p-6">
             <header class="flex justify-between items-center mb-8 mt-4">
                 <h1 class="text-2xl font-bold text-gray-800 tracking-wide flex items-center">
                     <i class="fa-solid fa-map-location-dot text-custom-primary mr-3 text-3xl"></i>
@@ -1741,7 +1836,7 @@
             </div>
         </div>
         <!-- 2. DASHBOARD -->
-        <div id="trip-dashboard-view" class="max-w-xl mx-auto bg-white min-h-screen shadow-2xl overflow-hidden rounded-none sm:rounded-3xl border border-gray-100 relative hidden">
+        <div id="trip-dashboard-view" class="max-w-xl md:max-w-5xl mx-auto bg-white min-h-screen shadow-2xl overflow-hidden rounded-none sm:rounded-3xl border border-gray-100 relative hidden">
             <header class="p-4 bg-white sticky top-0 z-20 border-b border-gray-100 flex items-center justify-between">
                 <div class="flex items-center overflow-hidden">
                     <button onclick="window.exitTrip()" class="mr-3 text-gray-400 hover:text-custom-primary flex-shrink-0">
@@ -1784,71 +1879,87 @@
                     <div id="add-expense-container">
                         <div class="bg-white p-6 rounded-[30px] shadow-sm border border-pink-50">
                             <form onsubmit="event.preventDefault(); window.addExpense();">
-                                <div class="mb-4">
-                                    <label class="text-sm font-bold text-gray-400 block mb-1">日期</label>
-                                    <div class="relative">
-                                        <input type="date" id="expense-date" class="w-full p-3 pl-4 bg-gray-50 rounded-2xl font-bold text-gray-700">
-                                        <i class="fa-regular fa-calendar absolute right-4 top-3.5 text-gray-400 pointer-events-none"></i>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- LEFT COLUMN -->
+                                    <div>
+                                        <div class="mb-4">
+                                            <label class="text-sm font-bold text-gray-400 block mb-1">日期</label>
+                                            <div class="relative">
+                                                <input type="date" id="expense-date" class="w-full p-3 pl-4 bg-gray-50 rounded-2xl font-bold text-gray-700">
+                                                <i class="fa-regular fa-calendar absolute right-4 top-3.5 text-gray-400 pointer-events-none"></i>
+                                            </div>
+                                        </div>
+                                        <div class="mb-4">
+                                            <label class="text-sm font-bold text-gray-400 block mb-1">金額 & 幣別</label>
+                                            <div class="flex gap-2">
+                                                <input type="number" id="expense-amount" placeholder="0" class="flex-1 p-3 bg-gray-50 rounded-2xl text-xl font-bold text-gray-700">
+                                                <div id="add-currency-container" class="flex bg-gray-100 rounded-2xl p-1 items-center">
+                                                    <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-4 py-2 rounded-xl text-sm font-bold text-gray-400 transition-all">TWD</button>
+                                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-4 py-2 rounded-xl text-sm font-bold bg-[#FF7596] text-white shadow-md transition-all">JPY</button>
+                                                    <input type="hidden" id="expense-currency" value="JPY">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-4">
+                                            <label class="text-sm font-bold text-gray-400 block mb-1">用途</label>
+                                            <input type="text" id="expense-description" placeholder="例如: 一蘭拉麵" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700">
+                                        </div>
+                                        <div class="mb-6">
+                                            <button type="button" onclick="document.getElementById('expense-camera-input').click()" class="w-full p-3 mb-2 text-sm font-bold text-pink-500 bg-pink-50 rounded-xl border border-pink-100 flex items-center justify-center gap-2">
+                                                <i class="fa-solid fa-camera"></i>
+                                                拍照 (選填)
+                                            </button>
+                                            <input type="file" id="expense-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'expense-preview-img', 'expense-preview-container')">
+                                            <div id="expense-preview-container" class="hidden mb-2 text-center">
+                                                <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover">
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="mb-4">
-                                    <label class="text-sm font-bold text-gray-400 block mb-1">金額 & 幣別</label>
-                                    <div class="flex gap-2">
-                                        <input type="number" id="expense-amount" placeholder="0" class="flex-1 p-3 bg-gray-50 rounded-2xl text-xl font-bold text-gray-700">
-                                        <div id="add-currency-container" class="flex bg-gray-100 rounded-2xl p-1 items-center">
-                                            <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-4 py-2 rounded-xl text-sm font-bold text-gray-400 transition-all">TWD</button>
-                                            <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-4 py-2 rounded-xl text-sm font-bold bg-[#FF7596] text-white shadow-md transition-all">JPY</button>
-                                            <input type="hidden" id="expense-currency" value="JPY">
+                                    
+                                    <!-- RIGHT COLUMN -->
+                                    <div>
+                                        <div class="mb-4">
+                                            <label class="text-sm font-bold text-gray-400 block mb-2">誰付錢?</label>
+                                            <div id="expense-payer-select" class="flex gap-2 bg-gray-50 p-2 rounded-2xl overflow-x-auto no-scrollbar"></div>
+                                            <input type="hidden" id="expense-payer" value="Josh">
+                                        </div>
+                                        <div class="mb-4">
+                                            <label class="text-sm font-bold text-gray-400 block mb-2">分帳方式</label>
+                                            <div class="border-2 border-dashed border-gray-200 rounded-3xl p-4 bg-gray-50">
+                                                <div class="flex gap-2 mb-3">
+                                                    <button type="button" id="btn-split-shared" onclick="window.selectSplitType('shared')" class="split-type-btn active">
+                                                        <i class="fa-solid fa-users mr-1"></i>
+                                                        共同分擔
+                                                    </button>
+                                                    <button type="button" id="btn-split-personal" onclick="window.selectSplitType('personal')" class="split-type-btn inactive">
+                                                        <i class="fa-solid fa-user mr-1"></i>
+                                                        個人獨享
+                                                    </button>
+                                                </div>
+                                                <div id="beneficiaries-container" class="flex flex-wrap"></div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-4">
+                                            <label class="text-sm font-bold text-gray-400 block mb-2">類別</label>
+                                            <div class="flex flex-wrap gap-2">
+                                                <button type="button" data-category="Food" onclick="window.selectCategory('Food')" class="category-btn block-select-btn active-category">餐飲</button>
+                                                <button type="button" data-category="Transport" onclick="window.selectCategory('Transport')" class="category-btn block-select-btn">交通</button>
+                                                <button type="button" data-category="Accommodation" onclick="window.selectCategory('Accommodation')" class="category-btn block-select-btn">住宿</button>
+                                                <button type="button" data-category="Shopping" onclick="window.selectCategory('Shopping')" class="category-btn block-select-btn">購物</button>
+                                                <button type="button" data-category="Ticket" onclick="window.selectCategory('Ticket')" class="category-btn block-select-btn">門票</button>
+                                                <button type="button" data-category="Purchasing" onclick="window.selectCategory('Purchasing')" class="category-btn block-select-btn">代購</button>
+                                            </div>
+                                        </div>
+                                        <!-- Dynamic Payment Method -->
+                                        <div class="mb-4">
+                                            <label class="text-sm font-bold text-gray-400 block mb-2">支付方式</label>
+                                            <div id="expense-payment-select-container" class="flex flex-wrap gap-2">
+                                                <!-- Injected by JS -->
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="mb-4">
-                                    <label class="text-sm font-bold text-gray-400 block mb-1">用途</label>
-                                    <input type="text" id="expense-description" placeholder="例如: 一蘭拉麵" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700">
-                                </div>
-                                <div class="mb-4">
-                                    <label class="text-sm font-bold text-gray-400 block mb-2">誰付錢?</label>
-                                    <div id="expense-payer-select" class="flex gap-2 bg-gray-50 p-2 rounded-2xl"></div>
-                                    <input type="hidden" id="expense-payer" value="Josh">
-                                </div>
-                                <div class="mb-4">
-                                    <label class="text-sm font-bold text-gray-400 block mb-2">分帳方式</label>
-                                    <div class="border-2 border-dashed border-gray-200 rounded-3xl p-4 bg-gray-50">
-                                        <div class="flex gap-2 mb-3">
-                                            <button type="button" id="btn-split-shared" onclick="window.selectSplitType('shared')" class="split-type-btn active">
-                                                <i class="fa-solid fa-users mr-1"></i>
-                                                共同分擔
-                                            </button>
-                                            <button type="button" id="btn-split-personal" onclick="window.selectSplitType('personal')" class="split-type-btn inactive">
-                                                <i class="fa-solid fa-user mr-1"></i>
-                                                個人獨享
-                                            </button>
-                                        </div>
-                                        <div id="beneficiaries-container" class="flex flex-wrap"></div>
-                                    </div>
-                                </div>
-                                <div class="mb-4">
-                                    <label class="text-sm font-bold text-gray-400 block mb-2">類別</label>
-                                    <div class="flex flex-wrap gap-2">
-                                        <button type="button" data-category="Food" onclick="window.selectCategory('Food')" class="category-btn block-select-btn active-category">餐飲</button>
-                                        <button type="button" data-category="Transport" onclick="window.selectCategory('Transport')" class="category-btn block-select-btn">交通</button>
-                                        <button type="button" data-category="Accommodation" onclick="window.selectCategory('Accommodation')" class="category-btn block-select-btn">住宿</button>
-                                        <button type="button" data-category="Shopping" onclick="window.selectCategory('Shopping')" class="category-btn block-select-btn">購物</button>
-                                        <button type="button" data-category="Ticket" onclick="window.selectCategory('Ticket')" class="category-btn block-select-btn">門票</button>
-                                        <button type="button" data-category="Purchasing" onclick="window.selectCategory('Purchasing')" class="category-btn block-select-btn">代購</button>
-                                    </div>
-                                </div>
-                                <div class="mb-6">
-                                    <button type="button" onclick="document.getElementById('expense-camera-input').click()" class="w-full p-3 mb-2 text-sm font-bold text-pink-500 bg-pink-50 rounded-xl border border-pink-100 flex items-center justify-center gap-2">
-                                        <i class="fa-solid fa-camera"></i>
-                                        拍照 (選填)
-                                    </button>
-                                    <input type="file" id="expense-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'expense-preview-img', 'expense-preview-container')">
-                                    <div id="expense-preview-container" class="hidden mb-2 text-center">
-                                        <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover">
-                                    </div>
-                                </div>
-                                <button type="submit" class="w-full py-4 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all">確認紀錄</button>
+                                <button type="submit" class="w-full py-4 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all mt-4">確認紀錄</button>
                             </form>
                         </div>
                     </div>
@@ -1860,7 +1971,7 @@
                                 匯出記帳 Excel
                             </button>
 
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
                                     <p class="text-xs text-gray-400 font-bold mb-1">總預算</p>
                                     <div id="budget-display-area" class="flex items-center gap-2">
@@ -1884,13 +1995,14 @@
                                         $ <span id="total-spent">0</span>
                                     </p>
                                 </div>
+                                <div class="bg-white p-5 rounded-3xl shadow-md border-2 border-pink-50 text-center col-span-2 md:col-span-2 flex flex-col justify-center">
+                                    <p class="text-xs font-bold text-gray-400 mb-2">結算建議</p>
+                                    <p id="settlement-result" class="text-lg font-bold text-gray-700">計算中...</p>
+                                </div>
                             </div>
-                            <div class="grid grid-cols-2 gap-4" id="payer-cards-container"></div>
-                            <div class="grid grid-cols-2 gap-4" id="payment-cards-container"></div>
-                            <div class="bg-white p-5 rounded-3xl shadow-md border-2 border-pink-50 text-center">
-                                <p class="text-xs font-bold text-gray-400 mb-2">結算建議</p>
-                                <p id="settlement-result" class="text-lg font-bold text-gray-700">計算中...</p>
-                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="payer-cards-container"></div>
+                            <!-- Dynamic Payment Cards Grid -->
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="payment-cards-container"></div>
                         </div>
                         <div class="mt-6">
                             <!-- Split Filter Container -->
@@ -1901,7 +2013,7 @@
                                 <span id="category-total-display" class="text-sm font-bold text-[#FF8BA7]"></span>
                             </div>
                             <div id="category-filter-container" class="flex flex-wrap gap-2 mb-4 overflow-x-auto no-scrollbar"></div>
-                            <div id="expense-list" class="space-y-3 pb-24"></div>
+                            <div id="expense-list" class="space-y-3 pb-24 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                         </div>
                     </div>
                 </div>
@@ -1965,35 +2077,37 @@
                             新增慾望
                         </h3>
                         <form onsubmit="window.addWishlistItem(event)">
-                            <input type="text" id="wishlist-name" placeholder="商品名稱" class="w-full p-4 mb-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
-                            <div class="flex gap-2 mb-3">
-                                <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 p-4 border-0 bg-gray-50 rounded-2xl font-bold" required>
-                                <input type="number" id="wishlist-qty" value="1" class="w-20 p-4 border-0 bg-gray-50 rounded-2xl font-bold text-center">
-                            </div>
-                            <div class="relative mb-3">
-                                <select id="wishlist-cat" class="w-full p-4 border-0 bg-gray-50 rounded-2xl font-bold appearance-none">
-                                    <option value="伴手禮">🎁 伴手禮</option>
-                                    <option value="藥妝">💊 藥妝</option>
-                                    <option value="服飾">👕 服飾</option>
-                                    <option value="電器">⚡ 電器</option>
-                                    <option value="其他">✨ 其他</option>
-                                </select>
-                                <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
-                            </div>
-                            <div class="mb-4">
-                                <button type="button" onclick="document.getElementById('item-camera-input').click()" class="w-full p-3 mb-2 text-sm font-bold text-pink-500 bg-pink-50 rounded-xl border border-pink-100 flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-camera"></i>
-                                    拍照 (選填)
-                                </button>
-                                <input type="file" id="item-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'item-preview-img', 'item-preview-container')">
-                                <div id="item-preview-container" class="hidden mb-2 text-center">
-                                    <img id="item-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="text" id="wishlist-name" placeholder="商品名稱" class="w-full p-4 mb-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
+                                <div class="relative mb-3">
+                                    <select id="wishlist-cat" class="w-full p-4 border-0 bg-gray-50 rounded-2xl font-bold appearance-none">
+                                        <option value="伴手禮">🎁 伴手禮</option>
+                                        <option value="藥妝">💊 藥妝</option>
+                                        <option value="服飾">👕 服飾</option>
+                                        <option value="電器">⚡ 電器</option>
+                                        <option value="其他">✨ 其他</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
+                                </div>
+                                <div class="flex gap-2 mb-3">
+                                    <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 p-4 border-0 bg-gray-50 rounded-2xl font-bold" required>
+                                    <input type="number" id="wishlist-qty" value="1" class="w-20 p-4 border-0 bg-gray-50 rounded-2xl font-bold text-center">
+                                </div>
+                                <div class="mb-4">
+                                    <button type="button" onclick="document.getElementById('item-camera-input').click()" class="w-full p-3 mb-2 text-sm font-bold text-pink-500 bg-pink-50 rounded-xl border border-pink-100 flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-camera"></i>
+                                        拍照 (選填)
+                                    </button>
+                                    <input type="file" id="item-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'item-preview-img', 'item-preview-container')">
+                                    <div id="item-preview-container" class="hidden mb-2 text-center">
+                                        <img id="item-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover">
+                                    </div>
                                 </div>
                             </div>
                             <button type="submit" class="w-full py-4 font-bold text-white bg-[#FF8BA7] rounded-2xl shadow-md hover:bg-[#ff7596] transition-all">新增清單項目</button>
                         </form>
                     </div>
-                    <div id="wishlist-list" class="space-y-3"></div>
+                    <div id="wishlist-list" class="space-y-3 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
                 <!-- Packing -->
                 <div id="packing-tab" class="main-tab-content hidden p-4">
@@ -2018,22 +2132,38 @@
                             <button type="submit" class="w-full py-4 font-bold text-white bg-[#4ECDC4] rounded-2xl shadow-md hover:opacity-90 transition-all">加入行李箱</button>
                         </form>
                     </div>
-                    <div id="packing-list" class="space-y-2"></div>
+                    <div id="packing-list" class="space-y-2 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
                 <!-- Overview -->
                 <div id="overview-tab" class="main-tab-content hidden p-4">
-                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-orange-100 mb-6 relative overflow-hidden group">
-                        <div class="absolute -right-6 -top-6 w-24 h-24 bg-orange-50 rounded-full opacity-50 pointer-events-none"></div>
-                        <h3 class="font-bold text-gray-700 mb-4 flex items-center relative z-10">
-                            <i class="fa-solid fa-map-location text-orange-400 text-xl mr-2"></i>
-                            旅程資訊
-                        </h3>
-                        <div class="mb-4 relative z-10">
-                            <label class="text-xs text-gray-400 block mb-1 font-bold ml-1">旅程名稱 (點擊編輯)</label>
-                            <input type="text" id="trip-name-input" class="w-full p-4 bg-orange-50 border-2 border-transparent rounded-2xl font-bold text-gray-700 text-lg focus:bg-white focus:border-orange-200 outline-none transition-all" oninput="window.updateTripNamePreview()" onchange="window.saveTripName()">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-orange-100 mb-6 relative overflow-hidden group">
+                            <div class="absolute -right-6 -top-6 w-24 h-24 bg-orange-50 rounded-full opacity-50 pointer-events-none"></div>
+                            <h3 class="font-bold text-gray-700 mb-4 flex items-center relative z-10">
+                                <i class="fa-solid fa-map-location text-orange-400 text-xl mr-2"></i>
+                                旅程資訊
+                            </h3>
+                            <div class="mb-4 relative z-10">
+                                <label class="text-xs text-gray-400 block mb-1 font-bold ml-1">旅程名稱 (點擊編輯)</label>
+                                <input type="text" id="trip-name-input" class="w-full p-4 bg-orange-50 border-2 border-transparent rounded-2xl font-bold text-gray-700 text-lg focus:bg-white focus:border-orange-200 outline-none transition-all" oninput="window.updateTripNamePreview()" onchange="window.saveTripName()">
+                            </div>
+                            <div id="trip-summary-block" class="bg-white border-l-4 border-orange-400 p-5 rounded-r-2xl shadow-sm relative z-10 mt-2"></div>
                         </div>
-                        <div id="trip-summary-block" class="bg-white border-l-4 border-orange-400 p-5 rounded-r-2xl shadow-sm relative z-10 mt-2"></div>
+                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-blue-100 mb-6 relative">
+                            <h3 class="font-bold text-gray-700 mb-4 flex items-center">
+                                <i class="fa-solid fa-user-group text-blue-400 text-xl mr-2"></i>
+                                旅伴設定
+                            </h3>
+                            <div class="flex gap-2 mb-3">
+                                <input type="text" id="new-participant-name" placeholder="輸入名字..." class="flex-1 min-w-0 p-3 bg-blue-50 border-0 rounded-xl font-bold outline-none">
+                                <button onclick="window.addParticipant()" class="w-12 flex-shrink-0 flex items-center justify-center bg-blue-400 text-white font-bold rounded-xl shadow-md">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                            <div id="participants-list"></div>
+                        </div>
                     </div>
+                    
                     <div class="grid grid-cols-2 gap-4 mb-6">
                         <div class="p-6 text-center border border-yellow-100 bg-yellow-50 rounded-3xl shadow-sm">
                             <p class="mb-1 text-xs font-bold text-yellow-700 uppercase">Duration</p>
@@ -2049,60 +2179,50 @@
                             </p>
                         </div>
                     </div>
-                    <div class="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-blue-100 mb-6 relative">
-                        <h3 class="font-bold text-gray-700 mb-4 flex items-center">
-                            <i class="fa-solid fa-user-group text-blue-400 text-xl mr-2"></i>
-                            旅伴設定
-                        </h3>
-                        <div class="flex gap-2 mb-3">
-                            <input type="text" id="new-participant-name" placeholder="輸入名字..." class="flex-1 min-w-0 p-3 bg-blue-50 border-0 rounded-xl font-bold outline-none">
-                            <button onclick="window.addParticipant()" class="w-12 flex-shrink-0 flex items-center justify-center bg-blue-400 text-white font-bold rounded-xl shadow-md">
-                                <i class="fa-solid fa-plus"></i>
-                            </button>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-6 mb-6 bg-white border border-green-100 shadow-sm rounded-3xl">
+                            <h3 class="flex items-center mb-4 text-lg font-bold text-gray-700">
+                                <i class="mr-2 fa-solid fa-calculator text-custom-secondary"></i>
+                                簡易換算
+                            </h3>
+                            <div class="flex items-center gap-3">
+                                <div class="flex-1">
+                                    <label class="block mb-1 text-xs text-gray-400" id="calc-currency-label">JPY</label>
+                                    <input type="number" id="calc-jpy" class="w-full p-3 text-lg font-bold border-2 border-gray-100 bg-gray-50 rounded-xl" placeholder="0" oninput="window.calculateTwd()">
+                                </div>
+                                <i class="mt-4 text-gray-300 fa-solid fa-arrow-right"></i>
+                                <div class="flex-1">
+                                    <label class="block mb-1 text-xs text-gray-400">台幣 (TWD)</label>
+                                    <input type="text" id="calc-twd" class="w-full h-[54px] p-3 text-lg font-bold border-2 border-green-100 bg-green-50 text-custom-secondary rounded-xl" readonly value="0">
+                                </div>
+                            </div>
+                            <p class="mt-2 text-xs text-right text-gray-400">
+                                匯率: <span id="calc-rate-display" class="font-bold text-custom-danger">0.215</span>
+                            </p>
                         </div>
-                        <div id="participants-list"></div>
-                    </div>
-                    <div class="p-6 mb-6 bg-white border border-green-100 shadow-sm rounded-3xl">
-                        <h3 class="flex items-center mb-4 text-lg font-bold text-gray-700">
-                            <i class="mr-2 fa-solid fa-calculator text-custom-secondary"></i>
-                            簡易換算
-                        </h3>
-                        <div class="flex items-center gap-3">
-                            <div class="flex-1">
-                                <label class="block mb-1 text-xs text-gray-400" id="calc-currency-label">JPY</label>
-                                <input type="number" id="calc-jpy" class="w-full p-3 text-lg font-bold border-2 border-gray-100 bg-gray-50 rounded-xl" placeholder="0" oninput="window.calculateTwd()">
+                        <div class="p-6 mb-6 bg-white border border-pink-100 shadow-sm rounded-3xl">
+                            <h3 class="flex items-center mb-4 text-lg font-bold text-gray-700">
+                                <i class="mr-2 fa-solid fa-location-dot text-custom-primary"></i>
+                                想去地點清單
+                            </h3>
+                            <div class="space-y-3">
+                                <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
+                                <input type="text" id="new-spot-desc" placeholder="簡單附註 (選填)" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
+                                <input type="text" id="new-spot-link" placeholder="Google Map 連結" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
+                                <button type="button" onclick="document.getElementById('spot-camera-input').click()" class="flex items-center justify-center w-full gap-2 p-3 font-bold text-gray-500 transition bg-gray-100 rounded-xl hover:bg-gray-200">
+                                    <i class="fa-solid fa-camera"></i>
+                                    點我拍照或選照片
+                                </button>
+                                <input type="file" id="spot-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'spot-preview-img', 'spot-preview-container')">
+                                <div id="spot-preview-container" class="hidden mb-2 text-center">
+                                    <img id="spot-preview-img" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl">
+                                </div>
+                                <button onclick="window.addSpot()" class="w-full p-3 font-bold text-white bg-[#FF8BA7] rounded-xl shadow-md active:scale-95">新增景點</button>
                             </div>
-                            <i class="mt-4 text-gray-300 fa-solid fa-arrow-right"></i>
-                            <div class="flex-1">
-                                <label class="block mb-1 text-xs text-gray-400">台幣 (TWD)</label>
-                                <input type="text" id="calc-twd" class="w-full h-[54px] p-3 text-lg font-bold border-2 border-green-100 bg-green-50 text-custom-secondary rounded-xl" readonly value="0">
-                            </div>
-                        </div>
-                        <p class="mt-2 text-xs text-right text-gray-400">
-                            匯率: <span id="calc-rate-display" class="font-bold text-custom-danger">0.215</span>
-                        </p>
-                    </div>
-                    <div class="p-6 mb-6 bg-white border border-pink-100 shadow-sm rounded-3xl">
-                        <h3 class="flex items-center mb-4 text-lg font-bold text-gray-700">
-                            <i class="mr-2 fa-solid fa-location-dot text-custom-primary"></i>
-                            想去地點清單
-                        </h3>
-                        <div class="space-y-3">
-                            <input type="text" id="new-spot-name" placeholder="景點名稱 (必填)" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
-                            <input type="text" id="new-spot-desc" placeholder="簡單附註 (選填)" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
-                            <input type="text" id="new-spot-link" placeholder="Google Map 連結" class="w-full p-3 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-300">
-                            <button type="button" onclick="document.getElementById('spot-camera-input').click()" class="flex items-center justify-center w-full gap-2 p-3 font-bold text-gray-500 transition bg-gray-100 rounded-xl hover:bg-gray-200">
-                                <i class="fa-solid fa-camera"></i>
-                                點我拍照或選照片
-                            </button>
-                            <input type="file" id="spot-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'spot-preview-img', 'spot-preview-container')">
-                            <div id="spot-preview-container" class="hidden mb-2 text-center">
-                                <img id="spot-preview-img" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl">
-                            </div>
-                            <button onclick="window.addSpot()" class="w-full p-3 font-bold text-white bg-[#FF8BA7] rounded-xl shadow-md active:scale-95">新增景點</button>
                         </div>
                     </div>
-                    <div id="spots-list" class="space-y-4"></div>
+                    <div id="spots-list" class="space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                     <!-- Data Binding Button (Only for Legacy Trip) -->
                     <div id="legacy-import-container" class="mt-8 text-center hidden">
                         <button id="bind-data-btn" onclick="window.bindLegacyData()" class="px-6 py-3 bg-gray-100 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition text-sm">
@@ -2141,6 +2261,25 @@
                         <label class="block mb-1 text-sm font-bold text-gray-500">預計天數</label>
                         <input type="number" id="new-trip-days" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center font-bold text-custom-primary" readonly>
                     </div>
+                    
+                    <div class="mb-6">
+                        <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色</label>
+                        <div class="flex gap-4 justify-center">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="new-trip-color" value="pink" class="hidden peer" checked>
+                                <div class="w-10 h-10 rounded-full bg-pink-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-pink-400"></div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="new-trip-color" value="blue" class="hidden peer">
+                                <div class="w-10 h-10 rounded-full bg-blue-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-blue-400"></div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="new-trip-color" value="purple" class="hidden peer">
+                                <div class="w-10 h-10 rounded-full bg-purple-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-purple-400"></div>
+                            </label>
+                        </div>
+                    </div>
+
                     <button type="submit" class="w-full p-3 font-bold text-white shadow-lg bg-custom-primary rounded-2xl">建立旅程</button>
                 </form>
             </div>
@@ -2173,85 +2312,91 @@
         </div>
         <!-- Edit Expense -->
         <div id="editExpenseModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editExpenseModal')">
-            <div class="w-full max-w-sm p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[85vh]" onclick="event.stopPropagation()">
+            <div class="w-full max-w-sm md:max-w-2xl p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[85vh]" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700">
                     編輯記帳
                     <button onclick="window.closeModal('editExpenseModal')" class="bg-gray-100 w-8 h-8 rounded-full text-gray-400">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </h3>
-                <input type="hidden" id="edit-expense-id">
-                <input type="hidden" id="edit-expense-old-image">
-                <div class="mb-4">
-                    <label class="block mb-1 text-sm font-bold text-gray-500">日期</label>
-                    <input type="date" id="edit-expense-date" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl font-bold">
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-1 text-sm font-bold text-gray-500">金額</label>
-                    <div class="flex gap-2 items-center">
-                        <input type="number" id="edit-expense-amount" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-xl font-bold text-xl">
-                        <div id="edit-currency-container" class="flex-shrink-0 flex bg-gray-100 rounded-xl p-1 items-center">
-                            <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold text-gray-400">TWD</button>
-                            <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold bg-[#FF7596] text-white">JPY</button>
-                            <input type="hidden" id="edit-expense-currency">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Left Column -->
+                    <div>
+                        <input type="hidden" id="edit-expense-id">
+                        <input type="hidden" id="edit-expense-old-image">
+                        <div class="mb-4">
+                            <label class="block mb-1 text-sm font-bold text-gray-500">日期</label>
+                            <input type="date" id="edit-expense-date" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl font-bold">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block mb-1 text-sm font-bold text-gray-500">金額</label>
+                            <div class="flex gap-2 items-center">
+                                <input type="number" id="edit-expense-amount" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-xl font-bold text-xl">
+                                <div id="edit-currency-container" class="flex-shrink-0 flex bg-gray-100 rounded-xl p-1 items-center">
+                                    <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold text-gray-400">TWD</button>
+                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold bg-[#FF7596] text-white">JPY</button>
+                                    <input type="hidden" id="edit-expense-currency">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block mb-1 text-sm font-bold text-gray-500">用途</label>
+                            <input type="text" id="edit-expense-desc" class="w-full p-3 mb-4 border-0 bg-gray-50 rounded-xl">
+                        </div>
+                         <div id="edit-expense-preview-container" class="relative hidden mb-3 text-center">
+                            <img id="edit-expense-preview" src="" class="object-cover w-full h-40 border-2 border-pink-100 rounded-xl mb-2">
+                            <button type="button" onclick="window.removeEditExpensePhoto()" class="text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
+                        </div>
+                        <button type="button" onclick="document.getElementById('edit-expense-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
+                            <i class="fa-solid fa-camera"></i>
+                            更換照片
+                        </button>
+                        <input type="file" id="edit-expense-file" accept="image/*" class="hidden" onchange="window.previewEditImage(this, 'edit-expense-preview', 'edit-expense-preview-container')">
+                    </div>
+
+                    <!-- Right Column -->
+                    <div>
+                        <div class="mb-4">
+                            <label class="block mb-2 text-sm font-bold text-gray-500">付款人</label>
+                            <div id="edit-expense-payer-select" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+                            <input type="hidden" id="edit-expense-payer">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block mb-2 text-sm font-bold text-gray-500">分帳方式</label>
+                            <div class="border-2 border-dashed border-gray-200 rounded-3xl p-4 bg-gray-50">
+                                <div class="flex gap-2 mb-3">
+                                    <button type="button" id="edit-btn-split-shared" onclick="window.selectSplitType('shared', true)" class="split-type-btn active">
+                                        <i class="fa-solid fa-users mr-1"></i>
+                                        共同分擔
+                                    </button>
+                                    <button type="button" id="edit-btn-split-personal" onclick="window.selectSplitType('personal', true)" class="split-type-btn inactive">
+                                        <i class="fa-solid fa-user mr-1"></i>
+                                        個人獨享
+                                    </button>
+                                </div>
+                                <div id="edit-beneficiaries-container" class="flex flex-wrap"></div>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block mb-2 text-sm font-bold">類別</label>
+                            <div id="edit-expense-category-select" class="grid grid-cols-3 gap-2 mb-6">
+                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Food" onclick="window.selectEditCategory('Food', true)" class="edit-category-btn block-select-btn">餐飲</button>
+                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Transport" onclick="window.selectEditCategory('Transport', true)" class="edit-category-btn block-select-btn">交通</button>
+                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Accommodation" onclick="window.selectEditCategory('Accommodation', true)" class="edit-category-btn block-select-btn">住宿</button>
+                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Shopping" onclick="window.selectEditCategory('Shopping', true)" class="edit-category-btn block-select-btn">購物</button>
+                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Ticket" onclick="window.selectEditCategory('Ticket', true)" class="edit-category-btn block-select-btn">門票</button>
+                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Other" onclick="window.selectEditCategory('Other', true)" class="edit-category-btn block-select-btn">其他</button>
+                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Purchasing" onclick="window.selectEditCategory('Purchasing', true)" class="edit-category-btn block-select-btn">代購</button>
+                            </div>
+                        </div>
+                         <div class="mb-4">
+                            <label class="block mb-2 text-sm font-bold text-gray-500">支付方式</label>
+                            <div id="edit-expense-payment-select-container" class="flex flex-wrap gap-2"></div>
                         </div>
                     </div>
                 </div>
-                <div class="mb-4">
-                    <label class="block mb-1 text-sm font-bold text-gray-500">用途</label>
-                    <input type="text" id="edit-expense-desc" class="w-full p-3 mb-4 border-0 bg-gray-50 rounded-xl">
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2 text-sm font-bold text-gray-500">付款人</label>
-                    <div id="edit-expense-payer-select" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
-                    <input type="hidden" id="edit-expense-payer">
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2 text-sm font-bold text-gray-500">分帳方式</label>
-                    <div class="border-2 border-dashed border-gray-200 rounded-3xl p-4 bg-gray-50">
-                        <div class="flex gap-2 mb-3">
-                            <button type="button" id="edit-btn-split-shared" onclick="window.selectSplitType('shared', true)" class="split-type-btn active">
-                                <i class="fa-solid fa-users mr-1"></i>
-                                共同分擔
-                            </button>
-                            <button type="button" id="edit-btn-split-personal" onclick="window.selectSplitType('personal', true)" class="split-type-btn inactive">
-                                <i class="fa-solid fa-user mr-1"></i>
-                                個人獨享
-                            </button>
-                        </div>
-                        <div id="edit-beneficiaries-container" class="flex flex-wrap"></div>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2 text-sm font-bold">類別</label>
-                    <div id="edit-expense-category-select" class="grid grid-cols-3 gap-2 mb-6">
-                        <button type="button" class="edit-category-btn block-select-btn !text-xs !p-1 !m-0" data-edit-category="Food" onclick="window.selectCategory('Food', true)">餐飲</button>
-                        <button type="button" class="edit-category-btn block-select-btn !text-xs !p-1 !m-0" data-edit-category="Transport" onclick="window.selectCategory('Transport', true)">交通</button>
-                        <button type="button" class="edit-category-btn block-select-btn !text-xs !p-1 !m-0" data-edit-category="Accommodation" onclick="window.selectCategory('Accommodation', true)">住宿</button>
-                        <button type="button" class="edit-category-btn block-select-btn !text-xs !p-1 !m-0" data-edit-category="Shopping" onclick="window.selectCategory('Shopping', true)">購物</button>
-                        <button type="button" class="edit-category-btn block-select-btn !text-xs !p-1 !m-0" data-edit-category="Ticket" onclick="window.selectCategory('Ticket', true)">門票</button>
-                        <button type="button" class="edit-category-btn block-select-btn !text-xs !p-1 !m-0" data-edit-category="Other" onclick="window.selectCategory('Other', true)">其他</button>
-                        <button type="button" class="edit-category-btn block-select-btn !text-xs !p-1 !m-0" data-edit-category="Purchasing" onclick="window.selectCategory('Purchasing', true)">代購</button>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="block mb-2 text-sm font-bold text-gray-500">支付方式</label>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" data-edit-payment="Cash" onclick="window.selectPayment('Cash', true)" class="edit-payment-btn block-select-btn">現金</button>
-                        <button type="button" data-edit-payment="Card" onclick="window.selectPayment('Card', true)" class="edit-payment-btn block-select-btn">刷卡</button>
-                        <button type="button" data-edit-payment="Paypay" onclick="window.selectPayment('Paypay', true)" class="edit-payment-btn block-select-btn">PayPay</button>
-                    </div>
-                </div>
-                <div id="edit-expense-preview-container" class="relative hidden mb-3 text-center">
-                    <img id="edit-expense-preview" src="" class="object-cover w-full h-40 border-2 border-pink-100 rounded-xl mb-2">
-                    <button type="button" onclick="window.removeEditExpensePhoto()" class="text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
-                </div>
-                <button type="button" onclick="document.getElementById('edit-expense-file').click()" class="flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
-                    <i class="fa-solid fa-camera"></i>
-                    更換照片
-                </button>
-                <input type="file" id="edit-expense-file" accept="image/*" class="hidden" onchange="window.previewImage(this, 'edit-expense-preview', 'edit-expense-preview-container')">
-                <div class="flex gap-3">
+               
+                <div class="flex gap-3 mt-4">
                     <button onclick="window.deleteExpense()" class="flex-1 p-3 font-bold text-red-400 border-2 border-red-100 rounded-2xl">刪除</button>
                     <button onclick="window.saveExpenseUpdate()" class="flex-[2] p-3 font-bold text-white bg-custom-primary rounded-2xl shadow-lg">儲存</button>
                 </div>
@@ -2298,14 +2443,14 @@
                     <i class="fa-solid fa-camera"></i>
                     更換照片
                 </button>
-                <input type="file" id="edit-wishlist-file" accept="image/*" class="hidden" onchange="window.previewImage(this, 'edit-wishlist-preview', 'edit-wishlist-preview-container')">
+                <input type="file" id="edit-wishlist-file" accept="image/*" class="hidden" onchange="window.previewEditWishlistImage(this)">
                 <div class="flex gap-3">
                     <button onclick="window.deleteWishlistItem()" class="flex-1 p-3 font-bold text-red-400 border-2 border-red-100 rounded-2xl">刪除</button>
                     <button onclick="window.saveWishlistUpdate()" class="flex-[2] p-3 font-bold text-white bg-custom-primary rounded-2xl shadow-lg">儲存</button>
                 </div>
             </div>
         </div>
-       <!-- Add Itinerary -->
+        <!-- Add Itinerary -->
         <div id="addItineraryModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('addItineraryModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl max-h-[85vh] overflow-y-auto" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
