@@ -203,7 +203,9 @@
               , ACTIVE_BENEFICIARIES = [];
             let PAYER_FILTER = 'All'
               , PAYMENT_FILTER = 'All'
-              , CATEGORY_FILTER = 'All';
+              , CATEGORY_FILTER = 'All'
+              , SPLIT_FILTER = 'All'; // New Filter Variable
+
             let EDIT_PAYER = ''
               , EDIT_CATEGORY = ''
               , EDIT_PAYMENT = ''
@@ -641,17 +643,21 @@
             window.selectCategory = (c, isEdit=false) => {
                 if (isEdit) {
                     EDIT_CATEGORY = c;
+                    // Remove active class from all
                     document.querySelectorAll('.edit-category-btn').forEach(b => b.classList.remove('active-category'));
-                    const btn = document.querySelector(`[data-edit-category="${c}"]`);
+                    // Add active class to target (using data attribute)
+                    const btn = document.querySelector(`button[data-edit-category="${c}"]`);
                     if(btn) btn.classList.add('active-category');
                 } else {
                     ACTIVE_CATEGORY = c;
                     document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active-category'));
-                    const btn = document.querySelector(`[data-category="${c}"]`);
+                    const btn = document.querySelector(`button[data-category="${c}"]`);
                     if(btn) btn.classList.add('active-category');
                 }
-            }
-            ;
+            };
+            // Alias for backward compatibility if HTML uses old name
+            window.selectEditCategory = (c, isEdit) => window.selectCategory(c, isEdit);
+
             window.selectPayment = (p, isEdit=false) => {
                 if (isEdit) {
                     EDIT_PAYMENT = p;
@@ -790,6 +796,12 @@
                 window.renderExpenseDashboard();
             }
             ;
+
+            window.toggleSplitFilter = (type) => {
+                SPLIT_FILTER = type;
+                window.renderExpenseDashboard();
+            };
+
             window.enableBudgetEdit = () => {
                 document.getElementById('budget-display-area').classList.add('hidden');
                 document.getElementById('budget-edit-area').classList.remove('hidden');
@@ -859,6 +871,17 @@
                 }
                 );
                 document.getElementById('settlement-result').innerHTML = maxDebtor ? `<span class="text-[#FF8BA7]">${maxDebtor}</span> 需再付出 <span class="text-[#FF8BA7]">$${Math.round(maxDebt).toLocaleString()}</span>` : "目前已結清";
+
+                // --- Render Split Filters ---
+                const splitContainer = document.getElementById('split-filter-container');
+                if(splitContainer) {
+                    splitContainer.innerHTML = `
+                        <button onclick="window.toggleSplitFilter('All')" class="block-select-btn px-3 py-1 text-xs rounded-full ${SPLIT_FILTER === 'All' ? 'active-filter' : ''}">全部</button>
+                        <button onclick="window.toggleSplitFilter('shared')" class="block-select-btn px-3 py-1 text-xs rounded-full ${SPLIT_FILTER === 'shared' ? 'active-filter' : ''}">👥 共同</button>
+                        <button onclick="window.toggleSplitFilter('personal')" class="block-select-btn px-3 py-1 text-xs rounded-full ${SPLIT_FILTER === 'personal' ? 'active-filter' : ''}">👤 個人</button>
+                    `;
+                }
+
                 window.renderExpenseList();
             }
             ;
@@ -870,7 +893,11 @@
                     const matchPayer = PAYER_FILTER === 'All' || e.payer === PAYER_FILTER;
                     const matchPayment = PAYMENT_FILTER === 'All' || (PAYMENT_FILTER === 'Cash' ? e.payment === 'Cash' : e.payment !== 'Cash');
                     const matchCategory = CATEGORY_FILTER === 'All' || e.category === CATEGORY_FILTER;
-                    return matchPayer && matchPayment && matchCategory;
+                    // Split Filter
+                    const currentSplit = e.splitType || 'shared'; 
+                    const matchSplit = SPLIT_FILTER === 'All' || currentSplit === SPLIT_FILTER;
+
+                    return matchPayer && matchPayment && matchCategory && matchSplit;
                 });
 
                 // Calculate Total for displayed list
@@ -898,7 +925,13 @@
                 document.getElementById('expense-list').innerHTML = filteredData.map(e => {
                     const twd = e.currency !== 'TWD' ? Math.round(e.amount * window.EXCHANGE_RATE) : e.amount;
                     const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center mr-3 text-custom-primary"><i class="fa-solid ${iconMap[e.category] || 'fa-shapes'}"></i></div>`;
-                    return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm">${e.description}</p><p class="text-xs text-gray-400">${e.date} · ${e.payer} · ${e.category}</p></div></div><div class="text-right"><p class="font-bold text-[#FF6B6B]">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
+                    
+                    const isPersonal = e.splitType === 'personal';
+                    const splitTag = isPersonal
+                        ? `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-400 border border-purple-100">👤 個人</span>`
+                        : `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-400 border border-blue-100">👥 分擔</span>`;
+
+                    return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm">${e.description}</p><p class="text-xs text-gray-400 mt-0.5 flex items-center">${e.date} · ${e.payer} ${splitTag}</p><p class="text-[10px] text-gray-300 mt-0.5">${e.category}</p></div></div><div class="text-right"><p class="font-bold text-[#FF6B6B]">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
                 }).join('');
             }
             ;
@@ -930,26 +963,47 @@
             }
             ;
             window.saveExpenseUpdate = async () => {
-                const id = document.getElementById('edit-expense-id').value;
-                const fileIn = document.getElementById('edit-expense-file');
-                let imgUrl = document.getElementById('edit-expense-old-image').value;
-                if (fileIn.files[0]) {
-                    const snap = await uploadBytes(ref(storage, `expenses/updated_${Date.now()}_${fileIn.files[0].name}`), fileIn.files[0]);
-                    imgUrl = await getDownloadURL(snap.ref);
+                const btn = document.querySelector('#editExpenseModal button[onclick="window.saveExpenseUpdate()"]');
+                if(btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
+
+                try {
+                    const id = document.getElementById('edit-expense-id').value;
+                    const fileIn = document.getElementById('edit-expense-file');
+                    let imgUrl = document.getElementById('edit-expense-old-image').value;
+                    
+                    if (fileIn.files[0]) {
+                        const snap = await uploadBytes(ref(storage, `expenses/updated_${Date.now()}_${fileIn.files[0].name}`), fileIn.files[0]);
+                        imgUrl = await getDownloadURL(snap.ref);
+                    }
+
+                    // Fallback defaults if global variables are somehow empty
+                    const finalPayer = EDIT_PAYER || window.TRIP_PARTICIPANTS[0];
+                    const finalCategory = EDIT_CATEGORY || 'Food';
+                    const finalPayment = EDIT_PAYMENT || 'Cash';
+                    const finalSplit = EDIT_SPLIT_TYPE || 'shared';
+                    const finalBens = (EDIT_BENEFICIARIES && EDIT_BENEFICIARIES.length > 0) ? EDIT_BENEFICIARIES : [...window.TRIP_PARTICIPANTS];
+                    const finalCurrency = document.getElementById('edit-expense-currency').value || 'JPY';
+
+                    await updateDoc(doc(db, "expenses", id), {
+                        date: document.getElementById('edit-expense-date').value,
+                        amount: parseFloat(document.getElementById('edit-expense-amount').value),
+                        description: document.getElementById('edit-expense-desc').value,
+                        currency: finalCurrency,
+                        payer: finalPayer,
+                        category: finalCategory,
+                        payment: finalPayment,
+                        splitType: finalSplit,
+                        beneficiaries: finalBens,
+                        imageUrl: imgUrl
+                    });
+                    
+                    window.closeModal('editExpenseModal');
+                } catch (e) {
+                    console.error("Save failed:", e);
+                    alert("儲存失敗，請檢查網路或重新整理: " + e.message);
+                } finally {
+                    if(btn) { btn.disabled = false; btn.innerText = "儲存"; }
                 }
-                await updateDoc(doc(db, "expenses", id), {
-                    date: document.getElementById('edit-expense-date').value,
-                    amount: parseFloat(document.getElementById('edit-expense-amount').value),
-                    description: document.getElementById('edit-expense-description').value,
-                    currency: document.getElementById('edit-expense-currency').value,
-                    payer: EDIT_PAYER,
-                    category: EDIT_CATEGORY,
-                    payment: EDIT_PAYMENT,
-                    splitType: EDIT_SPLIT_TYPE,
-                    beneficiaries: EDIT_BENEFICIARIES,
-                    imageUrl: imgUrl
-                });
-                window.closeModal('editExpenseModal');
             }
             ;
             window.deleteExpense = async () => {
@@ -1839,6 +1893,9 @@
                             </div>
                         </div>
                         <div class="mt-6">
+                            <!-- Split Filter Container -->
+                            <div id="split-filter-container" class="flex gap-2 mb-4 overflow-x-auto no-scrollbar"></div>
+
                             <div class="mb-2 flex justify-between items-center px-1">
                                 <span class="text-xs font-bold text-gray-400">消費類別</span>
                                 <span id="category-total-display" class="text-sm font-bold text-[#FF8BA7]"></span>
