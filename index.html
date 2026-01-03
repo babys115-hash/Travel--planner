@@ -108,7 +108,7 @@
             }
 
             .block-select-btn {
-                @apply px-4 py-2 border-2 rounded-full text-sm font-bold transition-all duration-200 mr-2 mb-2 bg-white flex-shrink-0 cursor-pointer text-gray-400 border-gray-100; }
+                @apply px-4 py-2 border-2 rounded-full text-sm font-bold transition-all duration-200 mr-2 mb-2 bg-white flex-shrink-0 cursor-pointer text-gray-400 border-gray-100 whitespace-nowrap; }
 
             .active-filter, .active-category, .active-payment, .active-payer {
                 background-color: #FF7596 !important;
@@ -119,7 +119,7 @@
 
             /* Updated Split Buttons */
             .split-type-btn {
-                @apply flex-1 py-2 rounded-xl text-sm font-bold transition-all border-2 border-transparent; }
+                @apply flex-1 py-2 rounded-xl text-sm font-bold transition-all border-2 border-transparent whitespace-nowrap; }
 
             .split-type-btn.active {
                 @apply bg-[#FF8BA7] text-white shadow-md; }
@@ -129,7 +129,7 @@
 
             /* Updated Beneficiary Buttons */
             .beneficiary-btn {
-                @apply px-4 py-2 rounded-full text-sm font-bold border-2 transition-all mr-2 mb-2 flex-1 text-center justify-center; }
+                @apply px-4 py-2 rounded-full text-sm font-bold border-2 transition-all mr-2 mb-2 flex-1 text-center justify-center whitespace-nowrap; }
 
             .beneficiary-btn.active {
                 @apply bg-[#4ECDC4] border-[#4ECDC4] text-white shadow-sm; transform: scale(1.05);
@@ -191,7 +191,16 @@
             window.PACKING_DATA = [];
             window.SPOTS_DATA = [];
             window.TRIP_PARTICIPANTS = ['Josh', 'Candice'];
-            window.TRIP_PAYMENT_METHODS = ['Cash', 'Card']; // Default
+            window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
+            
+            // Default Categories
+            window.DEFAULT_CATEGORIES = ['Food', 'Transport', 'Accommodation', 'Shopping', 'Ticket', 'Purchasing'];
+            window.TRIP_CATEGORIES = [...window.DEFAULT_CATEGORIES];
+
+            // Default Wishlist Categories
+            window.DEFAULT_WISHLIST_CATEGORIES = ['伴手禮', '藥妝', '服飾', '電器', '其他'];
+            window.TRIP_WISHLIST_CATEGORIES = [...window.DEFAULT_WISHLIST_CATEGORIES];
+
             window.CURRENT_CURRENCY = 'JPY';
             window.EXCHANGE_RATE = 0.215;
             window.TOTAL_BUDGET = 0; 
@@ -212,6 +221,10 @@
               , EDIT_PAYMENT = ''
               , EDIT_SPLIT_TYPE = 'shared'
               , EDIT_BENEFICIARIES = [];
+            
+            // Wishlist State
+            let ACTIVE_WISHLIST_CATEGORY = '伴手禮';
+            let EDIT_WISHLIST_CATEGORY = '';
 
             window.openModal = (id) => document.getElementById(id).classList.remove('hidden');
             window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
@@ -367,6 +380,8 @@
                     totalBudget: 0,
                     participants: ['Josh', 'Candice'],
                     paymentMethods: ['Cash', 'Card'],
+                    categories: window.DEFAULT_CATEGORIES,
+                    wishlistCategories: window.DEFAULT_WISHLIST_CATEGORIES,
                     tripName: name
                 });
                 window.closeModal('createTripModal');
@@ -488,6 +503,20 @@
                             window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
                         }
 
+                        // Sync Expense Categories
+                        if (data.categories && Array.isArray(data.categories)) {
+                            window.TRIP_CATEGORIES = data.categories;
+                        } else {
+                            window.TRIP_CATEGORIES = [...window.DEFAULT_CATEGORIES];
+                        }
+                        
+                        // Sync Wishlist Categories
+                        if (data.wishlistCategories && Array.isArray(data.wishlistCategories)) {
+                            window.TRIP_WISHLIST_CATEGORIES = data.wishlistCategories;
+                        } else {
+                            window.TRIP_WISHLIST_CATEGORIES = [...window.DEFAULT_WISHLIST_CATEGORIES];
+                        }
+
                         if (window.applyCurrencySettings) {
                             window.applyCurrencySettings(data.currency || 'JPY');
                         }
@@ -496,6 +525,12 @@
                         window.renderBeneficiaryButtons();
                         window.renderPaymentMethodsSelect('expense-payment-select-container'); 
                         window.renderPaymentMethodsSelect('edit-expense-payment-select-container', true);
+                        window.renderCategorySelection('expense-category-options');
+                        window.renderCategorySelection('edit-expense-category-options', true);
+                        // Initial Render
+                        window.renderWishlistCategoryOptions();
+                        window.renderWishlistCategoryOptions(true);
+                        
                         window.renderExpenseDashboard();
                         window.renderParticipantsList();
                     }
@@ -653,19 +688,124 @@
                 if (isEdit) {
                     EDIT_CATEGORY = c;
                     // Remove active class from all
-                    document.querySelectorAll('.edit-category-btn').forEach(b => b.classList.remove('active-category'));
+                    const container = isEdit ? document.getElementById('edit-expense-category-options') : document.getElementById('expense-category-options');
+                    container.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active-category'));
                     // Add active class to target (using data attribute)
-                    const btn = document.querySelector(`button[data-edit-category="${c}"]`);
+                    const btn = container.querySelector(`button[data-category="${c}"]`);
                     if(btn) btn.classList.add('active-category');
                 } else {
                     ACTIVE_CATEGORY = c;
-                    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active-category'));
-                    const btn = document.querySelector(`button[data-category="${c}"]`);
+                    const container = document.getElementById('expense-category-options');
+                    container.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active-category'));
+                    const btn = container.querySelector(`button[data-category="${c}"]`);
                     if(btn) btn.classList.add('active-category');
                 }
             };
             // Alias for backward compatibility if HTML uses old name
             window.selectEditCategory = (c, isEdit) => window.selectCategory(c, isEdit);
+
+            // --- Category Management (Expense) ---
+            window.addCategory = async () => {
+                const newCat = prompt("請輸入新類別名稱:");
+                if (newCat && !window.TRIP_CATEGORIES.includes(newCat)) {
+                    const newCats = [...window.TRIP_CATEGORIES, newCat];
+                    const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
+                    await setDoc(ref, { categories: newCats }, { merge: true });
+                }
+            };
+
+            window.renderCategorySelection = (containerId, isEdit = false) => {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+
+                const currentCat = isEdit ? EDIT_CATEGORY : ACTIVE_CATEGORY;
+                
+                // If current category is not in list (legacy data), add it temporarily so it shows as selected
+                let displayList = [...window.TRIP_CATEGORIES];
+                if (currentCat && !displayList.includes(currentCat)) {
+                    displayList.push(currentCat);
+                }
+
+                let html = displayList.map(c => {
+                    const isActive = currentCat === c;
+                    const activeClass = isActive ? 'active-category' : '';
+                    const clickFn = `window.selectCategory('${c}', ${isEdit})`;
+                    return `<button type="button" data-category="${c}" onclick="${clickFn}" class="category-btn block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass}">${c}</button>`;
+                }).join('');
+
+                // Add "Plus" button
+                html += `<button type="button" onclick="window.addCategory()" class="block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
+
+                // Wrap for Edit Modal grid layout if needed, otherwise flex wrap
+                if (isEdit) {
+                    container.className = "grid grid-cols-3 gap-2 mb-6";
+                } else {
+                    // Force horizontal scroll for non-edit mode (Add Expense)
+                    container.className = "flex flex-wrap gap-2";
+                }
+                
+                container.innerHTML = html;
+            };
+
+            // --- Category Management (Wishlist) ---
+             window.addWishlistCategory = async () => {
+                const newCat = prompt("請輸入新清單類別:");
+                if (newCat && !window.TRIP_WISHLIST_CATEGORIES.includes(newCat)) {
+                    const newCats = [...window.TRIP_WISHLIST_CATEGORIES, newCat];
+                    const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
+                    await setDoc(ref, { wishlistCategories: newCats }, { merge: true });
+                }
+            };
+
+            window.selectWishlistCategory = (c, isEdit=false) => {
+                if (isEdit) {
+                    EDIT_WISHLIST_CATEGORY = c;
+                    document.getElementById('edit-wishlist-category').value = c;
+                    window.renderWishlistCategoryOptions(true);
+                } else {
+                    ACTIVE_WISHLIST_CATEGORY = c;
+                    document.getElementById('wishlist-cat').value = c;
+                    window.renderWishlistCategoryOptions(false);
+                }
+            };
+
+            window.renderWishlistCategoryOptions = (isEdit = false) => {
+                const containerId = isEdit ? 'edit-wishlist-category-options' : 'wishlist-category-options';
+                const container = document.getElementById(containerId);
+                if (!container) return;
+
+                const currentCat = isEdit ? EDIT_WISHLIST_CATEGORY : ACTIVE_WISHLIST_CATEGORY;
+                const emojiMap = {
+                    '伴手禮': '🎁',
+                    '藥妝': '💊',
+                    '服飾': '👕',
+                    '電器': '⚡',
+                    '其他': '✨'
+                };
+
+                // Add current if missing
+                let displayList = [...window.TRIP_WISHLIST_CATEGORIES];
+                if (currentCat && !displayList.includes(currentCat)) displayList.push(currentCat);
+
+                let html = displayList.map(c => {
+                   const icon = emojiMap[c] || '🏷️';
+                   const isActive = currentCat === c;
+                   const activeClass = isActive ? 'active-category' : '';
+                   const clickFn = `window.selectWishlistCategory('${c}', ${isEdit})`;
+                   return `<button type="button" onclick="${clickFn}" class="block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass}">${icon} ${c}</button>`;
+                }).join('');
+
+                // Add Button
+                html += `<button type="button" onclick="window.addWishlistCategory()" class="block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
+
+                if(isEdit) {
+                    container.className = "grid grid-cols-3 gap-2 mb-3";
+                } else {
+                    container.className = "flex flex-wrap gap-2";
+                }
+                
+                container.innerHTML = html;
+            };
 
             window.selectPayment = (p, isEdit=false) => {
                 if (isEdit) {
@@ -713,7 +853,9 @@
                 }).join('');
 
                 html += `<button type="button" onclick="window.addPaymentMethod()" class="block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary"><i class="fa-solid fa-plus"></i></button>`;
-
+                
+                // Force horizontal scroll for non-edit mode
+                container.className = isEdit ? "flex flex-wrap gap-2" : "flex gap-2 overflow-x-auto no-scrollbar pb-1";
                 container.innerHTML = html;
             };
 
@@ -728,8 +870,8 @@
                     window.renderEditBeneficiaryButtons();
                 } else {
                     ACTIVE_SPLIT_TYPE = t;
-                    document.getElementById('btn-split-shared').className = t === 'shared' ? 'split-type-btn active' : 'split-type-btn inactive';
-                    document.getElementById('btn-split-personal').className = t === 'personal' ? 'split-type-btn active' : 'split-type-btn inactive';
+                    document.getElementById('btn-split-shared').className = t === 'shared' ? 'split-type-btn active !text-xs !py-1 !px-2' : 'split-type-btn inactive !text-xs !py-1 !px-2';
+                    document.getElementById('btn-split-personal').className = t === 'personal' ? 'split-type-btn active !text-xs !py-1 !px-2' : 'split-type-btn inactive !text-xs !py-1 !px-2';
                     ACTIVE_BENEFICIARIES = t === 'shared' ? [...window.TRIP_PARTICIPANTS] : [];
                     window.renderBeneficiaryButtons();
                 }
@@ -952,8 +1094,17 @@
             }
             ;
             window.renderExpenseList = () => {
-                const cats = ['All', ...new Set(window.EXPENSES_DATA.map(e => e.category))];
-                document.getElementById('category-filter-container').innerHTML = cats.map(c => `<button onclick="window.toggleCategoryFilter('${c}')" class="block-select-btn px-3 py-1 text-xs rounded-full ${CATEGORY_FILTER === c ? 'active-filter' : ''}">${c === 'All' ? '全部' : c}</button>`).join('');
+                // Use TRIP_CATEGORIES instead of deriving from data to ensure custom ones show up even if empty
+                // But for filters, we might want to show all used + all configured. 
+                // Let's merge them.
+                const usedCats = new Set(window.EXPENSES_DATA.map(e => e.category));
+                const allCats = [...new Set([...window.TRIP_CATEGORIES, ...usedCats, 'All'])];
+                
+                // Sorting: 'All' first, then defined categories, then others
+                const sortedCats = ['All', ...window.TRIP_CATEGORIES];
+                allCats.forEach(c => { if(!sortedCats.includes(c)) sortedCats.push(c); });
+
+                document.getElementById('category-filter-container').innerHTML = sortedCats.map(c => `<button onclick="window.toggleCategoryFilter('${c}')" class="block-select-btn px-3 py-1 text-xs rounded-full ${CATEGORY_FILTER === c ? 'active-filter' : ''}">${c === 'All' ? '全部' : c}</button>`).join('');
                 
                 const filteredData = window.EXPENSES_DATA.filter(e => {
                     const matchPayer = PAYER_FILTER === 'All' || e.payer === PAYER_FILTER;
@@ -1003,7 +1154,8 @@
                 };
                 document.getElementById('expense-list').innerHTML = filteredData.map(e => {
                     const twd = e.currency !== 'TWD' ? Math.round(e.amount * window.EXCHANGE_RATE) : e.amount;
-                    const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center mr-3 text-custom-primary"><i class="fa-solid ${iconMap[e.category] || 'fa-shapes'}"></i></div>`;
+                    const iconClass = iconMap[e.category] || 'fa-tag'; // Default icon for custom categories
+                    const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center mr-3 text-custom-primary"><i class="fa-solid ${iconClass}"></i></div>`;
                     
                     const isPersonal = e.splitType === 'personal';
                     // Tag Logic
@@ -1038,6 +1190,10 @@
                 EDIT_BENEFICIARIES = e.beneficiaries || [...window.TRIP_PARTICIPANTS];
                 window.selectSplitType(EDIT_SPLIT_TYPE, true);
                 EDIT_CATEGORY = e.category || 'Food';
+                
+                // Re-render categories here to ensure we capture any that might be in data but not in list (legacy edge case) 
+                // and to set the active class correctly
+                window.renderCategorySelection('edit-expense-category-options', true);
                 window.selectCategory(EDIT_CATEGORY, true);
                 
                 // Dynamic Payment
@@ -1639,8 +1795,11 @@
                 document.getElementById('edit-wishlist-name').value = item.name;
                 document.getElementById('edit-wishlist-price').value = item.price;
                 document.getElementById('edit-wishlist-qty').value = item.quantity;
-                document.getElementById('edit-wishlist-category').value = item.category;
                 document.getElementById('edit-wishlist-old-image').value = item.imageUrl || '';
+                
+                // Set Category State
+                window.selectWishlistCategory(item.category || '其他', true);
+
                 if (item.imageUrl) {
                     document.getElementById('edit-wishlist-preview').src = item.imageUrl;
                     document.getElementById('edit-wishlist-preview-container').classList.remove('hidden');
@@ -1658,11 +1817,15 @@
                     const snap = await uploadBytes(ref(storage, `wishlist/updated_${Date.now()}_${fileIn.files[0].name}`), fileIn.files[0]);
                     imgUrl = await getDownloadURL(snap.ref);
                 }
+                
+                // Get value from hidden input now
+                const cat = document.getElementById('edit-wishlist-category').value;
+
                 await updateDoc(doc(db, "wishlists", id), {
                     name: document.getElementById('edit-wishlist-name').value,
                     price: parseFloat(document.getElementById('edit-wishlist-price').value),
                     quantity: parseInt(document.getElementById('edit-wishlist-qty').value),
-                    category: document.getElementById('edit-wishlist-category').value,
+                    category: cat,
                     imageUrl: imgUrl
                 });
                 window.closeModal('editWishlistModal');
@@ -1930,89 +2093,76 @@
                         </button>
                     </div>
                     <div id="add-expense-container">
-                        <div class="bg-white p-6 rounded-[30px] shadow-sm border border-pink-50">
+                        <div class="bg-white p-3 md:p-6 rounded-[20px] shadow-sm border border-pink-50">
                             <form onsubmit="event.preventDefault(); window.addExpense();">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                                     <!-- LEFT COLUMN -->
                                     <div>
-                                        <div class="mb-4">
-                                            <label class="text-sm font-bold text-gray-400 block mb-1">日期</label>
-                                            <div class="relative">
-                                                <input type="date" id="expense-date" class="w-full p-3 pl-4 bg-gray-50 rounded-2xl font-bold text-gray-700">
-                                                <i class="fa-regular fa-calendar absolute right-4 top-3.5 text-gray-400 pointer-events-none"></i>
+                                        <!-- Row 1: Date & Amount & Currency Combined -->
+                                        <div class="flex gap-2 mb-2">
+                                            <!-- Date (Compact) -->
+                                            <div class="relative shrink-0">
+                                                <input type="date" id="expense-date" class="w-[135px] p-2 text-xs md:text-sm bg-gray-50 rounded-xl font-bold text-gray-700 h-full">
                                             </div>
-                                        </div>
-                                        <div class="mb-4">
-                                            <label class="text-sm font-bold text-gray-400 block mb-1">金額 & 幣別</label>
-                                            <div class="flex gap-2">
-                                                <input type="number" id="expense-amount" placeholder="0" class="flex-1 p-3 bg-gray-50 rounded-2xl text-xl font-bold text-gray-700">
-                                                <div id="add-currency-container" class="flex bg-gray-100 rounded-2xl p-1 items-center">
-                                                    <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-4 py-2 rounded-xl text-sm font-bold text-gray-400 transition-all">TWD</button>
-                                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-4 py-2 rounded-xl text-sm font-bold bg-[#FF7596] text-white shadow-md transition-all">JPY</button>
+                                            <!-- Amount & Currency -->
+                                            <div class="flex-1 flex gap-1 min-w-0">
+                                                <input type="number" id="expense-amount" placeholder="0" class="flex-1 min-w-0 p-2 bg-gray-50 rounded-xl text-lg font-bold text-gray-700">
+                                                <div id="add-currency-container" class="flex bg-gray-100 rounded-xl p-1 items-center shrink-0">
+                                                    <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-2 py-1.5 rounded-lg text-xs font-bold text-gray-400 transition-all">TWD</button>
+                                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-2 py-1.5 rounded-lg text-xs font-bold bg-[#FF7596] text-white shadow-md transition-all">JPY</button>
                                                     <input type="hidden" id="expense-currency" value="JPY">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="mb-4">
-                                            <label class="text-sm font-bold text-gray-400 block mb-1">用途</label>
-                                            <input type="text" id="expense-description" placeholder="例如: 一蘭拉麵" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700">
-                                        </div>
-                                        <div class="mb-6">
-                                            <button type="button" onclick="document.getElementById('expense-camera-input').click()" class="w-full p-3 mb-2 text-sm font-bold text-pink-500 bg-pink-50 rounded-xl border border-pink-100 flex items-center justify-center gap-2">
+
+                                        <!-- Row 2: Description & Camera -->
+                                        <div class="flex gap-2 mb-2">
+                                            <input type="text" id="expense-description" placeholder="用途 (例如: 拉麵)" class="flex-1 min-w-0 p-2 bg-gray-50 rounded-xl font-bold text-gray-700">
+                                            <button type="button" onclick="document.getElementById('expense-camera-input').click()" class="w-10 h-10 shrink-0 bg-pink-50 text-pink-400 rounded-xl border border-pink-100 flex items-center justify-center">
                                                 <i class="fa-solid fa-camera"></i>
-                                                拍照 (選填)
                                             </button>
-                                            <input type="file" id="expense-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'expense-preview-img', 'expense-preview-container')">
-                                            <div id="expense-preview-container" class="hidden mb-2 text-center">
-                                                <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover">
-                                            </div>
+                                        </div>
+                                        <input type="file" id="expense-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'expense-preview-img', 'expense-preview-container')">
+                                        <div id="expense-preview-container" class="hidden mb-2 text-center">
+                                            <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover">
                                         </div>
                                     </div>
                                     
                                     <!-- RIGHT COLUMN -->
                                     <div>
-                                        <div class="mb-4">
-                                            <label class="text-sm font-bold text-gray-400 block mb-2">誰付錢?</label>
-                                            <div id="expense-payer-select" class="flex gap-2 bg-gray-50 p-2 rounded-2xl overflow-x-auto no-scrollbar"></div>
-                                            <input type="hidden" id="expense-payer" value="Josh">
-                                        </div>
-                                        <div class="mb-4">
-                                            <label class="text-sm font-bold text-gray-400 block mb-2">分帳方式</label>
-                                            <div class="border-2 border-dashed border-gray-200 rounded-3xl p-4 bg-gray-50">
-                                                <div class="flex gap-2 mb-3">
-                                                    <button type="button" id="btn-split-shared" onclick="window.selectSplitType('shared')" class="split-type-btn active">
-                                                        <i class="fa-solid fa-users mr-1"></i>
-                                                        共同分擔
-                                                    </button>
-                                                    <button type="button" id="btn-split-personal" onclick="window.selectSplitType('personal')" class="split-type-btn inactive">
-                                                        <i class="fa-solid fa-user mr-1"></i>
-                                                        個人獨享
-                                                    </button>
+                                        <!-- Payer & Split & Benficiaries -->
+                                        <div class="mb-2">
+                                            <div class="flex justify-between items-center mb-1">
+                                                <label class="text-xs font-bold text-gray-400">付款 & 分帳</label>
+                                            </div>
+                                            <div class="flex gap-2 items-center mb-2 overflow-x-auto no-scrollbar">
+                                                <div id="expense-payer-select" class="flex gap-1 shrink-0"></div> 
+                                                <input type="hidden" id="expense-payer" value="Josh">
+                                                <div class="w-[1px] h-6 bg-gray-200 mx-1"></div>
+                                                <div class="flex bg-gray-50 rounded-xl p-0.5 shrink-0">
+                                                    <button type="button" id="btn-split-shared" onclick="window.selectSplitType('shared')" class="split-type-btn active !text-xs !py-1 !px-2">共同</button>
+                                                    <button type="button" id="btn-split-personal" onclick="window.selectSplitType('personal')" class="split-type-btn inactive !text-xs !py-1 !px-2">個人</button>
                                                 </div>
-                                                <div id="beneficiaries-container" class="flex flex-wrap"></div>
+                                            </div>
+                                             <div id="beneficiaries-container" class="flex gap-1 overflow-x-auto no-scrollbar pb-1"></div>
+                                        </div>
+
+                                        <!-- Category (Horizontal Scroll) -->
+                                        <div class="mb-2">
+                                            <label class="text-xs font-bold text-gray-400 block mb-1">類別</label>
+                                            <div id="expense-category-options" class="flex flex-wrap gap-2">
+                                                <!-- Dynamic -->
                                             </div>
                                         </div>
-                                        <div class="mb-4">
-                                            <label class="text-sm font-bold text-gray-400 block mb-2">類別</label>
-                                            <div class="flex flex-wrap gap-2">
-                                                <button type="button" data-category="Food" onclick="window.selectCategory('Food')" class="category-btn block-select-btn active-category">餐飲</button>
-                                                <button type="button" data-category="Transport" onclick="window.selectCategory('Transport')" class="category-btn block-select-btn">交通</button>
-                                                <button type="button" data-category="Accommodation" onclick="window.selectCategory('Accommodation')" class="category-btn block-select-btn">住宿</button>
-                                                <button type="button" data-category="Shopping" onclick="window.selectCategory('Shopping')" class="category-btn block-select-btn">購物</button>
-                                                <button type="button" data-category="Ticket" onclick="window.selectCategory('Ticket')" class="category-btn block-select-btn">門票</button>
-                                                <button type="button" data-category="Purchasing" onclick="window.selectCategory('Purchasing')" class="category-btn block-select-btn">代購</button>
-                                            </div>
-                                        </div>
-                                        <!-- Dynamic Payment Method -->
-                                        <div class="mb-4">
-                                            <label class="text-sm font-bold text-gray-400 block mb-2">支付方式</label>
-                                            <div id="expense-payment-select-container" class="flex flex-wrap gap-2">
-                                                <!-- Injected by JS -->
-                                            </div>
+
+                                        <!-- Payment (Horizontal Scroll) -->
+                                        <div class="mb-2">
+                                             <label class="text-xs font-bold text-gray-400 block mb-1">支付方式</label>
+                                             <div id="expense-payment-select-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></div>
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" class="w-full py-4 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all mt-4">確認紀錄</button>
+                                <button type="submit" class="w-full py-3 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all mt-2">確認紀錄</button>
                             </form>
                         </div>
                     </div>
@@ -2073,7 +2223,7 @@
                 <!-- Itinerary -->
                 <div id="itinerary-tab" class="main-tab-content p-4">
                     <!-- Weather Widget -->
-                    <div class="bg-blue-50 p-6 rounded-3xl shadow-sm border-2 border-white mb-6 relative overflow-hidden ring-1 ring-blue-100">
+                    <div class="bg-blue-50 p-4 md:p-6 rounded-3xl shadow-sm border-2 border-white mb-6 relative overflow-hidden ring-1 ring-blue-100">
                         <!-- Header -->
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="font-bold text-gray-700 flex items-center text-lg">
@@ -2087,11 +2237,11 @@
                         <!-- Search -->
                         <div class="flex gap-2 relative z-10">
                             <input type="text" id="weather-city-input" 
-                                   placeholder="輸入城市 (如: Tokyo, Paris, Taipei)" 
-                                   class="flex-1 p-4 bg-white border-0 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm placeholder-gray-400"
+                                   placeholder="輸入城市 (如: Tokyo)" 
+                                   class="flex-1 min-w-0 p-3 bg-white border-0 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm placeholder-gray-400"
                                    onkeypress="if(event.key === 'Enter') window.searchWeather()">
                             <button onclick="window.searchWeather()" 
-                                    class="w-14 bg-blue-400 text-white font-bold rounded-2xl shadow-md hover:bg-blue-500 transition active:scale-95 flex items-center justify-center">
+                                    class="w-12 shrink-0 bg-blue-400 text-white font-bold rounded-2xl shadow-md hover:bg-blue-500 transition active:scale-95 flex items-center justify-center">
                                 <i class="fa-solid fa-magnifying-glass"></i>
                             </button>
                         </div>
@@ -2132,19 +2282,14 @@
                         <form onsubmit="window.addWishlistItem(event)">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <input type="text" id="wishlist-name" placeholder="商品名稱" class="w-full p-4 mb-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
-                                <div class="relative mb-3">
-                                    <select id="wishlist-cat" class="w-full p-4 border-0 bg-gray-50 rounded-2xl font-bold appearance-none">
-                                        <option value="伴手禮">🎁 伴手禮</option>
-                                        <option value="藥妝">💊 藥妝</option>
-                                        <option value="服飾">👕 服飾</option>
-                                        <option value="電器">⚡ 電器</option>
-                                        <option value="其他">✨ 其他</option>
-                                    </select>
-                                    <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
+                                <div class="mb-3">
+                                    <label class="block mb-1 text-sm font-bold text-gray-500">分類</label>
+                                    <div id="wishlist-category-options" class="flex flex-wrap gap-2"></div>
+                                    <input type="hidden" id="wishlist-cat" value="伴手禮">
                                 </div>
                                 <div class="flex gap-2 mb-3">
-                                    <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 p-4 border-0 bg-gray-50 rounded-2xl font-bold" required>
-                                    <input type="number" id="wishlist-qty" value="1" class="w-20 p-4 border-0 bg-gray-50 rounded-2xl font-bold text-center">
+                                    <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
+                                    <input type="number" id="wishlist-qty" value="1" class="w-20 p-3 border-0 bg-gray-50 rounded-2xl font-bold text-center">
                                 </div>
                                 <div class="mb-4">
                                     <button type="button" onclick="document.getElementById('item-camera-input').click()" class="w-full p-3 mb-2 text-sm font-bold text-pink-500 bg-pink-50 rounded-xl border border-pink-100 flex items-center justify-center gap-2">
@@ -2507,14 +2652,8 @@
                         </div>
                         <div class="mb-4">
                             <label class="block mb-2 text-sm font-bold">類別</label>
-                            <div id="edit-expense-category-select" class="grid grid-cols-3 gap-2 mb-6">
-                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Food" onclick="window.selectEditCategory('Food', true)" class="edit-category-btn block-select-btn">餐飲</button>
-                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Transport" onclick="window.selectEditCategory('Transport', true)" class="edit-category-btn block-select-btn">交通</button>
-                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Accommodation" onclick="window.selectEditCategory('Accommodation', true)" class="edit-category-btn block-select-btn">住宿</button>
-                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Shopping" onclick="window.selectEditCategory('Shopping', true)" class="edit-category-btn block-select-btn">購物</button>
-                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Ticket" onclick="window.selectEditCategory('Ticket', true)" class="edit-category-btn block-select-btn">門票</button>
-                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Other" onclick="window.selectEditCategory('Other', true)" class="edit-category-btn block-select-btn">其他</button>
-                                <button type="button" class="block-select-btn !text-xs !p-1 !m-0" data-edit-category="Purchasing" onclick="window.selectEditCategory('Purchasing', true)" class="edit-category-btn block-select-btn">代購</button>
+                            <div id="edit-expense-category-options" class="grid grid-cols-3 gap-2 mb-6">
+                                <!-- Dynamic Categories Injected Here -->
                             </div>
                         </div>
                          <div class="mb-4">
@@ -2553,15 +2692,10 @@
                         <input type="number" id="edit-wishlist-qty" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center" min="1">
                     </div>
                 </div>
-                <div class="relative mb-3">
-                    <select id="edit-wishlist-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
-                        <option value="伴手禮">🎁 伴手禮</option>
-                        <option value="藥妝">💊 藥妝</option>
-                        <option value="服飾">👕 服飾</option>
-                        <option value="電器">⚡ 電器</option>
-                        <option value="其他">✨ 其他</option>
-                    </select>
-                    <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
+                <div class="mb-3">
+                    <label class="block mb-1 text-sm font-bold text-gray-500">分類</label>
+                    <div id="edit-wishlist-category-options" class="grid grid-cols-3 gap-2"></div>
+                    <input type="hidden" id="edit-wishlist-category">
                 </div>
                 <div id="edit-wishlist-preview-container" class="relative hidden mb-3 text-center">
                     <img id="edit-wishlist-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
@@ -2690,9 +2824,9 @@
                             <option value="電子">📱 3C</option>
                             <option value="藥品">💊 藥品</option>
                             <option value="盥洗">🚿 盥洗</option>
-                            <option value="其他">🧩 其他</option>
+                            <option value="其他">✨ 其他</option>
                         </select>
-                        <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none"></i>
+                        <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none text-xs"></i>
                     </div>
                     <button type="submit" id="save-packing-btn" class="w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
                 </form>
