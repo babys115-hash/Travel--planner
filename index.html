@@ -174,15 +174,6 @@
 
             .filter-card-active {
                 @apply ring-2 ring-offset-1 transform scale-105; }
-
-            .filter-card-active.blue {
-                @apply ring-blue-400 bg-blue-50; }
-
-            .filter-card-active.green {
-                @apply ring-green-400 bg-green-50; }
-
-            .filter-card-active.purple {
-                @apply ring-purple-400 bg-purple-50; }
         </style>
         <script type="module">
             import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
@@ -1280,6 +1271,7 @@
             ;
             
             window.getParticipantStyle = (name) => {
+                // Returns styles for tags, not cards
                 const styles = [
                     'bg-purple-50 text-purple-500 border-purple-200',
                     'bg-pink-50 text-pink-500 border-pink-200', 
@@ -1332,26 +1324,26 @@
                 document.getElementById('total-spent').innerText = Math.round(total).toLocaleString();
                 document.getElementById('overview-budget-display').innerText = (window.TOTAL_BUDGET || 0).toLocaleString();
                 
+                // UNIFIED COLORS - PAYER CARDS
                 document.getElementById('payer-cards-container').innerHTML = window.TRIP_PARTICIPANTS.map( (p, i) => {
-                    // Extract text color from style for the title
-                    const style = window.getParticipantStyle(p);
-                    // Extract text-color class specifically or just use the whole style for a dot/indicator
-                    // Let's parse the text color class roughly
-                    const textColor = style.split(' ').find(c => c.startsWith('text-')) || 'text-gray-500';
+                    const isActive = PAYER_FILTER === p;
+                    // Pink Theme for Payers
+                    const activeClass = isActive ? 'ring-2 ring-[#FF8BA7] bg-pink-50' : 'hover:bg-gray-50 border-gray-100';
+                    const textClass = isActive ? 'text-[#FF8BA7]' : 'text-gray-400';
+                    const icon = isActive ? '<i class="fa-solid fa-check text-[#FF8BA7]"></i>' : '';
                     
-                    return `<div onclick="window.togglePayerFilter('${p}')" class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 cursor-pointer transition ${PAYER_FILTER === p ? 'filter-card-active blue' : 'hover:bg-gray-50'}"><p class="text-xs font-bold mb-1 ${textColor} flex justify-between">${p} 付 ${PAYER_FILTER === p ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`;
+                    return `<div onclick="window.togglePayerFilter('${p}')" class="bg-white p-4 rounded-3xl shadow-sm border transition cursor-pointer ${activeClass}"><p class="text-xs font-bold mb-1 ${textClass} flex justify-between">${p} 付 ${icon}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`;
                 }).join('');
                 
-                // Dynamic Payment Cards
-                const paymentColors = ['green', 'purple', 'orange', 'cyan', 'rose'];
+                // UNIFIED COLORS - PAYMENT CARDS
                 document.getElementById('payment-cards-container').innerHTML = window.TRIP_PAYMENT_METHODS.map((pm, i) => {
-                     const colorName = paymentColors[i % paymentColors.length];
                      const isActive = PAYMENT_FILTER === pm;
-                     const activeClass = isActive ? `filter-card-active ${colorName}` : 'hover:bg-gray-50';
-                     const borderColor = `border-${colorName}-100`;
-                     const textColor = `text-${colorName}-500`;
+                     // Teal Theme for Payments
+                     const activeClass = isActive ? 'ring-2 ring-[#4ECDC4] bg-teal-50' : 'hover:bg-gray-50 border-gray-100';
+                     const textClass = isActive ? 'text-[#4ECDC4]' : 'text-gray-400';
+                     const icon = isActive ? '<i class="fa-solid fa-check text-[#4ECDC4]"></i>' : '';
                      
-                     return `<div onclick="window.togglePaymentFilter('${pm}')" class="bg-white p-4 rounded-3xl shadow-sm border ${borderColor} cursor-pointer transition ${activeClass}"><p class="text-xs font-bold ${textColor} mb-1 flex justify-between">${pm} ${PAYMENT_FILTER === pm ? '<i class="fa-solid fa-check"></i>' : ''}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(paymentTotals[pm] || 0).toLocaleString()}</p></div>`;
+                     return `<div onclick="window.togglePaymentFilter('${pm}')" class="bg-white p-4 rounded-3xl shadow-sm border transition cursor-pointer ${activeClass}"><p class="text-xs font-bold ${textClass} mb-1 flex justify-between">${pm} ${icon}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(paymentTotals[pm] || 0).toLocaleString()}</p></div>`;
                 }).join('');
 
                 let balance = {};
@@ -2589,19 +2581,26 @@
                     <!-- Expense Details (Search, Summary, List) -->
                     <div id="expense-details-container" class="">
                         <div class="space-y-4">
-                            <!-- SEARCH BAR -->
-                            <div class="relative">
-                                <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-400"></i>
-                                <input type="text" placeholder="搜尋記帳 (說明、金額、類別)..." oninput="window.updateSearchTerm(this.value)" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-gray-100 shadow-sm focus:border-pink-300 font-bold text-gray-600 transition-all">
+                            
+                            <!-- Search & Export Row -->
+                            <div class="flex gap-3">
+                                <div class="relative flex-1">
+                                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-300"></i>
+                                    <input type="text" placeholder="搜尋..." oninput="window.updateSearchTerm(this.value)" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-gray-100 shadow-sm focus:border-pink-300 font-bold text-gray-600 transition-all">
+                                </div>
+                                <button onclick="window.exportExpensesToExcel()" class="w-12 h-[50px] shrink-0 rounded-2xl bg-white border border-[#4ECDC4] text-[#4ECDC4] font-bold shadow-sm hover:bg-[#E0F7FA] transition flex items-center justify-center" title="匯出 Excel">
+                                    <i class="fa-solid fa-file-excel text-xl"></i>
+                                </button>
                             </div>
 
-                            <!-- Export Button for Expenses (Moved to TOP) -->
-                            <button onclick="window.exportExpensesToExcel()" class="w-full py-3 rounded-2xl bg-white border-2 border-[#4ECDC4] text-[#4ECDC4] font-bold shadow-sm hover:bg-[#E0F7FA] transition flex items-center justify-center mb-4">
-                                <i class="fa-solid fa-file-excel mr-2 text-xl"></i>
-                                匯出記帳 Excel
-                            </button>
+                            <!-- Settlement Suggestion (Moved to Top) -->
+                            <div class="bg-white p-5 rounded-3xl shadow-md border-l-4 border-l-[#FF8BA7] border-y border-r border-gray-50 text-center flex flex-col justify-center">
+                                <p class="text-xs font-bold text-gray-400 mb-2">💡 結算建議</p>
+                                <div id="settlement-result" class="text-lg font-bold text-gray-700">計算中...</div>
+                            </div>
 
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <!-- Budget & Spent Grid -->
+                            <div class="grid grid-cols-2 gap-4">
                                 <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
                                     <p class="text-xs text-gray-400 font-bold mb-1">總預算</p>
                                     <div id="budget-display-area" class="flex items-center gap-2">
@@ -2625,13 +2624,11 @@
                                         $ <span id="total-spent">0</span>
                                     </p>
                                 </div>
-                                <div class="bg-white p-5 rounded-3xl shadow-md border-2 border-pink-50 text-center col-span-2 md:col-span-2 flex flex-col justify-center">
-                                    <p class="text-xs font-bold text-gray-400 mb-2">結算建議</p>
-                                    <p id="settlement-result" class="text-lg font-bold text-gray-700">計算中...</p>
-                                </div>
                             </div>
+
+                            <!-- Payer Cards -->
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="payer-cards-container"></div>
-                            <!-- Dynamic Payment Cards Grid -->
+                            <!-- Payment Cards -->
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="payment-cards-container"></div>
                         </div>
                         <div class="mt-6">
