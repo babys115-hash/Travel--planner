@@ -197,6 +197,10 @@
             window.DEFAULT_CATEGORIES = ['Food', 'Transport', 'Accommodation', 'Shopping', 'Ticket', 'Purchasing'];
             window.TRIP_CATEGORIES = [...window.DEFAULT_CATEGORIES];
 
+            // Default Wishlist Categories
+            window.DEFAULT_WISHLIST_CATEGORIES = ['伴手禮', '藥妝', '服飾', '電器', '其他'];
+            window.TRIP_WISHLIST_CATEGORIES = [...window.DEFAULT_WISHLIST_CATEGORIES];
+
             window.CURRENT_CURRENCY = 'JPY';
             window.EXCHANGE_RATE = 0.215;
             window.TOTAL_BUDGET = 0; 
@@ -373,6 +377,7 @@
                     participants: ['Josh', 'Candice'],
                     paymentMethods: ['Cash', 'Card'],
                     categories: window.DEFAULT_CATEGORIES,
+                    wishlistCategories: window.DEFAULT_WISHLIST_CATEGORIES,
                     tripName: name
                 });
                 window.closeModal('createTripModal');
@@ -494,11 +499,18 @@
                             window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
                         }
 
-                        // Sync Categories
+                        // Sync Expense Categories
                         if (data.categories && Array.isArray(data.categories)) {
                             window.TRIP_CATEGORIES = data.categories;
                         } else {
                             window.TRIP_CATEGORIES = [...window.DEFAULT_CATEGORIES];
+                        }
+                        
+                        // Sync Wishlist Categories
+                        if (data.wishlistCategories && Array.isArray(data.wishlistCategories)) {
+                            window.TRIP_WISHLIST_CATEGORIES = data.wishlistCategories;
+                        } else {
+                            window.TRIP_WISHLIST_CATEGORIES = [...window.DEFAULT_WISHLIST_CATEGORIES];
                         }
 
                         if (window.applyCurrencySettings) {
@@ -511,6 +523,7 @@
                         window.renderPaymentMethodsSelect('edit-expense-payment-select-container', true);
                         window.renderCategorySelection('expense-category-options');
                         window.renderCategorySelection('edit-expense-category-options', true);
+                        window.renderWishlistCategoryOptions();
                         window.renderExpenseDashboard();
                         window.renderParticipantsList();
                     }
@@ -684,7 +697,7 @@
             // Alias for backward compatibility if HTML uses old name
             window.selectEditCategory = (c, isEdit) => window.selectCategory(c, isEdit);
 
-            // --- Category Management ---
+            // --- Category Management (Expense) ---
             window.addCategory = async () => {
                 const newCat = prompt("請輸入新類別名稱:");
                 if (newCat && !window.TRIP_CATEGORIES.includes(newCat)) {
@@ -725,6 +738,43 @@
                 }
                 
                 container.innerHTML = html;
+            };
+
+            // --- Category Management (Wishlist) ---
+             window.addWishlistCategory = async () => {
+                const newCat = prompt("請輸入新清單類別:");
+                if (newCat && !window.TRIP_WISHLIST_CATEGORIES.includes(newCat)) {
+                    const newCats = [...window.TRIP_WISHLIST_CATEGORIES, newCat];
+                    const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
+                    await setDoc(ref, { wishlistCategories: newCats }, { merge: true });
+                }
+            };
+
+            window.renderWishlistCategoryOptions = () => {
+                const emojiMap = {
+                    '伴手禮': '🎁',
+                    '藥妝': '💊',
+                    '服飾': '👕',
+                    '電器': '⚡',
+                    '其他': '✨'
+                };
+                
+                const optionsHtml = window.TRIP_WISHLIST_CATEGORIES.map(c => {
+                   const icon = emojiMap[c] || '🏷️';
+                   return `<option value="${c}">${icon} ${c}</option>`;
+                }).join('');
+
+                const addSelect = document.getElementById('wishlist-cat');
+                const editSelect = document.getElementById('edit-wishlist-category');
+                
+                if(addSelect) addSelect.innerHTML = optionsHtml;
+                
+                if(editSelect) {
+                    const currentVal = editSelect.value;
+                    editSelect.innerHTML = optionsHtml;
+                    // If current item has a category not in list anymore (or was default), select it
+                    if(currentVal) editSelect.value = currentVal;
+                }
             };
 
             window.selectPayment = (p, isEdit=false) => {
@@ -2195,15 +2245,16 @@
                         <form onsubmit="window.addWishlistItem(event)">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <input type="text" id="wishlist-name" placeholder="商品名稱" class="w-full p-4 mb-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
-                                <div class="relative mb-3">
-                                    <select id="wishlist-cat" class="w-full p-4 border-0 bg-gray-50 rounded-2xl font-bold appearance-none">
-                                        <option value="伴手禮">🎁 伴手禮</option>
-                                        <option value="藥妝">💊 藥妝</option>
-                                        <option value="服飾">👕 服飾</option>
-                                        <option value="電器">⚡ 電器</option>
-                                        <option value="其他">✨ 其他</option>
-                                    </select>
-                                    <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
+                                <div class="flex gap-2 mb-3">
+                                    <div class="relative flex-1">
+                                        <select id="wishlist-cat" class="w-full p-4 border-0 bg-gray-50 rounded-2xl font-bold appearance-none">
+                                            <!-- Dynamic -->
+                                        </select>
+                                        <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
+                                    </div>
+                                    <button type="button" onclick="window.addWishlistCategory()" class="w-14 bg-gray-100 text-gray-400 rounded-2xl font-bold hover:bg-gray-200 text-xl flex items-center justify-center">
+                                        +
+                                    </button>
                                 </div>
                                 <div class="flex gap-2 mb-3">
                                     <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
@@ -2610,15 +2661,16 @@
                         <input type="number" id="edit-wishlist-qty" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center" min="1">
                     </div>
                 </div>
-                <div class="relative mb-3">
-                    <select id="edit-wishlist-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
-                        <option value="伴手禮">🎁 伴手禮</option>
-                        <option value="藥妝">💊 藥妝</option>
-                        <option value="服飾">👕 服飾</option>
-                        <option value="電器">⚡ 電器</option>
-                        <option value="其他">✨ 其他</option>
-                    </select>
-                    <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
+                <div class="flex gap-2 mb-3">
+                    <div class="relative flex-1">
+                        <select id="edit-wishlist-category" class="w-full p-3 border-0 appearance-none bg-gray-50 rounded-xl">
+                            <!-- Dynamic -->
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-4 top-5 text-gray-400 pointer-events-none"></i>
+                    </div>
+                    <button type="button" onclick="window.addWishlistCategory()" class="w-14 bg-gray-100 text-gray-400 rounded-2xl font-bold hover:bg-gray-200 text-xl flex items-center justify-center">
+                        +
+                    </button>
                 </div>
                 <div id="edit-wishlist-preview-container" class="relative hidden mb-3 text-center">
                     <img id="edit-wishlist-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
