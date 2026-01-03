@@ -1270,15 +1270,29 @@
             }
             ;
             
-            window.getParticipantStyle = (name) => {
-                // Returns styles for tags, not cards
+            window.getParticipantTheme = (name) => {
+                // Hardcoded themes for specific users
+                if (name === 'Josh') return {
+                    bg: 'bg-blue-50',
+                    text: 'text-blue-500',
+                    border: 'border-blue-100',
+                    ring: 'ring-blue-400',
+                    lightBg: 'bg-blue-50' // For cards
+                };
+                if (name === 'Candice') return {
+                    bg: 'bg-pink-50',
+                    text: 'text-pink-500',
+                    border: 'border-pink-100',
+                    ring: 'ring-pink-400',
+                    lightBg: 'bg-pink-50' // For cards
+                };
+                
+                // Fallback for others
                 const styles = [
-                    'bg-purple-50 text-purple-500 border-purple-200',
-                    'bg-pink-50 text-pink-500 border-pink-200', 
-                    'bg-blue-50 text-blue-500 border-blue-200',
-                    'bg-orange-50 text-orange-500 border-orange-200',
-                    'bg-emerald-50 text-emerald-500 border-emerald-200',
-                    'bg-cyan-50 text-cyan-500 border-cyan-200'
+                    { bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-100', ring: 'ring-orange-400', lightBg: 'bg-orange-50' },
+                    { bg: 'bg-emerald-50', text: 'text-emerald-500', border: 'border-emerald-100', ring: 'ring-emerald-400', lightBg: 'bg-emerald-50' },
+                    { bg: 'bg-cyan-50', text: 'text-cyan-500', border: 'border-cyan-100', ring: 'ring-cyan-400', lightBg: 'bg-cyan-50' },
+                    { bg: 'bg-indigo-50', text: 'text-indigo-500', border: 'border-indigo-100', ring: 'ring-indigo-400', lightBg: 'bg-indigo-50' }
                 ];
                 let hash = 0;
                 for (let i = 0; i < name.length; i++) {
@@ -1327,23 +1341,25 @@
                 // UNIFIED COLORS - PAYER CARDS
                 document.getElementById('payer-cards-container').innerHTML = window.TRIP_PARTICIPANTS.map( (p, i) => {
                     const isActive = PAYER_FILTER === p;
-                    // Pink Theme for Payers
-                    const activeClass = isActive ? 'ring-2 ring-[#FF8BA7] bg-pink-50' : 'hover:bg-gray-50 border-gray-100';
-                    const textClass = isActive ? 'text-[#FF8BA7]' : 'text-gray-400';
-                    const icon = isActive ? '<i class="fa-solid fa-check text-[#FF8BA7]"></i>' : '';
+                    const theme = window.getParticipantTheme(p);
                     
-                    return `<div onclick="window.togglePayerFilter('${p}')" class="bg-white p-4 rounded-3xl shadow-sm border transition cursor-pointer ${activeClass}"><p class="text-xs font-bold mb-1 ${textClass} flex justify-between">${p} 付 ${icon}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`;
+                    // Use theme colors for background, making them distinct
+                    let cardClass = isActive ? `ring-2 ${theme.ring} ${theme.lightBg} shadow-md` : `${theme.lightBg} hover:opacity-80 border-transparent`;
+                    
+                    const icon = isActive ? `<i class="fa-solid fa-check ${theme.text}"></i>` : '';
+                    
+                    return `<div onclick="window.togglePayerFilter('${p}')" class="p-4 rounded-3xl border transition cursor-pointer ${cardClass}"><p class="text-xs font-bold mb-1 ${theme.text} flex justify-between">${p} 付 ${icon}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`;
                 }).join('');
                 
                 // UNIFIED COLORS - PAYMENT CARDS
                 document.getElementById('payment-cards-container').innerHTML = window.TRIP_PAYMENT_METHODS.map((pm, i) => {
                      const isActive = PAYMENT_FILTER === pm;
                      // Teal Theme for Payments
-                     const activeClass = isActive ? 'ring-2 ring-[#4ECDC4] bg-teal-50' : 'hover:bg-gray-50 border-gray-100';
+                     const activeClass = isActive ? 'ring-2 ring-[#4ECDC4] bg-teal-50' : 'bg-white hover:bg-gray-50 border-gray-100';
                      const textClass = isActive ? 'text-[#4ECDC4]' : 'text-gray-400';
                      const icon = isActive ? '<i class="fa-solid fa-check text-[#4ECDC4]"></i>' : '';
                      
-                     return `<div onclick="window.togglePaymentFilter('${pm}')" class="bg-white p-4 rounded-3xl shadow-sm border transition cursor-pointer ${activeClass}"><p class="text-xs font-bold ${textClass} mb-1 flex justify-between">${pm} ${icon}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(paymentTotals[pm] || 0).toLocaleString()}</p></div>`;
+                     return `<div onclick="window.togglePaymentFilter('${pm}')" class="p-4 rounded-3xl shadow-sm border transition cursor-pointer ${activeClass}"><p class="text-xs font-bold ${textClass} mb-1 flex justify-between">${pm} ${icon}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(paymentTotals[pm] || 0).toLocaleString()}</p></div>`;
                 }).join('');
 
                 let balance = {};
@@ -1535,20 +1551,27 @@
                     const isPersonal = e.splitType === 'personal';
                     // Tag Logic
                     let splitTag = '';
+                    let payerTag = '';
+
+                    // Payer Tag (Use theme)
+                    const payerTheme = window.getParticipantTheme(e.payer);
+                    payerTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold ${payerTheme.bg} ${payerTheme.text} ${payerTheme.border} border"><i class="fa-solid fa-wallet mr-1"></i>${e.payer}</span>`;
+
                     if (isPersonal) {
                         // If personal, show who it's for
                         const ben = e.beneficiaries && e.beneficiaries.length > 0 ? e.beneficiaries[0] : '個人';
-                        const style = window.getParticipantStyle(ben);
-                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold ${style} border">👤 ${ben}</span>`;
+                        const theme = window.getParticipantTheme(ben);
+                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold ${theme.bg} ${theme.text} ${theme.border} border">👤 ${ben}</span>`;
                     } else {
-                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#E0F7FA] text-[#006064] border border-[#B2EBF2]">👥 共同</span>`;
+                        // Shared = Purple
+                        splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-600 border border-purple-200">👥 共同</span>`;
                     }
                     
                     // Payment Method Tag
                     const pMethod = e.payment || 'Cash';
                     const pTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200">${pMethod}</span>`;
 
-                    return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm ${isTransfer ? 'text-green-600' : ''}">${e.description}</p><p class="text-xs text-gray-400 mt-0.5 flex items-center flex-wrap gap-1">${e.date} · ${e.payer} ${splitTag} ${pTag}</p><p class="text-[10px] text-gray-300 mt-0.5">${e.category}</p></div></div><div class="text-right"><p class="font-bold ${amountColorClass}">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
+                    return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm ${isTransfer ? 'text-green-600' : ''}">${e.description}</p><p class="text-xs text-gray-400 mt-1 flex items-center flex-wrap gap-1">${e.date} ${payerTag} ${splitTag} ${pTag}</p><p class="text-[10px] text-gray-300 mt-0.5 hidden">${e.category}</p></div></div><div class="text-right"><p class="font-bold ${amountColorClass}">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
                 }).join('');
             }
             ;
