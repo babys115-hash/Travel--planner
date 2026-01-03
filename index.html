@@ -2,7 +2,7 @@
 <html lang="zh-TW">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>My Travel History</title>
         <link rel="icon" type="image/png" href="./luggage.png">
         <link rel="apple-touch-icon" href="./luggage.png">
@@ -26,15 +26,14 @@
                 font-family: 'Zen Maru Gothic', sans-serif !important;
                 color: var(--custom-text);
                 background-color: var(--custom-bg);
+                overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
             }
 
             /* --- Guest Mode Styles --- */
-            /* Hide elements marked as auth-only when in guest mode */
             body.guest-mode .auth-only {
                 display: none !important;
             }
             
-            /* Show elements marked as guest-only when in guest mode */
             body.guest-mode .guest-banner {
                 display: flex;
             }
@@ -208,12 +207,12 @@
             window.TRIP_PARTICIPANTS = ['Josh', 'Candice'];
             window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
             
-            // Permissions
+            // --- Permissions ---
             window.IS_LOCKED = true; // Default to locked (Guest Mode)
-            window.TRIP_PIN = "8888"; // Default PIN
+            window.CURRENT_TRIP_PIN = "8888"; // Will be loaded from trip settings
 
-            // Default Categories
-            window.DEFAULT_CATEGORIES = ['Food', 'Transport', 'Accommodation', 'Shopping', 'Ticket', 'Purchasing'];
+            // Default Categories (Updated: Purchasing -> 代購)
+            window.DEFAULT_CATEGORIES = ['Food', 'Transport', 'Accommodation', 'Shopping', 'Ticket', '代購', 'Transfer'];
             window.TRIP_CATEGORIES = [...window.DEFAULT_CATEGORIES];
 
             // Default Wishlist Categories
@@ -302,8 +301,9 @@
 
             window.toggleLock = () => {
                 if (window.IS_LOCKED) {
-                    const input = prompt("請輸入旅程編輯密碼 (預設: 8888):");
-                    if (input === window.TRIP_PIN) {
+                    const input = prompt("請輸入旅程編輯密碼:");
+                    // Check against current trip's PIN
+                    if (input === window.CURRENT_TRIP_PIN) {
                         window.IS_LOCKED = false;
                         alert("已解鎖編輯權限！");
                         window.applyLockState();
@@ -366,7 +366,7 @@
             ;
             window.enterTrip = (id) => {
                 window.CURRENT_TRIP_ID = id;
-                window.IS_LOCKED = true; // Default lock on entry
+                window.IS_LOCKED = true; // Always lock when entering a trip
                 window.applyLockState();
 
                 const trip = window.TRIP_LIST.find(t => t.id === id);
@@ -436,10 +436,14 @@
                     categories: window.DEFAULT_CATEGORIES,
                     wishlistCategories: window.DEFAULT_WISHLIST_CATEGORIES,
                     tripName: name,
-                    pin: pin
+                    pin: pin 
                 });
                 window.closeModal('createTripModal');
                 window.enterTrip(ref.id);
+                // Unlock immediately for creator
+                window.IS_LOCKED = false;
+                window.CURRENT_TRIP_PIN = pin;
+                window.applyLockState();
             }
             ;
             window.deleteTrip = async (id) => {
@@ -575,7 +579,9 @@
                             window.applyCurrencySettings(data.currency || 'JPY');
                         }
                         
-                        if (data.pin) window.TRIP_PIN = data.pin;
+                        // Sync PIN
+                        if (data.pin) window.CURRENT_TRIP_PIN = data.pin;
+                        else window.CURRENT_TRIP_PIN = "8888";
 
                         window.renderExpensePayerButtons();
                         window.renderBeneficiaryButtons();
@@ -590,8 +596,9 @@
                         window.renderExpenseDashboard();
                         window.renderParticipantsList();
                         
-                        if(document.getElementById('edit-trip-info-pin')) {
-                            document.getElementById('edit-trip-info-pin').value = data.pin || '8888';
+                        // Load PIN into edit modal if open
+                        if (document.getElementById('edit-trip-info-pin')) {
+                            document.getElementById('edit-trip-info-pin').value = window.CURRENT_TRIP_PIN;
                         }
                     }
                 });
@@ -968,6 +975,37 @@
             }
             ;
 
+            // --- REVERSE (SWAP) LOGIC ---
+            window.swapPayerBeneficiary = (isEdit = false) => {
+                // Get current states
+                const currentPayer = isEdit ? EDIT_PAYER : ACTIVE_PAYER;
+                const currentBens = isEdit ? EDIT_BENEFICIARIES : ACTIVE_BENEFICIARIES;
+                const currentSplit = isEdit ? EDIT_SPLIT_TYPE : ACTIVE_SPLIT_TYPE;
+
+                // Only works if split type is 'personal' and there is exactly 1 beneficiary
+                if (currentSplit === 'personal' && currentBens.length === 1) {
+                    const oldBeneficiary = currentBens[0];
+                    
+                    // Swap
+                    if (isEdit) {
+                        EDIT_PAYER = oldBeneficiary;
+                        EDIT_BENEFICIARIES = [currentPayer];
+                        window.renderEditExpensePayerButtons();
+                        window.renderEditBeneficiaryButtons();
+                        // Visual feedback
+                        document.getElementById('edit-expense-payer').value = EDIT_PAYER;
+                    } else {
+                        ACTIVE_PAYER = oldBeneficiary;
+                        ACTIVE_BENEFICIARIES = [currentPayer];
+                        window.renderExpensePayerButtons();
+                        window.renderBeneficiaryButtons();
+                        document.getElementById('expense-payer').value = ACTIVE_PAYER;
+                    }
+                } else {
+                    alert("只能在「個人支出」且只有一位受益人時進行交換。");
+                }
+            };
+
             window.renderBeneficiaryButtons = () => {
                 const container = document.getElementById('beneficiaries-container');
                 container.innerHTML = window.TRIP_PARTICIPANTS.map(p => {
@@ -1022,10 +1060,25 @@
                     imageUrl: imgUrl,
                     timestamp: serverTimestamp()
                 });
-                alert('記帳成功');
+                // alert('記帳成功'); // Removed alert for smoother flow
+                
+                // Clear Form
                 document.getElementById('expense-description').value = '';
                 document.getElementById('expense-amount').value = '';
                 document.getElementById('expense-preview-container').classList.add('hidden');
+                
+                // Reset Filters to All so user sees the new item
+                PAYER_FILTER = 'All';
+                PAYMENT_FILTER = 'All';
+                CATEGORY_FILTER = 'All';
+                SPLIT_FILTER = 'All';
+                
+                // Switch to Details View and Scroll to List
+                window.switchExpenseView('details');
+                setTimeout(() => {
+                    const list = document.getElementById('expense-list');
+                    if(list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
             }
             ;
             window.togglePayerFilter = (p) => {
@@ -1081,7 +1134,12 @@
 
                 window.EXPENSES_DATA.forEach(e => {
                     const v = e.currency !== 'TWD' ? e.amount * window.EXCHANGE_RATE : e.amount;
-                    total += v;
+                    
+                    // Only add to Total Spent if it is NOT a Transfer
+                    if (e.category !== 'Transfer') {
+                        total += v;
+                    }
+
                     if (e.payer && payerTotals[e.payer] !== undefined)
                         payerTotals[e.payer] += v;
                     
@@ -1126,16 +1184,32 @@
                     );
                 }
                 );
-                let maxDebtor = null
-                  , maxDebt = 0;
+                let maxDebtor = null, maxDebt = 0;
+                let maxCreditor = null, maxCredit = 0;
+
                 Object.keys(balance).forEach(p => {
                     if (balance[p] < 0 && Math.abs(balance[p]) > maxDebt) {
                         maxDebtor = p;
                         maxDebt = Math.abs(balance[p]);
                     }
+                    if (balance[p] > 0 && balance[p] > maxCredit) {
+                        maxCreditor = p;
+                        maxCredit = balance[p];
+                    }
+                });
+
+                let settlementHtml = maxDebtor ? `<div class="mb-3 text-sm"><span class="text-[#FF8BA7] font-bold text-lg">${maxDebtor}</span> 應支付 <span class="text-gray-700 font-bold">${maxCreditor}</span> <br><span class="text-[#FF8BA7] font-bold text-xl">$${Math.round(maxDebt).toLocaleString()}</span></div>` : "<div class='text-green-500 font-bold'><i class='fa-solid fa-circle-check mr-1'></i> 款項已全部結清</div>";
+                
+                if (maxDebtor && maxCreditor) {
+                    settlementHtml += `
+                        <button onclick="window.settleUp('${maxDebtor}', '${maxCreditor}', ${Math.round(maxDebt)})" class="auth-only w-full py-2 bg-blue-500 text-white rounded-xl font-bold shadow-md hover:bg-blue-600 transition text-sm mb-2">
+                            <i class="fa-solid fa-hand-holding-dollar mr-1"></i> 點此標記為「已付款」
+                        </button>
+                        <p class="text-[10px] text-gray-400">* 新增紀錄後，系統將自動重新計算餘額</p>
+                    `;
                 }
-                );
-                document.getElementById('settlement-result').innerHTML = maxDebtor ? `<span class="text-[#FF8BA7]">${maxDebtor}</span> 需再付出 <span class="text-[#FF8BA7]">$${Math.round(maxDebt).toLocaleString()}</span>` : "目前已結清";
+
+                document.getElementById('settlement-result').innerHTML = settlementHtml;
 
                 // --- Render Split Filters ---
                 const splitContainer = document.getElementById('split-filter-container');
@@ -1154,7 +1228,56 @@
                 window.renderExpenseList();
             }
             ;
-            window.renderExpenseList = () => {
+
+            window.settleUp = (debtor, creditor, amount) => {
+                // Pre-fill Add Expense Form for Settlement
+                window.switchMainNav('expense-tab');
+                window.switchExpenseView('add');
+                
+                // Set Date to Today
+                const dateInput = document.getElementById('expense-date');
+                const today = new Date().toISOString().split('T')[0];
+                dateInput.value = today;
+                
+                document.getElementById('expense-description').value = `💸 款項結清 (Payment)`;
+                document.getElementById('expense-amount').value = amount;
+                
+                // Set Payer to Debtor
+                ACTIVE_PAYER = debtor;
+                window.renderExpensePayerButtons();
+                
+                // Set Split to Personal
+                window.selectSplitType('personal');
+                
+                // Set Beneficiary to Creditor
+                ACTIVE_BENEFICIARIES = [creditor];
+                window.renderBeneficiaryButtons();
+                
+                // Set Category to Transfer
+                if(window.TRIP_CATEGORIES.includes('Transfer')) {
+                    window.selectCategory('Transfer');
+                } else {
+                    // Automatically add Transfer category if missing for better UX
+                    ACTIVE_CATEGORY = 'Transfer';
+                    window.TRIP_CATEGORIES.push('Transfer');
+                    const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
+                    setDoc(ref, { categories: window.TRIP_CATEGORIES }, { merge: true });
+                    window.renderCategorySelection('expense-category-options');
+                }
+                
+                // Scroll to top
+                document.getElementById('add-expense-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Visual Highlight
+                dateInput.classList.add('bg-yellow-100', 'transition-colors', 'duration-500');
+                
+                setTimeout(() => {
+                     alert(`已自動填入今天日期與結算金額。\n\n由 ${debtor} 支付 $${amount} 給 ${creditor} (個人支出)。\n\n確認無誤後，請點擊下方的「確認紀錄」，系統將自動重新計算餘額。`);
+                     dateInput.classList.remove('bg-yellow-100');
+                }, 500);
+            };
+
+                       window.renderExpenseList = () => {
                 // Use TRIP_CATEGORIES instead of deriving from data to ensure custom ones show up even if empty
                 // But for filters, we might want to show all used + all configured. 
                 // Let's merge them.
@@ -1211,12 +1334,17 @@
                     Accommodation: 'fa-bed',
                     Shopping: 'fa-bag-shopping',
                     Ticket: 'fa-ticket',
-                    Purchasing: 'fa-cart-plus'
+                    '代購': 'fa-cart-plus', // Updated
+                    Transfer: 'fa-money-bill-transfer'
                 };
                 document.getElementById('expense-list').innerHTML = filteredData.map(e => {
                     const twd = e.currency !== 'TWD' ? Math.round(e.amount * window.EXCHANGE_RATE) : e.amount;
                     const iconClass = iconMap[e.category] || 'fa-tag'; // Default icon for custom categories
-                    const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center mr-3 text-custom-primary"><i class="fa-solid ${iconClass}"></i></div>`;
+                    const isTransfer = e.category === 'Transfer';
+                    const iconColorClass = isTransfer ? 'text-green-500 bg-green-50' : 'text-custom-primary bg-pink-50';
+                    const amountColorClass = isTransfer ? 'text-green-500' : 'text-[#FF6B6B]';
+                    
+                    const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full ${iconColorClass} flex items-center justify-center mr-3"><i class="fa-solid ${iconClass}"></i></div>`;
                     
                     const isPersonal = e.splitType === 'personal';
                     // Tag Logic
@@ -1233,7 +1361,7 @@
                     const pMethod = e.payment || 'Cash';
                     const pTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200">${pMethod}</span>`;
 
-                    return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm">${e.description}</p><p class="text-xs text-gray-400 mt-0.5 flex items-center flex-wrap gap-1">${e.date} · ${e.payer} ${splitTag} ${pTag}</p><p class="text-[10px] text-gray-300 mt-0.5">${e.category}</p></div></div><div class="text-right"><p class="font-bold text-[#FF6B6B]">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
+                    return `<div onclick="window.openEditExpenseModal('${e.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition"><div class="flex items-center">${imgHtml}<div><p class="font-bold text-gray-700 text-sm ${isTransfer ? 'text-green-600' : ''}">${e.description}</p><p class="text-xs text-gray-400 mt-0.5 flex items-center flex-wrap gap-1">${e.date} · ${e.payer} ${splitTag} ${pTag}</p><p class="text-[10px] text-gray-300 mt-0.5">${e.category}</p></div></div><div class="text-right"><p class="font-bold ${amountColorClass}">${e.currency} ${e.amount.toLocaleString()}</p><p class="text-[10px] text-gray-400">≈ ${twd.toLocaleString()}</p></div></div>`;
                 }).join('');
             }
             ;
@@ -1369,8 +1497,7 @@
                             <button onclick="window.openEditTripInfoModal()" class="auth-only ml-3 text-sm text-gray-300 hover:text-custom-primary bg-gray-50 w-8 h-8 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-gear"></i></button>
                         </h3>
                     </div>
-                    <div onclick="window.openEditTripInfoModal()" class="auth-only cursor-pointer w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm hover:scale-110 transition"><i class="fa-solid ${icon}"></i></div>
-                    <div class="cursor-default w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm hidden" style="display: ${window.IS_LOCKED ? 'flex' : 'none'} !important"><i class="fa-solid ${icon}"></i></div>
+                    <div onclick="window.openEditTripInfoModal()" class="cursor-pointer w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm hover:scale-110 transition"><i class="fa-solid ${icon}"></i></div>
                 </div>`;
                 
                 // Update container border color dynamically
@@ -1395,7 +1522,7 @@
                 if (!trip) return;
 
                 document.getElementById('edit-trip-info-name').value = window.CURRENT_TRIP_NAME;
-                document.getElementById('edit-trip-info-pin').value = window.TRIP_PIN;
+                document.getElementById('edit-trip-info-pin').value = window.CURRENT_TRIP_PIN;
                 
                 // Set Color Radio
                 const color = trip.color || 'pink';
@@ -1433,7 +1560,7 @@
 
                 // Update local visual state immediately for better UX
                 window.CURRENT_TRIP_NAME = name;
-                window.TRIP_PIN = pin;
+                window.CURRENT_TRIP_PIN = pin;
                 document.getElementById('trip-title-display').innerText = name;
                 document.getElementById('trip-name-input').value = name;
                 
@@ -2181,13 +2308,13 @@
                                     <!-- LEFT COLUMN -->
                                     <div>
                                         <!-- Row 1: Date & Amount & Currency Combined -->
-                                        <div class="flex gap-2 mb-2">
+                                        <div class="flex flex-wrap gap-2 mb-2">
                                             <!-- Date (Compact) -->
-                                            <div class="relative shrink-0">
-                                                <input type="date" id="expense-date" class="w-[135px] p-2 text-xs md:text-sm bg-gray-50 rounded-xl font-bold text-gray-700 h-full">
+                                            <div class="relative flex-1 min-w-[120px]">
+                                                <input type="date" id="expense-date" class="w-full p-2 text-xs md:text-sm bg-gray-50 rounded-xl font-bold text-gray-700 h-full">
                                             </div>
                                             <!-- Amount & Currency -->
-                                            <div class="flex-1 flex gap-1 min-w-0">
+                                            <div class="flex-[2] flex gap-1 min-w-0">
                                                 <input type="number" id="expense-amount" placeholder="0" class="flex-1 min-w-0 p-2 bg-gray-50 rounded-xl text-lg font-bold text-gray-700">
                                                 <div id="add-currency-container" class="flex bg-gray-100 rounded-xl p-1 items-center shrink-0">
                                                     <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-2 py-1.5 rounded-lg text-xs font-bold text-gray-400 transition-all">TWD</button>
@@ -2220,10 +2347,15 @@
                                             <div class="flex gap-2 items-center mb-2 overflow-x-auto no-scrollbar">
                                                 <div id="expense-payer-select" class="flex gap-1 shrink-0"></div> 
                                                 <input type="hidden" id="expense-payer" value="Josh">
-                                                <div class="w-[1px] h-6 bg-gray-200 mx-1"></div>
+                                                
+                                                <!-- SWAP BUTTON -->
+                                                <button type="button" onclick="window.swapPayerBeneficiary()" class="mx-1 text-gray-300 hover:text-custom-primary transition transform active:scale-95 flex-shrink-0" title="交換付款人與受益人">
+                                                    <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
+                                                </button>
+
                                                 <div class="flex bg-gray-50 rounded-xl p-0.5 shrink-0">
                                                     <button type="button" id="btn-split-shared" onclick="window.selectSplitType('shared')" class="split-type-btn active !text-xs !py-1 !px-2">共同</button>
-                                                    <button type="button" id="btn-split-personal" onclick="window.selectSplitType('personal')" class="split-type-btn inactive !text-xs !py-1 !px-2">個人</button>
+                                                    <button type="button" id="btn-split-personal" onclick="window.selectSplitType('personal')" class="split-type-btn inactive !text-xs !py-1 !px-2">個人支出</button>
                                                 </div>
                                             </div>
                                              <div id="beneficiaries-container" class="flex gap-1 overflow-x-auto no-scrollbar pb-1"></div>
@@ -2554,18 +2686,34 @@
                     
                     <div class="mb-6">
                         <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色</label>
-                        <div class="flex gap-4 justify-center">
-                            <label class="cursor-pointer">
+                        <div class="flex gap-4 justify-center flex-wrap">
+                            <label class="cursor-pointer group">
                                 <input type="radio" name="new-trip-color" value="pink" class="hidden peer" checked>
-                                <div class="w-10 h-10 rounded-full bg-pink-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-pink-400"></div>
+                                <div class="w-10 h-10 rounded-full bg-pink-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-pink-400 group-hover:scale-110 transition"></div>
                             </label>
-                            <label class="cursor-pointer">
+                            <label class="cursor-pointer group">
                                 <input type="radio" name="new-trip-color" value="blue" class="hidden peer">
-                                <div class="w-10 h-10 rounded-full bg-blue-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-blue-400"></div>
+                                <div class="w-10 h-10 rounded-full bg-blue-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-blue-400 group-hover:scale-110 transition"></div>
                             </label>
-                            <label class="cursor-pointer">
+                            <label class="cursor-pointer group">
                                 <input type="radio" name="new-trip-color" value="purple" class="hidden peer">
-                                <div class="w-10 h-10 rounded-full bg-purple-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-purple-400"></div>
+                                <div class="w-10 h-10 rounded-full bg-purple-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-purple-400 group-hover:scale-110 transition"></div>
+                            </label>
+                             <label class="cursor-pointer group">
+                                <input type="radio" name="new-trip-color" value="orange" class="hidden peer">
+                                <div class="w-10 h-10 rounded-full bg-orange-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-orange-400 group-hover:scale-110 transition"></div>
+                            </label>
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="new-trip-color" value="green" class="hidden peer">
+                                <div class="w-10 h-10 rounded-full bg-green-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-green-400 group-hover:scale-110 transition"></div>
+                            </label>
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="new-trip-color" value="teal" class="hidden peer">
+                                <div class="w-10 h-10 rounded-full bg-teal-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-teal-400 group-hover:scale-110 transition"></div>
+                            </label>
+                             <label class="cursor-pointer group">
+                                <input type="radio" name="new-trip-color" value="indigo" class="hidden peer">
+                                <div class="w-10 h-10 rounded-full bg-indigo-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-indigo-400 group-hover:scale-110 transition"></div>
                             </label>
                         </div>
                     </div>
@@ -2612,6 +2760,14 @@
                             <input type="radio" name="edit-trip-color" value="green" class="hidden peer">
                             <div class="w-10 h-10 rounded-full bg-green-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-green-400 group-hover:scale-110 transition"></div>
                         </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="edit-trip-color" value="teal" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full bg-teal-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-teal-400 group-hover:scale-110 transition"></div>
+                        </label>
+                         <label class="cursor-pointer group">
+                            <input type="radio" name="edit-trip-color" value="indigo" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full bg-indigo-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-indigo-400 group-hover:scale-110 transition"></div>
+                        </label>
                     </div>
 
                     <label class="block mb-2 text-sm font-bold text-gray-500">圖標</label>
@@ -2652,6 +2808,32 @@
                 </form>
             </div>
         </div>
+        <!-- Edit Trip Date Modal -->
+        <div id="editTripDateModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripDateModal')">
+            <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
+                <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
+                    調整旅程日期
+                    <button onclick="window.closeModal('editTripDateModal')" class="flex items-center justify-center w-8 h-8 text-gray-400 bg-gray-100 rounded-full">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </h3>
+                <div class="flex gap-2 mb-3">
+                    <div class="flex-1">
+                        <label class="block mb-1 text-sm font-bold text-gray-500">開始日期</label>
+                        <input type="date" id="edit-trip-start" class="w-full p-3 border-0 bg-gray-50 rounded-xl" onchange="window.calculateEditTripDays()">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block mb-1 text-sm font-bold text-gray-500">結束日期</label>
+                        <input type="date" id="edit-trip-end" class="w-full p-3 border-0 bg-gray-50 rounded-xl" onchange="window.calculateEditTripDays()">
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label class="block mb-1 text-sm font-bold text-gray-500">天數</label>
+                    <input type="number" id="edit-trip-days" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center font-bold text-custom-primary" readonly>
+                </div>
+                <button onclick="window.saveTripDates()" id="save-trip-date-btn" class="w-full p-3 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl">確認修改</button>
+            </div>
+        </div>
         <!-- Edit Expense -->
         <div id="editExpenseModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editExpenseModal')">
             <div class="w-full max-w-sm md:max-w-2xl p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[85vh]" onclick="event.stopPropagation()">
@@ -2672,7 +2854,7 @@
                         </div>
                         <div class="mb-4">
                             <label class="block mb-1 text-sm font-bold text-gray-500">金額</label>
-                            <div class="flex gap-2 items-center">
+                            <div class="flex flex-wrap gap-2 items-center">
                                 <input type="number" id="edit-expense-amount" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-xl font-bold text-xl">
                                 <div id="edit-currency-container" class="flex-shrink-0 flex bg-gray-100 rounded-xl p-1 items-center">
                                     <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold text-gray-400">TWD</button>
@@ -2705,15 +2887,21 @@
                         </div>
                         <div class="mb-4">
                             <label class="block mb-2 text-sm font-bold text-gray-500">分帳方式</label>
-                            <div class="border-2 border-dashed border-gray-200 rounded-3xl p-4 bg-gray-50">
-                                <div class="flex gap-2 mb-3">
+                            <div class="border-2 border-dashed border-gray-200 rounded-3xl p-4 bg-gray-50 relative">
+                                <div class="flex gap-2 mb-3 items-center">
                                     <button type="button" id="edit-btn-split-shared" onclick="window.selectSplitType('shared', true)" class="split-type-btn active">
                                         <i class="fa-solid fa-users mr-1"></i>
                                         共同分擔
                                     </button>
+                                    
+                                    <!-- SWAP BUTTON EDIT -->
+                                    <button type="button" onclick="window.swapPayerBeneficiary(true)" class="mx-1 text-gray-300 hover:text-custom-primary transition transform active:scale-95 flex-shrink-0" title="交換付款人與受益人">
+                                        <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
+                                    </button>
+
                                     <button type="button" id="edit-btn-split-personal" onclick="window.selectSplitType('personal', true)" class="split-type-btn inactive">
                                         <i class="fa-solid fa-user mr-1"></i>
-                                        個人獨享
+                                        個人支出
                                     </button>
                                 </div>
                                 <div id="edit-beneficiaries-container" class="flex flex-wrap"></div>
@@ -2755,7 +2943,7 @@
                 <label class="block mb-1 text-sm font-bold text-gray-500">名稱</label>
                 <input type="text" id="edit-wishlist-name" class="w-full p-3 mb-3 font-bold border-0 bg-gray-50 rounded-xl" required>
                 <div class="flex gap-2 mb-3">
-                    <div class="flex-1">
+                    <div class="flex-1 min-w-0">
                         <label class="block mb-1 text-sm font-bold text-gray-500">價格</label>
                         <input type="number" id="edit-wishlist-price" class="w-full p-3 font-bold border-0 bg-gray-50 rounded-xl" required>
                     </div>
@@ -2781,6 +2969,9 @@
                 <div class="flex gap-3 auth-only">
                     <button onclick="window.deleteWishlistItem()" class="flex-1 p-3 font-bold text-red-400 border-2 border-red-100 rounded-2xl">刪除</button>
                     <button onclick="window.saveWishlistUpdate()" class="flex-[2] p-3 font-bold text-white bg-custom-primary rounded-2xl shadow-lg">儲存</button>
+                </div>
+                <div class="hidden mt-4 text-center guest-banner">
+                    <p class="text-sm font-bold text-gray-400"><i class="fa-solid fa-lock mr-1"></i> 訪客模式僅供檢視</p>
                 </div>
             </div>
         </div>
@@ -2829,8 +3020,8 @@
                     <input type="hidden" id="edit-itinerary-id">
                     <input type="hidden" id="edit-itinerary-idx">
                     <div class="relative mb-3">
-                        <input type="time" id="edit-itinerary-time" class="w-full p-4 pl-12 bg-white border-2 border-gray-100 rounded-2xl font-bold text-gray-700 shadow-sm" required>
-                        <i class="fa-regular fa-clock absolute left-4 top-5 text-gray-400"></i>
+                        <input type="time" id="edit-itinerary-time" class="w-full p-3 pl-10 bg-white border-2 border-gray-100 rounded-2xl font-bold text-gray-700 shadow-sm" required>
+                        <i class="fa-regular fa-clock absolute left-4 top-4 text-gray-400"></i>
                     </div>
                     <input type="text" id="edit-itinerary-title" placeholder="行程標題" class="w-full p-4 mb-3 bg-white border-2 border-gray-100 rounded-2xl font-bold text-gray-700 shadow-sm" required>
                     <input type="text" id="edit-itinerary-link" placeholder="地圖連結" class="w-full p-4 mb-3 bg-white border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-700 shadow-sm">
@@ -2876,6 +3067,9 @@
                     </button>
                     <input type="file" id="edit-spot-file" accept="image/*" class="hidden" onchange="window.previewEditImage(this, 'edit-spot-preview', 'edit-spot-preview-container')">
                     <button type="submit" class="auth-only w-full p-3 mt-4 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
+                    <div class="hidden mt-4 text-center guest-banner">
+                        <p class="text-sm font-bold text-gray-400"><i class="fa-solid fa-lock mr-1"></i> 訪客模式僅供檢視</p>
+                    </div>
                 </form>
             </div>
         </div>
@@ -2904,6 +3098,9 @@
                         <i class="absolute top-4 right-4 text-gray-400 fa-solid fa-chevron-down pointer-events-none text-xs"></i>
                     </div>
                     <button type="submit" id="save-packing-btn" class="auth-only w-full p-3 mt-4 font-bold text-white transition shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90">儲存修改</button>
+                    <div class="hidden mt-4 text-center guest-banner">
+                        <p class="text-sm font-bold text-gray-400"><i class="fa-solid fa-lock mr-1"></i> 訪客模式僅供檢視</p>
+                    </div>
                 </form>
             </div>
         </div>
