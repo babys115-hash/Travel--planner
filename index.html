@@ -309,6 +309,8 @@
                     // Check against current trip's PIN
                     if (input === window.CURRENT_TRIP_PIN) {
                         window.IS_LOCKED = false;
+                        // Save to localStorage
+                        localStorage.setItem(`is_unlocked_${window.CURRENT_TRIP_ID}`, 'true');
                         alert("已解鎖編輯權限！");
                         window.applyLockState();
                     } else {
@@ -316,6 +318,8 @@
                     }
                 } else {
                     window.IS_LOCKED = true;
+                    // Remove from localStorage
+                    localStorage.removeItem(`is_unlocked_${window.CURRENT_TRIP_ID}`);
                     window.applyLockState();
                 }
             };
@@ -370,7 +374,14 @@
             ;
             window.enterTrip = (id) => {
                 window.CURRENT_TRIP_ID = id;
-                window.IS_LOCKED = true; // Always lock when entering a trip
+                
+                // Check if previously unlocked
+                const isUnlocked = localStorage.getItem(`is_unlocked_${id}`);
+                if (isUnlocked === 'true') {
+                    window.IS_LOCKED = false;
+                } else {
+                    window.IS_LOCKED = true; // Default locked if not found
+                }
                 window.applyLockState();
 
                 const trip = window.TRIP_LIST.find(t => t.id === id);
@@ -394,11 +405,22 @@
             }
             ;
             window.calculateTripDays = () => {
-                const start = new Date(document.getElementById('new-trip-start').value);
-                const end = new Date(document.getElementById('new-trip-end').value);
+                const startInput = document.getElementById('new-trip-start');
+                const endInput = document.getElementById('new-trip-end');
+                
+                const start = new Date(startInput.value);
+                const end = new Date(endInput.value);
+                
+                // Set constraint: End date cannot be before start date
+                if (startInput.value) {
+                    endInput.min = startInput.value;
+                }
+
                 if (start && end && end >= start) {
                     const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
                     document.getElementById('new-trip-days').value = diff;
+                } else {
+                    document.getElementById('new-trip-days').value = '';
                 }
             }
             ;
@@ -447,6 +469,7 @@
                 // Unlock immediately for creator
                 window.IS_LOCKED = false;
                 window.CURRENT_TRIP_PIN = pin;
+                localStorage.setItem(`is_unlocked_${ref.id}`, 'true');
                 window.applyLockState();
             }
             ;
@@ -694,6 +717,9 @@
 
                 // 5. Re-render Dashboard (to update "≈ TWD" values in list and totals)
                 if(window.renderExpenseDashboard) window.renderExpenseDashboard();
+                
+                // 6. Re-render Wishlist to update currency symbol
+                if(window.renderWishlist) window.renderWishlist();
             };
             // -------------------------------------
 
@@ -2194,7 +2220,7 @@
                         statusHtml = `<span onclick="window.toggleWishlistStatus('${i.id}', '${s}')" class="text-xs font-bold px-2 py-1 rounded-lg bg-gray-100 text-gray-400 border border-gray-200 cursor-pointer hover:opacity-80 ml-2 shadow-sm transition-all">未買</span>`;
                     }
                     
-                    return `<div onclick="window.openEditWishlistModal('${i.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition opacity-${s === 'bought' ? '60' : '100'}"><div><p class="font-bold text-gray-700 text-lg ${s === 'bought' ? 'line-through text-gray-400' : ''}">${i.name} <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full ml-2 no-underline">x${i.quantity || 1}</span></p><div class="flex items-center mt-1"><p class="text-xs text-custom-primary mr-1">${i.category}</p>${statusHtml}</div></div><div class="flex items-center gap-3"><div class="text-right"><p class="font-bold text-gray-700 text-lg">¥${(i.price).toLocaleString()}</p>${i.imageUrl ? `<span onclick="event.stopPropagation(); window.openImagePreview('${i.imageUrl}')" class="text-xs text-blue-400 cursor-pointer underline">查看照片</span>` : ''}</div></div></div>`;
+                    return `<div onclick="window.openEditWishlistModal('${i.id}')" class="p-4 mb-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer hover:shadow-md transition opacity-${s === 'bought' ? '60' : '100'}"><div><p class="font-bold text-gray-700 text-lg ${s === 'bought' ? 'line-through text-gray-400' : ''}">${i.name} <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full ml-2 no-underline">x${i.quantity || 1}</span></p><div class="flex items-center mt-1"><p class="text-xs text-custom-primary mr-1">${i.category}</p>${statusHtml}</div></div><div class="flex items-center gap-3"><div class="text-right"><p class="font-bold text-gray-700 text-lg">${window.CURRENT_CURRENCY} ${(i.price).toLocaleString()}</p>${i.imageUrl ? `<span onclick="event.stopPropagation(); window.openImagePreview('${i.imageUrl}')" class="text-xs text-blue-400 cursor-pointer underline">查看照片</span>` : ''}</div></div></div>`;
                 }).join('');
             };
 
@@ -2897,14 +2923,14 @@
                 <form onsubmit="window.createNewTrip(event)">
                     <label class="block mb-1 text-sm font-bold text-gray-500">旅程名稱</label>
                     <input type="text" id="new-trip-name" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl" placeholder="例如: 沖繩五日" required>
-                    <div class="flex gap-2 mb-3">
-                        <div class="flex-1">
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
                             <label class="block mb-1 text-sm font-bold text-gray-500">開始日期</label>
-                            <input type="date" id="new-trip-start" class="w-full p-3 border-0 bg-gray-50 rounded-xl" required onchange="window.calculateTripDays()">
+                            <input type="date" id="new-trip-start" class="w-full p-3 border-0 bg-gray-50 rounded-xl" required oninput="window.calculateTripDays()" onchange="window.calculateTripDays()">
                         </div>
-                        <div class="flex-1">
+                        <div>
                             <label class="block mb-1 text-sm font-bold text-gray-500">結束日期</label>
-                            <input type="date" id="new-trip-end" class="w-full p-3 border-0 bg-gray-50 rounded-xl" required onchange="window.calculateTripDays()">
+                            <input type="date" id="new-trip-end" class="w-full p-3 border-0 bg-gray-50 rounded-xl" required oninput="window.calculateTripDays()" onchange="window.calculateTripDays()">
                         </div>
                     </div>
                     <div class="mb-3">
