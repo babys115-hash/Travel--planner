@@ -3195,19 +3195,19 @@
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </h3>
-                <div class="flex gap-2 mb-3">
-                    <div class="flex-1">
+                <div class="grid grid-cols-1 gap-4 mb-4">
+                    <div>
                         <label class="block mb-1 text-sm font-bold text-gray-500">開始日期</label>
-                        <input type="date" id="edit-trip-start" class="w-full p-3 border-0 bg-gray-50 rounded-xl" onchange="window.calculateEditTripDays()">
+                        <input type="date" id="edit-trip-start" class="w-full p-3 border-0 bg-gray-50 rounded-xl font-bold text-gray-700" onchange="window.calculateEditTripDays()">
                     </div>
-                    <div class="flex-1">
+                    <div>
                         <label class="block mb-1 text-sm font-bold text-gray-500">結束日期</label>
-                        <input type="date" id="edit-trip-end" class="w-full p-3 border-0 bg-gray-50 rounded-xl" onchange="window.calculateEditTripDays()">
+                        <input type="date" id="edit-trip-end" class="w-full p-3 border-0 bg-gray-50 rounded-xl font-bold text-gray-700" onchange="window.calculateEditTripDays()">
                     </div>
                 </div>
                 <div class="mb-6">
                     <label class="block mb-1 text-sm font-bold text-gray-500">天數</label>
-                    <input type="number" id="edit-trip-days" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center font-bold text-custom-primary" readonly>
+                    <input type="number" id="edit-trip-days" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center font-bold text-custom-primary text-xl" readonly>
                 </div>
                 <button onclick="window.saveTripDates()" id="save-trip-date-btn" class="w-full p-3 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl">確認修改</button>
             </div>
