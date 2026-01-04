@@ -2887,15 +2887,19 @@
                         </div>
                     </div>
                     
-                    <!-- Export Button for Itinerary (Moved to TOP) -->
-                    <button onclick="window.exportItineraryToExcel()" class="w-full py-2 mb-4 rounded-2xl bg-white border-2 border-[#FF8BA7] text-[#FF8BA7] font-bold text-sm shadow-sm hover:bg-[#FFF0F5] transition flex items-center justify-center">
-                         <i class="fa-solid fa-file-excel mr-2 text-lg"></i>
-                         匯出行程表
-                    </button>
-
-                    <div class="bg-white p-2 rounded-3xl shadow-sm border border-pink-50 mb-6 sticky top-[70px] z-10">
-                        <div id="date-buttons-container" class="flex overflow-x-auto no-scrollbar p-1 gap-2"></div>
+                    <!-- Date Selector with Integrated Export Icon (New Layout) -->
+                    <div class="bg-white p-2 rounded-3xl shadow-sm border border-pink-50 mb-6 sticky top-[70px] z-10 flex items-center gap-2">
+                        <div id="date-buttons-container" class="flex-1 flex overflow-x-auto no-scrollbar p-1 gap-2"></div>
+                        
+                        <!-- Separator -->
+                        <div class="w-[1px] h-6 bg-gray-100 mx-1"></div>
+                        
+                        <!-- Small Excel Export Icon (Green) -->
+                        <button onclick="window.exportItineraryToExcel()" class="flex-shrink-0 w-9 h-9 rounded-full bg-white border border-[#4ECDC4] text-[#4ECDC4] shadow-sm flex items-center justify-center mr-1 hover:bg-[#E0F7FA] transition" title="匯出行程 Excel">
+                             <i class="fa-solid fa-file-excel"></i>
+                        </button>
                     </div>
+
                     <div id="itinerary-container"></div>
                     <button onclick="window.openAddItineraryModal()" class="auth-only fixed right-6 bottom-24 w-14 h-14 rounded-full bg-[#FF8BA7] text-white shadow-xl flex items-center justify-center text-2xl hover:scale-110 transition z-20">
                         <i class="fa-solid fa-plus"></i>
@@ -2938,25 +2942,27 @@
                 </div>
                 <!-- Packing -->
                 <div id="packing-tab" class="main-tab-content hidden p-4">
-                    <div class="auth-only bg-white p-6 rounded-[30px] shadow-sm border border-blue-50 mb-6">
+                    <div class="auth-only bg-white p-5 rounded-[30px] shadow-sm border border-blue-50 mb-6">
                         <h3 class="flex items-center mb-4 text-xl font-bold text-gray-700">
                             <i class="fa-solid fa-shirt text-[#4ECDC4] mr-2"></i>
                             新增行李
                         </h3>
                         <form onsubmit="window.addPackingItem(event)">
-                            <div class="flex gap-2 mb-4">
-                                <input type="text" id="packing-name" placeholder="護照" class="flex-[2] p-4 border-0 bg-gray-50 rounded-2xl font-bold" required>
-                                <div class="flex-1 relative">
-                                    <select id="packing-cat" class="w-full h-full p-4 border-0 bg-gray-50 rounded-2xl font-bold appearance-none pl-3">
+                            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                                <input type="text" id="packing-name" placeholder="例如: 護照" class="w-full sm:flex-[2] p-3 border-0 bg-gray-50 rounded-2xl font-bold text-gray-700" required>
+                                <div class="w-full sm:flex-1 relative">
+                                    <select id="packing-cat" class="w-full p-3 border-0 bg-gray-50 rounded-2xl font-bold appearance-none pl-3 text-gray-700">
                                         <option value="證件">🪪 證件</option>
                                         <option value="衣物">👕 衣物</option>
                                         <option value="電子">📱 3C</option>
                                         <option value="藥品">💊 藥品</option>
+                                        <option value="盥洗">🚿 盥洗</option>
+                                        <option value="其他">✨ 其他</option>
                                     </select>
-                                    <i class="fa-solid fa-chevron-down absolute right-3 top-5 text-gray-400 pointer-events-none text-xs"></i>
+                                    <i class="fa-solid fa-chevron-down absolute right-3 top-4 text-gray-400 pointer-events-none text-xs"></i>
                                 </div>
                             </div>
-                            <button type="submit" class="w-full py-4 font-bold text-white bg-[#4ECDC4] rounded-2xl shadow-md hover:opacity-90 transition-all">加入行李箱</button>
+                            <button type="submit" class="w-full py-3 font-bold text-white bg-[#4ECDC4] rounded-2xl shadow-md hover:opacity-90 transition-all">加入行李箱</button>
                         </form>
                     </div>
                     <div id="packing-list" class="space-y-2 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
