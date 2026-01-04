@@ -15,11 +15,18 @@
         <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
         <style type="text/tailwindcss">
             :root {
+                /* Default Theme: Macaron Pink (#FF8BA7) */
                 --custom-primary: #FF8BA7;
                 --custom-secondary: #4ECDC4;
                 --custom-danger: #FF6B6B;
-                --custom-bg: #FFFDF9;
+                --custom-bg: #FDFBF7; 
                 --custom-text: #595959;
+                
+                /* Dynamic Theme Shades (Pink Default) */
+                --theme-50: #FFF0F5;
+                --theme-100: #FFE4E9;
+                --theme-200: #FFC2D1;
+                --theme-500: #FF8BA7;
             }
 
             body {
@@ -28,6 +35,17 @@
                 background-color: var(--custom-bg);
                 overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
             }
+
+            /* --- Theme Utility Classes --- */
+            .bg-custom-primary { background-color: var(--custom-primary) !important; }
+            .text-custom-primary { color: var(--custom-primary) !important; }
+            .border-custom-primary { border-color: var(--custom-primary) !important; }
+            
+            .bg-theme-50 { background-color: var(--theme-50) !important; }
+            .bg-theme-100 { background-color: var(--theme-100) !important; }
+            .border-theme-100 { border-color: var(--theme-100) !important; }
+            .text-theme-500 { color: var(--theme-500) !important; }
+            .ring-theme-50 { --tw-ring-color: var(--theme-50) !important; }
 
             /* --- Guest Mode Styles --- */
             body.guest-mode .auth-only {
@@ -48,14 +66,6 @@
 
             .bg-white {
                 background-color: #ffffff;
-            }
-
-            .bg-custom-primary {
-                background-color: var(--custom-primary);
-            }
-
-            .text-custom-primary {
-                color: var(--custom-primary);
             }
 
             .bg-custom-secondary {
@@ -98,7 +108,7 @@
                 color: white;
                 border-color: var(--custom-primary);
                 transform: scale(1.05);
-                box-shadow: 0 4px 12px rgba(255, 139, 167, 0.3);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
             }
 
             .main-nav-btn {
@@ -125,10 +135,10 @@
                 @apply px-4 py-2 border-2 rounded-full text-sm font-bold transition-all duration-200 mr-2 mb-2 bg-white flex-shrink-0 cursor-pointer text-gray-400 border-gray-100 whitespace-nowrap; }
 
             .active-filter, .active-category, .active-payment, .active-payer {
-                background-color: #FF7596 !important;
-                border-color: #FF7596 !important;
+                background-color: var(--custom-primary) !important;
+                border-color: var(--custom-primary) !important;
                 color: white !important;
-                box-shadow: 0 4px 6px rgba(255, 117, 150, 0.2);
+                box-shadow: 0 4px 6px rgba(0,0,0,0.08);
             }
             
             .delete-mode-btn {
@@ -140,7 +150,10 @@
                 @apply flex-1 py-2 rounded-xl text-sm font-bold transition-all border-2 border-transparent whitespace-nowrap; }
 
             .split-type-btn.active {
-                @apply bg-[#FF8BA7] text-white shadow-md; }
+                background-color: var(--custom-primary);
+                color: white;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.08);
+            }
 
             .split-type-btn.inactive {
                 @apply bg-white text-gray-400 border-gray-100; }
@@ -167,7 +180,7 @@
                 bottom: 20px;
                 left: 23px;
                 width: 2px;
-                background-image: linear-gradient(to bottom, #FFE5EA 50%, transparent 50%);
+                background-image: linear-gradient(to bottom, var(--theme-100) 50%, transparent 50%);
                 background-size: 2px 10px;
                 z-index: 0;
             }
@@ -202,11 +215,32 @@
             window.TRIP_PARTICIPANTS = ['Josh', 'Candice'];
             window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
             
+            // --- Macaron Pastel Theme Config ---
+            // t50/t100: Very light backgrounds, t500: Primary/Buttons
+            const THEMES = {
+                pink:   { primary: '#FF8BA7', t50: '#FFF0F5', t100: '#FFE4E9', t200: '#FFC2D1', t500: '#FF8BA7' },
+                blue:   { primary: '#6CB4EE', t50: '#F0F9FF', t100: '#E0F2FE', t200: '#BAE6FD', t500: '#6CB4EE' },
+                purple: { primary: '#B39CD0', t50: '#FAF5FF', t100: '#F3E8FF', t200: '#E9D5FF', t500: '#B39CD0' },
+                orange: { primary: '#FF9E80', t50: '#FFF7ED', t100: '#FFEDD5', t200: '#FED7AA', t500: '#FF9E80' },
+                green:  { primary: '#4ECDC4', t50: '#F0FDFA', t100: '#CCFBF1', t200: '#99F6E4', t500: '#4ECDC4' },
+                yellow: { primary: '#F7C566', t50: '#FFFBEB', t100: '#FEF3C7', t200: '#FDE68A', t500: '#F7C566' }
+            };
+
+            window.applyTheme = (colorName) => {
+                const theme = THEMES[colorName] || THEMES['pink'];
+                const root = document.documentElement;
+                root.style.setProperty('--custom-primary', theme.primary);
+                root.style.setProperty('--theme-50', theme.t50);
+                root.style.setProperty('--theme-100', theme.t100);
+                root.style.setProperty('--theme-200', theme.t200);
+                root.style.setProperty('--theme-500', theme.t500);
+            };
+
             // --- Permissions ---
             window.IS_LOCKED = true; // Default to locked (Guest Mode)
             window.CURRENT_TRIP_PIN = "8888"; // Will be loaded from trip settings
 
-            // Default Categories (Updated: Purchasing -> 代購)
+            // Default Categories
             window.DEFAULT_CATEGORIES = ['Food', 'Transport', 'Accommodation', 'Shopping', 'Ticket', '代購', 'Transfer'];
             window.TRIP_CATEGORIES = [...window.DEFAULT_CATEGORIES];
 
@@ -378,9 +412,13 @@
                         icon = (t.color === 'blue') ? 'fa-earth-asia' : 'fa-suitcase';
                     }
 
+                    // For list view, we use static colors or we could use style map
+                    // Let's use the actual theme color for the icon background
+                    const theme = THEMES[color] || THEMES['pink'];
+
                     return `<div onclick="window.enterTrip('${t.id}')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-4 cursor-pointer hover:shadow-md transition relative group">
                         <div class="flex items-center">
-                            <div class="w-14 h-14 rounded-full bg-${color}-100 text-${color}-500 flex items-center justify-center text-2xl mr-4 ring-4 ring-${color}-50">
+                            <div class="w-14 h-14 rounded-full flex items-center justify-center text-2xl mr-4 ring-4 ring-white shadow-sm" style="background-color: ${theme.t50}; color: ${theme.primary}">
                                 <i class="fa-solid ${icon}"></i>
                             </div>
                             <div class="flex-1">
@@ -408,6 +446,11 @@
                 window.applyLockState();
 
                 const trip = window.TRIP_LIST.find(t => t.id === id);
+                
+                // Apply Dynamic Theme based on trip color
+                const themeColor = trip ? (trip.color || 'pink') : 'pink';
+                window.applyTheme(themeColor);
+
                 window.CURRENT_TRIP_NAME = trip ? trip.name : 'My Trip';
                 document.getElementById('trip-list-view').classList.add('hidden');
                 document.getElementById('trip-dashboard-view').classList.remove('hidden');
@@ -553,6 +596,9 @@
                         const meta = docSnap.data();
                         document.getElementById('overview-duration-display').innerText = meta.days || 0;
                         window.renderTripSummaryBlock(meta.startDate, meta.days, meta.color, meta.icon);
+                        
+                        // Update theme if color changes in real-time
+                        if(meta.color) window.applyTheme(meta.color);
                     } else if (isLegacy) {
                         document.getElementById('overview-duration-display').innerText = 6;
                         window.renderTripSummaryBlock('2025-12-25', 6, 'pink', 'fa-suitcase');
@@ -806,8 +852,8 @@
             window.switchExpenseView = (v) => {
                 document.getElementById('add-expense-container').classList.toggle('hidden', v !== 'add');
                 document.getElementById('expense-details-container').classList.toggle('hidden', v !== 'details');
-                document.getElementById('tab-add-expense-btn').className = v === 'add' ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all' : 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
-                document.getElementById('tab-view-details-btn').className = v === 'details' ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all' : 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
+                document.getElementById('tab-add-expense-btn').className = v === 'add' ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-custom-primary text-white shadow-md transition-all' : 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
+                document.getElementById('tab-view-details-btn').className = v === 'details' ? 'flex-1 py-3 rounded-2xl text-sm font-bold bg-custom-primary text-white shadow-md transition-all' : 'flex-1 py-3 rounded-2xl text-sm font-bold bg-white text-gray-400 transition-all hover:bg-gray-50';
                 if (v === 'add') {
                     ACTIVE_BENEFICIARIES = [...window.TRIP_PARTICIPANTS];
                     window.renderBeneficiaryButtons();
@@ -829,14 +875,14 @@
                 const id = prefix ? prefix + 'expense-currency' : 'expense-currency';
                 const container = prefix ? document.getElementById('edit-currency-container') : document.getElementById('add-currency-container');
                 container.querySelectorAll('button').forEach(b => {
-                    b.classList.replace('bg-[#FF7596]', 'text-gray-400');
+                    b.classList.replace('bg-custom-primary', 'text-gray-400');
                     b.classList.remove('text-white');
                 }
                 );
                 const btn = container.querySelector(`[data-currency="${c}"]`);
                 if(btn) {
                     btn.classList.remove('text-gray-400');
-                    btn.classList.add('bg-[#FF7596]', 'text-white');
+                    btn.classList.add('bg-custom-primary', 'text-white');
                     document.getElementById(id).value = c;
                 }
             }
@@ -1443,9 +1489,9 @@
                 document.getElementById('payment-cards-container').innerHTML = window.TRIP_PAYMENT_METHODS.map((pm, i) => {
                      const isActive = PAYMENT_FILTER === pm;
                      // Teal Theme for Payments
-                     const activeClass = isActive ? 'ring-2 ring-[#4ECDC4] bg-teal-50' : 'bg-white hover:bg-gray-50 border-gray-100';
-                     const textClass = isActive ? 'text-[#4ECDC4]' : 'text-gray-400';
-                     const icon = isActive ? '<i class="fa-solid fa-check text-[#4ECDC4]"></i>' : '';
+                     const activeClass = isActive ? 'ring-2 ring-theme-50 bg-theme-50' : 'bg-white hover:bg-gray-50 border-gray-100';
+                     const textClass = isActive ? 'text-custom-primary' : 'text-gray-400';
+                     const icon = isActive ? '<i class="fa-solid fa-check text-custom-primary"></i>' : '';
                      
                      return `<div onclick="window.togglePaymentFilter('${pm}')" class="p-4 rounded-3xl shadow-sm border transition cursor-pointer ${activeClass}"><p class="text-xs font-bold ${textClass} mb-1 flex justify-between">${pm} ${icon}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(paymentTotals[pm] || 0).toLocaleString()}</p></div>`;
                 }).join('');
@@ -1514,11 +1560,11 @@
                 } else {
                     settlementHtml = settlements.map(s => `
                         <div class="mb-3 text-sm border-b border-gray-100 pb-2 last:border-0">
-                            <span class="text-[#FF8BA7] font-bold text-lg">${s.from}</span> 
+                            <span class="text-custom-primary font-bold text-lg">${s.from}</span> 
                             <span class="text-xs text-gray-400 mx-1">支付</span> 
                             <span class="text-gray-700 font-bold">${s.to}</span> 
                             <br>
-                            <span class="text-[#FF8BA7] font-bold text-xl">$${s.amount.toLocaleString()}</span>
+                            <span class="text-custom-primary font-bold text-xl">$${s.amount.toLocaleString()}</span>
                             <button onclick="window.settleUp('${s.from}', '${s.to}', ${s.amount})" class="auth-only ml-2 px-3 py-1 bg-blue-100 text-blue-500 rounded-lg text-xs font-bold hover:bg-blue-200">
                                 <i class="fa-solid fa-check"></i> 結清
                             </button>
@@ -1651,7 +1697,7 @@
                 const totalDisplay = document.getElementById('category-total-display');
                 if(totalDisplay) {
                     const prefix = CATEGORY_FILTER === 'All' ? '總計' : CATEGORY_FILTER;
-                    totalDisplay.innerHTML = `${prefix}: <span class="text-lg">$${Math.round(currentTotal).toLocaleString()}</span>`;
+                    totalDisplay.innerHTML = `${prefix}: <span class="text-lg text-custom-primary">$${Math.round(currentTotal).toLocaleString()}</span>`;
                 }
 
                 const iconMap = {
@@ -1668,7 +1714,8 @@
                     const twd = e.currency !== 'TWD' ? Math.round(e.amount * rate) : e.amount;
                     const iconClass = iconMap[e.category] || 'fa-tag'; // Default icon for custom categories
                     const isTransfer = e.category === 'Transfer';
-                    const iconColorClass = isTransfer ? 'text-green-500 bg-green-50' : 'text-custom-primary bg-pink-50';
+                    // Use dynamic theme classes
+                    const iconColorClass = isTransfer ? 'text-green-500 bg-green-50' : 'text-custom-primary bg-theme-50';
                     const amountColorClass = isTransfer ? 'text-green-500' : 'text-[#FF6B6B]';
                     
                     const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full ${iconColorClass} flex items-center justify-center mr-3"><i class="fa-solid ${iconClass}"></i></div>`;
@@ -1820,10 +1867,15 @@
                     endDate = end.toISOString().split('T')[0];
                     dateStr = `${startDate} ~ ${endDate}`;
                 }
+                
+                const theme = THEMES[color] || THEMES['pink'];
+                // Force update root variables just in case
+                window.applyTheme(color);
+
                 document.getElementById('trip-summary-block').innerHTML = `
                 <div class="flex justify-between items-center">
                     <div>
-                        <p class="text-xs text-${color}-400 font-bold mb-1 flex items-center">
+                        <p class="text-xs text-theme-500 font-bold mb-1 flex items-center">
                             <i class="fa-regular fa-calendar-days mr-2"></i> ${dateStr}
                             <button onclick="window.openEditTripDateModal('${startDate}', '${endDate}')" class="auth-only ml-2 text-gray-400 hover:text-custom-primary"><i class="fa-solid fa-pen"></i></button>
                         </p>
@@ -1832,12 +1884,12 @@
                             <button onclick="window.openEditTripInfoModal()" class="auth-only ml-3 text-sm text-gray-300 hover:text-custom-primary bg-gray-50 w-8 h-8 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-gear"></i></button>
                         </h3>
                     </div>
-                    <div onclick="window.openEditTripInfoModal()" class="cursor-pointer w-12 h-12 rounded-full bg-${color}-100 flex items-center justify-center text-${color}-400 text-xl shadow-sm hover:scale-110 transition"><i class="fa-solid ${icon}"></i></div>
+                    <div onclick="window.openEditTripInfoModal()" class="cursor-pointer w-12 h-12 rounded-full bg-theme-100 flex items-center justify-center text-theme-500 text-xl shadow-sm hover:scale-110 transition"><i class="fa-solid ${icon}"></i></div>
                 </div>`;
                 
                 // Update container border color dynamically
                 const container = document.getElementById('trip-summary-block');
-                container.className = `bg-white border-l-4 border-${color}-400 p-5 rounded-r-2xl shadow-sm relative z-10 mt-2`;
+                container.className = `bg-white border-l-4 border-custom-primary p-5 rounded-r-2xl shadow-sm relative z-10 mt-2`;
             }
             ;
 
@@ -1896,12 +1948,22 @@
                 // Update local visual state immediately for better UX
                 window.CURRENT_TRIP_NAME = name;
                 window.CURRENT_TRIP_PIN = pin;
+                
+                // CRITICAL: Apply Theme immediately
+                window.applyTheme(color);
+                
                 document.getElementById('trip-title-display').innerText = name;
                 document.getElementById('trip-name-input').value = name;
                 
                 // Re-render summary block with new color/icon
-                // We need date/days from existing logic, we can cheat a bit and re-fetch or just wait for listener. 
-                // But listener is fast. Let's just close modal.
+                const trip = window.TRIP_LIST.find(t => t.id === window.CURRENT_TRIP_ID);
+                if(trip) {
+                    trip.name = name;
+                    trip.color = color;
+                    trip.icon = icon;
+                    window.renderTripSummaryBlock(trip.startDate, trip.days, color, icon);
+                }
+                
                 window.closeModal('editTripInfoModal');
             };
 
@@ -2096,9 +2158,9 @@
                     return container.innerHTML = '<div class="text-center text-gray-400 py-10">尚無行程</div>';
 
                 const headerHtml = `
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-pink-100 mb-6 flex justify-between items-center cursor-pointer hover:bg-gray-50" onclick="window.openEditDailyTitleModal()">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-theme-100 mb-6 flex justify-between items-center cursor-pointer hover:bg-gray-50" onclick="window.openEditDailyTitleModal()">
                     <h2 class="text-lg font-bold text-gray-700">${d.city || '設定今日標題'} <i class="auth-only fa-solid fa-pen text-xs text-gray-300 ml-2"></i></h2>
-                    <span class="bg-pink-50 text-custom-primary px-3 py-1 rounded-full text-xs font-bold">${d.date}</span>
+                    <span class="bg-theme-50 text-custom-primary px-3 py-1 rounded-full text-xs font-bold">${d.date}</span>
                 </div>`;
 
                 const activitiesHtml = (d.activities || []).map( (a, i) => {
@@ -2117,16 +2179,16 @@
                         iconClass = 'fa-plane';
                     }
 
-                    const mapLinkHtml = a.link ? `<a href="${a.link}" target="_blank" onclick="event.stopPropagation()" class="text-[#4ECDC4] text-sm ml-2 font-bold hover:underline">(地圖 🗺️)</a>` : '';
+                    const mapLinkHtml = a.link ? `<a href="${a.link}" target="_blank" onclick="event.stopPropagation()" class="text-custom-secondary text-sm ml-2 font-bold hover:underline">(地圖 🗺️)</a>` : '';
                     const noteHtml = a.location ? `<p class="text-xs text-gray-400 mt-1 pl-6">${a.location}</p>` : '';
 
                     return `
                 <div class="flex items-start mb-6 group relative" onclick="window.openEditItineraryModal('${d.id}', ${i})">
                     <div class="w-14 pt-3 text-right mr-4 text-xs font-bold text-gray-400 font-mono">${a.time}</div>
-                    <div class="absolute left-[69px] top-4 w-3 h-3 bg-[#FF8BA7] rounded-full ring-4 ring-[#FFFDF9] z-20"></div>
+                    <div class="absolute left-[69px] top-4 w-3 h-3 bg-custom-primary rounded-full ring-4 ring-[#FFFDF9] z-20"></div>
                     <div class="flex-1 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative z-10 hover:shadow-md transition cursor-pointer">
                         <div class="flex items-start">
-                            <div class="mt-1 mr-2 text-[#FF8BA7]"><i class="fa-solid ${iconClass}"></i></div>
+                            <div class="mt-1 mr-2 text-custom-primary"><i class="fa-solid ${iconClass}"></i></div>
                             <div class="flex-1">
                                 <h3 class="font-bold text-gray-700 text-base leading-tight">${a.title} ${mapLinkHtml}</h3>
                                 ${noteHtml}
@@ -2688,7 +2750,7 @@
                             <i class="fa-solid fa-pen mr-1"></i>
                             記一筆
                         </button>
-                        <button id="tab-view-details-btn" onclick="window.switchExpenseView('details')" class="flex-1 py-3 rounded-2xl text-sm font-bold bg-[#FF8BA7] text-white shadow-md transition-all">
+                        <button id="tab-view-details-btn" onclick="window.switchExpenseView('details')" class="flex-1 py-3 rounded-2xl text-sm font-bold bg-custom-primary text-white shadow-md transition-all">
                             <i class="fa-solid fa-list mr-1"></i>
                             查明細
                         </button>
@@ -2696,7 +2758,7 @@
                     
                     <!-- Add Expense Form (Default Hidden if in Details mode) -->
                     <div id="add-expense-container" class="auth-only hidden">
-                        <div class="bg-white p-4 md:p-6 rounded-[30px] shadow-sm border border-pink-50">
+                        <div class="bg-white p-4 md:p-6 rounded-[30px] shadow-sm border border-theme-100">
                             <form onsubmit="event.preventDefault(); window.addExpense();">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <!-- LEFT COLUMN -->
@@ -2704,17 +2766,17 @@
                                         <!-- Row 1: Date (Full Width) -->
                                         <div class="mb-4">
                                             <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">日期</label>
-                                            <input type="date" id="expense-date" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 text-lg shadow-sm border-2 border-transparent focus:border-pink-200">
+                                            <input type="date" id="expense-date" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 text-lg shadow-sm border-2 border-transparent focus:border-theme-200">
                                         </div>
 
                                         <!-- Row 2: Amount & Currency (Full Width) -->
                                         <div class="mb-4">
                                             <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">金額</label>
                                             <div class="flex gap-2 items-center">
-                                                <input type="number" id="expense-amount" placeholder="0" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl text-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-pink-200">
+                                                <input type="number" id="expense-amount" placeholder="0" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl text-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-theme-200">
                                                 <div id="add-currency-container" class="flex bg-gray-100 rounded-xl p-1 items-center shrink-0 h-[56px]">
                                                     <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold text-gray-400 transition-all">TWD</button>
-                                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold bg-[#FF7596] text-white shadow-md transition-all">JPY</button>
+                                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold bg-custom-primary text-white shadow-md transition-all">JPY</button>
                                                     <input type="hidden" id="expense-currency" value="JPY">
                                                 </div>
                                             </div>
@@ -2724,14 +2786,14 @@
                                         <div class="mb-4">
                                             <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">用途 & 照片</label>
                                             <div class="flex gap-2">
-                                                <input type="text" id="expense-description" placeholder="例如: 一蘭拉麵" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-pink-200">
-                                                <button type="button" onclick="document.getElementById('expense-camera-input').click()" class="w-12 h-[52px] shrink-0 bg-pink-50 text-pink-400 rounded-2xl border-2 border-pink-100 flex items-center justify-center hover:bg-pink-100 transition">
+                                                <input type="text" id="expense-description" placeholder="例如: 一蘭拉麵" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-theme-200">
+                                                <button type="button" onclick="document.getElementById('expense-camera-input').click()" class="w-12 h-[52px] shrink-0 bg-theme-50 text-custom-primary rounded-2xl border-2 border-theme-100 flex items-center justify-center hover:bg-theme-100 transition">
                                                     <i class="fa-solid fa-camera text-lg"></i>
                                                 </button>
                                             </div>
                                             <input type="file" id="expense-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'expense-preview-img', 'expense-preview-container')">
                                             <div id="expense-preview-container" class="hidden mt-2 text-center">
-                                                <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover shadow-sm">
+                                                <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-theme-100 object-cover shadow-sm">
                                             </div>
                                         </div>
                                     </div>
@@ -2748,7 +2810,7 @@
                                                 <input type="hidden" id="expense-payer" value="Josh">
                                                 
                                                 <!-- SWAP BUTTON -->
-                                                <button type="button" id="btn-swap-payer" onclick="window.swapPayerBeneficiary()" class="hidden mx-1 w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:text-custom-primary hover:bg-pink-50 flex items-center justify-center transition flex-shrink-0" title="交換付款人與受益人">
+                                                <button type="button" id="btn-swap-payer" onclick="window.swapPayerBeneficiary()" class="hidden mx-1 w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:text-custom-primary hover:bg-theme-50 flex items-center justify-center transition flex-shrink-0" title="交換付款人與受益人">
                                                     <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
                                                 </button>
 
@@ -2777,7 +2839,7 @@
                                 </div>
                                 <div class="flex gap-3 mt-4">
                                      <button type="button" onclick="window.cancelAddExpense()" class="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-400 font-bold text-lg hover:bg-gray-200 transition-all">取消</button>
-                                     <button type="submit" class="flex-[2] py-4 rounded-2xl bg-[#FF8BA7] text-white font-bold text-lg shadow-lg hover:bg-[#ff7596] transition-all">確認紀錄</button>
+                                     <button type="submit" class="flex-[2] py-4 rounded-2xl bg-custom-primary text-white font-bold text-lg shadow-lg hover:opacity-90 transition-all">確認紀錄</button>
                                 </div>
                             </form>
                         </div>
@@ -2791,7 +2853,7 @@
                             <div class="flex gap-3">
                                 <div class="relative flex-1">
                                     <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-300"></i>
-                                    <input type="text" placeholder="搜尋..." oninput="window.updateSearchTerm(this.value)" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-gray-100 shadow-sm focus:border-pink-300 font-bold text-gray-600 transition-all">
+                                    <input type="text" placeholder="搜尋..." oninput="window.updateSearchTerm(this.value)" class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-gray-100 shadow-sm focus:border-theme-200 font-bold text-gray-600 transition-all">
                                 </div>
                                 <button onclick="window.exportExpensesToExcel()" class="w-12 h-[50px] shrink-0 rounded-2xl bg-white border border-[#4ECDC4] text-[#4ECDC4] font-bold shadow-sm hover:bg-[#E0F7FA] transition flex items-center justify-center" title="匯出 Excel">
                                     <i class="fa-solid fa-file-excel text-xl"></i>
@@ -2799,7 +2861,7 @@
                             </div>
 
                             <!-- Settlement Suggestion (Moved to Top) -->
-                            <div class="bg-white p-5 rounded-3xl shadow-md border-l-4 border-l-[#FF8BA7] border-y border-r border-gray-50 text-center flex flex-col justify-center">
+                            <div class="bg-white p-5 rounded-3xl shadow-md border-l-4 border-custom-primary border-y border-r border-gray-50 text-center flex flex-col justify-center">
                                 <p class="text-xs font-bold text-gray-400 mb-2">💡 結算建議</p>
                                 <div id="settlement-result" class="text-lg font-bold text-gray-700">計算中...</div>
                             </div>
@@ -2842,7 +2904,7 @@
 
                             <div class="mb-2 flex justify-between items-center px-1">
                                 <span class="text-xs font-bold text-gray-400">消費類別</span>
-                                <span id="category-total-display" class="text-sm font-bold text-[#FF8BA7]"></span>
+                                <span id="category-total-display" class="text-sm font-bold text-custom-primary"></span>
                             </div>
                             <div id="category-filter-container" class="flex flex-wrap gap-2 mb-4 overflow-x-auto no-scrollbar"></div>
                             <div id="expense-list" class="space-y-3 pb-24 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
@@ -2888,28 +2950,28 @@
                     </div>
                     
                     <!-- Date Selector with Integrated Export Icon (New Layout) -->
-                    <div class="bg-white p-2 rounded-3xl shadow-sm border border-pink-50 mb-6 sticky top-[70px] z-10 flex items-center gap-2">
+                    <div class="bg-white p-2 rounded-3xl shadow-sm border border-theme-100 mb-6 sticky top-[70px] z-10 flex items-center gap-2">
                         <div id="date-buttons-container" class="flex-1 flex overflow-x-auto no-scrollbar p-1 gap-2"></div>
                         
                         <!-- Separator -->
                         <div class="w-[1px] h-6 bg-gray-100 mx-1"></div>
                         
                         <!-- Small Excel Export Icon (Green) -->
-                        <button onclick="window.exportItineraryToExcel()" class="flex-shrink-0 w-9 h-9 rounded-full bg-white border border-[#4ECDC4] text-[#4ECDC4] shadow-sm flex items-center justify-center mr-1 hover:bg-[#E0F7FA] transition" title="匯出行程 Excel">
+                        <button onclick="window.exportItineraryToExcel()" class="flex-shrink-0 w-9 h-9 rounded-full bg-white border border-custom-primary text-custom-primary shadow-sm flex items-center justify-center mr-1 hover:bg-theme-50 transition" title="匯出行程 Excel">
                              <i class="fa-solid fa-file-excel"></i>
                         </button>
                     </div>
 
                     <div id="itinerary-container"></div>
-                    <button onclick="window.openAddItineraryModal()" class="auth-only fixed right-6 bottom-24 w-14 h-14 rounded-full bg-[#FF8BA7] text-white shadow-xl flex items-center justify-center text-2xl hover:scale-110 transition z-20">
+                    <button onclick="window.openAddItineraryModal()" class="auth-only fixed right-6 bottom-24 w-14 h-14 rounded-full bg-custom-primary text-white shadow-xl flex items-center justify-center text-2xl hover:scale-110 transition z-20">
                         <i class="fa-solid fa-plus"></i>
                     </button>
                 </div>
                 <!-- Wishlist -->
                 <div id="wishlist-tab" class="main-tab-content hidden p-4">
-                    <div class="auth-only bg-white p-6 rounded-[30px] shadow-lg border border-pink-100 mb-6">
+                    <div class="auth-only bg-white p-6 rounded-[30px] shadow-lg border border-theme-100 mb-6">
                         <h3 class="flex items-center mb-4 text-xl font-bold text-gray-700">
-                            <i class="fa-solid fa-cart-shopping text-[#FF8BA7] mr-2"></i>
+                            <i class="fa-solid fa-cart-shopping text-custom-primary mr-2"></i>
                             新增慾望
                         </h3>
                         <form onsubmit="window.addWishlistItem(event)">
@@ -2925,17 +2987,17 @@
                                     <input type="number" id="wishlist-qty" value="1" class="w-20 p-3 border-0 bg-gray-50 rounded-2xl font-bold text-center">
                                 </div>
                                 <div class="mb-4">
-                                    <button type="button" onclick="document.getElementById('item-camera-input').click()" class="w-full p-3 mb-2 text-sm font-bold text-pink-500 bg-pink-50 rounded-xl border border-pink-100 flex items-center justify-center gap-2">
+                                    <button type="button" onclick="document.getElementById('item-camera-input').click()" class="w-full p-3 mb-2 text-sm font-bold text-custom-primary bg-theme-50 rounded-xl border border-theme-100 flex items-center justify-center gap-2">
                                         <i class="fa-solid fa-camera"></i>
                                         拍照 (選填)
                                     </button>
                                     <input type="file" id="item-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'item-preview-img', 'item-preview-container')">
                                     <div id="item-preview-container" class="hidden mb-2 text-center">
-                                        <img id="item-preview-img" class="h-40 rounded-xl mx-auto border-2 border-pink-100 object-cover">
+                                        <img id="item-preview-img" class="h-40 rounded-xl mx-auto border-2 border-theme-100 object-cover">
                                     </div>
                                 </div>
                             </div>
-                            <button type="submit" class="w-full py-4 font-bold text-white bg-[#FF8BA7] rounded-2xl shadow-md hover:bg-[#ff7596] transition-all">新增清單項目</button>
+                            <button type="submit" class="w-full py-4 font-bold text-white bg-custom-primary rounded-2xl shadow-md hover:opacity-90 transition-all">新增清單項目</button>
                         </form>
                     </div>
                     <div id="wishlist-list" class="space-y-3 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
@@ -3034,7 +3096,7 @@
                                 匯率: <span id="calc-rate-display" class="font-bold text-custom-danger">0.215</span>
                             </p>
                         </div>
-                        <div class="p-6 mb-6 bg-white border border-pink-100 shadow-sm rounded-3xl">
+                        <div class="p-6 mb-6 bg-white border border-theme-100 shadow-sm rounded-3xl">
                             <h3 class="flex items-center mb-4 text-lg font-bold text-gray-700">
                                 <i class="mr-2 fa-solid fa-location-dot text-custom-primary"></i>
                                 想去地點清單
@@ -3052,7 +3114,7 @@
                                     <div id="spot-preview-container" class="hidden mb-2 text-center">
                                         <img id="spot-preview-img" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl">
                                     </div>
-                                    <button onclick="window.addSpot()" class="w-full p-3 font-bold text-white bg-[#FF8BA7] rounded-xl shadow-md active:scale-95">新增景點</button>
+                                    <button onclick="window.addSpot()" class="w-full p-3 font-bold text-white bg-custom-primary rounded-xl shadow-md active:scale-95">新增景點</button>
                                 </div>
                                 <div class="hidden guest-banner text-center text-gray-400 py-4" style="display: ${window.IS_LOCKED ? 'block' : 'none'}">
                                     <i class="fa-solid fa-lock mr-1"></i> 請先解鎖以新增景點
@@ -3105,38 +3167,32 @@
                         <p class="text-[10px] text-gray-400 mt-1">* 只有輸入此密碼的人才能編輯行程</p>
                     </div>
                     
-                    <div class="mb-6">
-                        <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色</label>
-                        <div class="flex gap-4 justify-center flex-wrap">
-                            <label class="cursor-pointer group">
-                                <input type="radio" name="new-trip-color" value="pink" class="hidden peer" checked>
-                                <div class="w-10 h-10 rounded-full bg-pink-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-pink-400 group-hover:scale-110 transition"></div>
-                            </label>
-                            <label class="cursor-pointer group">
-                                <input type="radio" name="new-trip-color" value="blue" class="hidden peer">
-                                <div class="w-10 h-10 rounded-full bg-blue-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-blue-400 group-hover:scale-110 transition"></div>
-                            </label>
-                            <label class="cursor-pointer group">
-                                <input type="radio" name="new-trip-color" value="purple" class="hidden peer">
-                                <div class="w-10 h-10 rounded-full bg-purple-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-purple-400 group-hover:scale-110 transition"></div>
-                            </label>
-                             <label class="cursor-pointer group">
-                                <input type="radio" name="new-trip-color" value="orange" class="hidden peer">
-                                <div class="w-10 h-10 rounded-full bg-orange-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-orange-400 group-hover:scale-110 transition"></div>
-                            </label>
-                            <label class="cursor-pointer group">
-                                <input type="radio" name="new-trip-color" value="green" class="hidden peer">
-                                <div class="w-10 h-10 rounded-full bg-green-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-green-400 group-hover:scale-110 transition"></div>
-                            </label>
-                            <label class="cursor-pointer group">
-                                <input type="radio" name="new-trip-color" value="teal" class="hidden peer">
-                                <div class="w-10 h-10 rounded-full bg-teal-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-teal-400 group-hover:scale-110 transition"></div>
-                            </label>
-                             <label class="cursor-pointer group">
-                                <input type="radio" name="new-trip-color" value="indigo" class="hidden peer">
-                                <div class="w-10 h-10 rounded-full bg-indigo-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-indigo-400 group-hover:scale-110 transition"></div>
-                            </label>
-                        </div>
+                    <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色 (馬卡龍色系)</label>
+                    <div class="flex gap-3 justify-center mb-6 flex-wrap">
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="new-trip-color" value="pink" class="hidden peer" checked>
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#FF8BA7] group-hover:scale-110 transition" style="background-color: #FF8BA7;"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="new-trip-color" value="blue" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#6CB4EE] group-hover:scale-110 transition" style="background-color: #6CB4EE;"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="new-trip-color" value="purple" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#B39CD0] group-hover:scale-110 transition" style="background-color: #B39CD0;"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="new-trip-color" value="orange" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#FF9E80] group-hover:scale-110 transition" style="background-color: #FF9E80;"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="new-trip-color" value="green" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#4ECDC4] group-hover:scale-110 transition" style="background-color: #4ECDC4;"></div>
+                        </label>
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="new-trip-color" value="yellow" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#F7C566] group-hover:scale-110 transition" style="background-color: #F7C566;"></div>
+                        </label>
                     </div>
 
                     <button type="submit" class="w-full p-3 font-bold text-white shadow-lg bg-custom-primary rounded-2xl">建立旅程</button>
@@ -3159,35 +3215,31 @@
                     <label class="block mb-1 text-sm font-bold text-gray-500">旅程密碼</label>
                     <input type="text" id="edit-trip-info-pin" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl tracking-widest font-bold" required>
 
-                    <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色</label>
+                    <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色 (馬卡龍色系)</label>
                     <div class="flex gap-3 justify-center mb-6 flex-wrap">
                         <label class="cursor-pointer group">
                             <input type="radio" name="edit-trip-color" value="pink" class="hidden peer">
-                            <div class="w-10 h-10 rounded-full bg-pink-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-pink-400 group-hover:scale-110 transition"></div>
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#FF8BA7] group-hover:scale-110 transition" style="background-color: #FF8BA7;"></div>
                         </label>
                         <label class="cursor-pointer group">
                             <input type="radio" name="edit-trip-color" value="blue" class="hidden peer">
-                            <div class="w-10 h-10 rounded-full bg-blue-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-blue-400 group-hover:scale-110 transition"></div>
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#6CB4EE] group-hover:scale-110 transition" style="background-color: #6CB4EE;"></div>
                         </label>
                         <label class="cursor-pointer group">
                             <input type="radio" name="edit-trip-color" value="purple" class="hidden peer">
-                            <div class="w-10 h-10 rounded-full bg-purple-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-purple-400 group-hover:scale-110 transition"></div>
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#B39CD0] group-hover:scale-110 transition" style="background-color: #B39CD0;"></div>
                         </label>
                         <label class="cursor-pointer group">
                             <input type="radio" name="edit-trip-color" value="orange" class="hidden peer">
-                            <div class="w-10 h-10 rounded-full bg-orange-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-orange-400 group-hover:scale-110 transition"></div>
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#FF9E80] group-hover:scale-110 transition" style="background-color: #FF9E80;"></div>
                         </label>
                         <label class="cursor-pointer group">
                             <input type="radio" name="edit-trip-color" value="green" class="hidden peer">
-                            <div class="w-10 h-10 rounded-full bg-green-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-green-400 group-hover:scale-110 transition"></div>
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#4ECDC4] group-hover:scale-110 transition" style="background-color: #4ECDC4;"></div>
                         </label>
                         <label class="cursor-pointer group">
-                            <input type="radio" name="edit-trip-color" value="teal" class="hidden peer">
-                            <div class="w-10 h-10 rounded-full bg-teal-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-teal-400 group-hover:scale-110 transition"></div>
-                        </label>
-                         <label class="cursor-pointer group">
-                            <input type="radio" name="edit-trip-color" value="indigo" class="hidden peer">
-                            <div class="w-10 h-10 rounded-full bg-indigo-400 ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-indigo-400 group-hover:scale-110 transition"></div>
+                            <input type="radio" name="edit-trip-color" value="yellow" class="hidden peer">
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#F7C566] group-hover:scale-110 transition" style="background-color: #F7C566;"></div>
                         </label>
                     </div>
 
@@ -3286,7 +3338,7 @@
                                 <input type="number" id="edit-expense-amount" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-xl font-bold text-xl">
                                 <div id="edit-currency-container" class="flex-shrink-0 flex bg-gray-100 rounded-xl p-1 items-center">
                                     <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold text-gray-400">TWD</button>
-                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold bg-[#FF7596] text-white">JPY</button>
+                                    <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold bg-custom-primary text-white">JPY</button>
                                     <input type="hidden" id="edit-expense-currency">
                                 </div>
                             </div>
@@ -3299,7 +3351,7 @@
                             <img id="edit-expense-preview" src="" class="object-cover w-full h-40 border-2 border-pink-100 rounded-xl mb-2">
                             <button type="button" onclick="window.removeEditExpensePhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                         </div>
-                        <button type="button" onclick="document.getElementById('edit-expense-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
+                        <button type="button" onclick="document.getElementById('edit-expense-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-custom-primary transition border border-theme-100 bg-theme-50 rounded-xl hover:bg-theme-100">
                             <i class="fa-solid fa-camera"></i>
                             更換照片
                         </button>
@@ -3389,7 +3441,7 @@
                     <img id="edit-wishlist-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
                     <button type="button" onclick="window.removeEditWishlistPhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                 </div>
-                <button type="button" onclick="document.getElementById('edit-wishlist-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
+                <button type="button" onclick="document.getElementById('edit-wishlist-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-custom-primary transition border border-theme-100 bg-theme-50 rounded-xl hover:bg-theme-100">
                     <i class="fa-solid fa-camera"></i>
                     更換照片
                 </button>
@@ -3426,7 +3478,7 @@
                     <input type="text" id="new-itinerary-link" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl text-gray-700">
                     <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">備註</label>
                     <textarea id="new-itinerary-note" rows="3" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl text-gray-700"></textarea>
-                    <button type="submit" class="w-full p-3 font-bold text-white shadow-lg bg-custom-primary rounded-2xl hover:bg-custom-primary-dark">完成</button>
+                    <button type="submit" class="w-full p-3 font-bold text-white shadow-lg bg-custom-primary rounded-2xl hover:bg-opacity-90">完成</button>
                 </form>
             </div>
         </div>
@@ -3456,7 +3508,7 @@
                     <textarea id="edit-itinerary-note" rows="3" placeholder="備註事項" class="w-full p-4 mb-6 bg-white border-2 border-gray-100 rounded-2xl text-sm font-bold text-gray-700 shadow-sm resize-none"></textarea>
                     <div class="flex gap-3 auth-only">
                         <button type="button" onclick="window.deleteItineraryItem()" class="flex-1 py-3 bg-white border-2 border-red-100 text-red-400 font-bold rounded-2xl hover:bg-red-50 transition">刪除</button>
-                        <button type="submit" class="flex-[2] py-3 bg-[#FF8BA7] text-white font-bold rounded-2xl shadow-lg hover:bg-[#ff7596] transition">儲存</button>
+                        <button type="submit" class="flex-[2] py-3 bg-custom-primary text-white font-bold rounded-2xl shadow-lg hover:opacity-90 transition">儲存</button>
                     </div>
                     <div class="hidden mt-4 text-center guest-banner">
                         <p class="text-sm font-bold text-gray-400"><i class="fa-solid fa-lock mr-1"></i> 訪客模式僅供檢視</p>
@@ -3489,7 +3541,7 @@
                         <img id="edit-spot-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
                         <button type="button" onclick="window.removeEditSpotPhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                     </div>
-                    <button type="button" onclick="document.getElementById('edit-spot-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-pink-500 transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
+                    <button type="button" onclick="document.getElementById('edit-spot-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-custom-primary transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
                         <i class="fa-solid fa-camera"></i>
                         更換照片
                     </button>
