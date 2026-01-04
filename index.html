@@ -236,6 +236,20 @@
                 root.style.setProperty('--theme-500', theme.t500);
             };
 
+            window.togglePinVisibility = (inputId, btn) => {
+                const input = document.getElementById(inputId);
+                const icon = btn.querySelector('i');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    input.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            };
+
             // --- Permissions ---
             window.IS_LOCKED = true; // Default to locked (Guest Mode)
             window.CURRENT_TRIP_PIN = "8888"; // Will be loaded from trip settings
@@ -3163,7 +3177,12 @@
                     </div>
                     <div class="mb-6">
                         <label class="block mb-1 text-sm font-bold text-gray-500">設定編輯密碼</label>
-                        <input type="text" id="new-trip-pin" class="w-full p-3 border-0 bg-gray-50 rounded-xl font-bold tracking-widest text-center" value="8888" placeholder="預設: 8888">
+                        <div class="relative">
+                            <input type="password" id="new-trip-pin" class="w-full p-3 border-0 bg-gray-50 rounded-xl font-bold tracking-widest text-center" value="8888" placeholder="預設: 8888">
+                            <button type="button" onclick="window.togglePinVisibility('new-trip-pin', this)" class="absolute right-3 top-3 text-gray-400 hover:text-custom-primary w-8 h-8 flex items-center justify-center transition">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
                         <p class="text-[10px] text-gray-400 mt-1">* 只有輸入此密碼的人才能編輯行程</p>
                     </div>
                     
@@ -3213,7 +3232,12 @@
                     <input type="text" id="edit-trip-info-name" class="w-full p-3 mb-4 border-0 bg-gray-50 rounded-xl" required>
                     
                     <label class="block mb-1 text-sm font-bold text-gray-500">旅程密碼</label>
-                    <input type="text" id="edit-trip-info-pin" class="w-full p-3 mb-6 border-0 bg-gray-50 rounded-xl tracking-widest font-bold" required>
+                    <div class="relative mb-6">
+                        <input type="password" id="edit-trip-info-pin" class="w-full p-3 border-0 bg-gray-50 rounded-xl tracking-widest font-bold text-center" required>
+                        <button type="button" onclick="window.togglePinVisibility('edit-trip-info-pin', this)" class="absolute right-3 top-3 text-gray-400 hover:text-custom-primary w-8 h-8 flex items-center justify-center transition">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
 
                     <label class="block mb-2 text-sm font-bold text-gray-500">主題顏色 (馬卡龍色系)</label>
                     <div class="flex gap-3 justify-center mb-6 flex-wrap">
