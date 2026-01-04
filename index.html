@@ -3238,21 +3238,28 @@
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </h3>
-                <div class="grid grid-cols-2 gap-2 mb-4">
-                    <div>
-                        <label class="block mb-1 text-sm font-bold text-gray-500">開始日期</label>
-                        <input type="date" id="edit-trip-start" class="w-full p-2 text-sm border-0 bg-gray-50 rounded-xl font-bold text-gray-700 min-w-0" onchange="window.calculateEditTripDays()">
+                
+                <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-4 flex items-center justify-between">
+                    <div class="flex-1 text-center">
+                        <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wide">Start</label>
+                        <input type="date" id="edit-trip-start" class="w-full bg-transparent border-0 text-center font-bold text-gray-700 p-0 text-sm focus:ring-0 cursor-pointer" onchange="window.calculateEditTripDays()">
                     </div>
-                    <div>
-                        <label class="block mb-1 text-sm font-bold text-gray-500">結束日期</label>
-                        <input type="date" id="edit-trip-end" class="w-full p-2 text-sm border-0 bg-gray-50 rounded-xl font-bold text-gray-700 min-w-0" onchange="window.calculateEditTripDays()">
+                    <div class="px-3 text-gray-300">
+                        <i class="fa-solid fa-arrow-right text-xs"></i>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wide">End</label>
+                        <input type="date" id="edit-trip-end" class="w-full bg-transparent border-0 text-center font-bold text-gray-700 p-0 text-sm focus:ring-0 cursor-pointer" onchange="window.calculateEditTripDays()">
                     </div>
                 </div>
-                <div class="mb-6">
-                    <label class="block mb-1 text-sm font-bold text-gray-500">天數</label>
-                    <input type="number" id="edit-trip-days" class="w-full p-3 border-0 bg-gray-50 rounded-xl text-center font-bold text-custom-primary text-xl" readonly>
+
+                <div class="flex items-center justify-center gap-2 mb-6 bg-white p-2">
+                    <span class="text-xs font-bold text-gray-400">預計行程共</span>
+                    <input type="number" id="edit-trip-days" class="w-16 p-0 bg-transparent border-b-2 border-pink-200 text-center font-bold text-custom-primary text-xl focus:outline-none" readonly>
+                    <span class="text-xs font-bold text-gray-400">天</span>
                 </div>
-                <button onclick="window.saveTripDates()" id="save-trip-date-btn" class="w-full p-3 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl">確認修改</button>
+
+                <button onclick="window.saveTripDates()" id="save-trip-date-btn" class="w-full p-3 font-bold text-white shadow-lg bg-custom-secondary rounded-2xl hover:opacity-90 transition-all">確認修改</button>
             </div>
         </div>
         <!-- Edit Expense -->
