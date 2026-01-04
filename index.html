@@ -286,6 +286,15 @@
                 window.initTripList();
                 document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
                 updateLiveExchangeRate();
+                
+                // Check Global Master Lock (For List View)
+                const isMasterUnlocked = localStorage.getItem('is_unlocked_master');
+                if(isMasterUnlocked === 'true') {
+                    window.IS_LOCKED = false;
+                } else {
+                    window.IS_LOCKED = true;
+                }
+                
                 window.applyLockState();
             }
             );
@@ -294,23 +303,33 @@
             window.applyLockState = () => {
                 const body = document.body;
                 const lockIcon = document.getElementById('lock-icon-display');
+                const listLockIcon = document.getElementById('list-lock-icon');
+                
                 if (window.IS_LOCKED) {
                     body.classList.add('guest-mode');
                     if(lockIcon) lockIcon.className = "fa-solid fa-lock text-red-400";
+                    if(listLockIcon) listLockIcon.className = "fa-solid fa-lock text-red-400";
                 } else {
                     body.classList.remove('guest-mode');
                     if(lockIcon) lockIcon.className = "fa-solid fa-lock-open text-green-400";
+                    if(listLockIcon) listLockIcon.className = "fa-solid fa-lock-open text-green-400";
                 }
             };
 
             window.toggleLock = () => {
                 if (window.IS_LOCKED) {
                     const input = prompt("請輸入旅程編輯密碼:");
-                    // Check against current trip's PIN
-                    if (input === window.CURRENT_TRIP_PIN) {
+                    // Use Trip PIN if inside a trip, otherwise default "8888" for list view admin
+                    const targetPin = window.CURRENT_TRIP_ID ? window.CURRENT_TRIP_PIN : "8888";
+                    
+                    if (input === targetPin) {
                         window.IS_LOCKED = false;
-                        // Save to localStorage
-                        localStorage.setItem(`is_unlocked_${window.CURRENT_TRIP_ID}`, 'true');
+                        // Save to localStorage based on context
+                        if(window.CURRENT_TRIP_ID) {
+                            localStorage.setItem(`is_unlocked_${window.CURRENT_TRIP_ID}`, 'true');
+                        } else {
+                            localStorage.setItem(`is_unlocked_master`, 'true');
+                        }
                         alert("已解鎖編輯權限！");
                         window.applyLockState();
                     } else {
@@ -319,7 +338,11 @@
                 } else {
                     window.IS_LOCKED = true;
                     // Remove from localStorage
-                    localStorage.removeItem(`is_unlocked_${window.CURRENT_TRIP_ID}`);
+                    if(window.CURRENT_TRIP_ID) {
+                        localStorage.removeItem(`is_unlocked_${window.CURRENT_TRIP_ID}`);
+                    } else {
+                        localStorage.removeItem(`is_unlocked_master`);
+                    }
                     window.applyLockState();
                 }
             };
@@ -365,7 +388,7 @@
                                 <p class="text-xs text-gray-400 font-bold">${t.startDate} · ${t.days} Days</p>
                             </div>
                             <div class="flex gap-2 auth-only" onclick="event.stopPropagation()">
-                                <button onclick="window.deleteTrip('${t.id}')" class="text-gray-300 hover:text-red-400 p-2"><i class="fa-solid fa-trash-can"></i></button>
+                                <button onclick="window.deleteTrip('${t.id}')" data-delete-id="${t.id}" class="text-gray-300 hover:text-red-400 p-2 text-lg"><i class="fa-solid fa-trash-can"></i></button>
                             </div>
                         </div>
                     </div>`;
@@ -474,8 +497,47 @@
             }
             ;
             window.deleteTrip = async (id) => {
-                if (confirm('確定刪除此旅程? (資料將無法復原)')) {
-                    await deleteDoc(doc(db, "trips_meta", id));
+                const trip = window.TRIP_LIST.find(t => t.id === id);
+                if (!confirm(`確定要刪除「${trip ? trip.name : '此旅程'}」嗎? \n\n⚠️ 警告: 此動作將刪除所有相關的行程、記帳與清單資料，且無法復原！`)) return;
+                
+                const btn = document.querySelector(`button[data-delete-id="${id}"]`);
+                if(btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+                }
+
+                try {
+                    const batch = writeBatch(db);
+                    
+                    // 1. Delete Meta & Settings
+                    batch.delete(doc(db, "trips_meta", id));
+                    batch.delete(doc(db, "trips_settings", id));
+                    
+                    // 2. Helper to delete sub-collection docs
+                    const delCol = async (name) => {
+                        const q = query(collection(db, name), where("tripId", "==", id));
+                        const s = await getDocs(q);
+                        s.forEach(d => batch.delete(d.ref));
+                    };
+                    
+                    // 3. Queue deletions
+                    await Promise.all([
+                        delCol('expenses'),
+                        delCol('itineraries'),
+                        delCol('wishlists'),
+                        delCol('packinglist'),
+                        delCol('spots')
+                    ]);
+
+                    await batch.commit();
+                    // UI updates automatically via onSnapshot
+                } catch (e) {
+                    console.error(e);
+                    alert('刪除失敗: ' + e.message);
+                    if(btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+                    }
                 }
             }
             ;
@@ -2481,6 +2543,11 @@
                     <i class="fa-solid fa-map-location-dot text-custom-primary mr-3 text-3xl"></i>
                     My Travel History
                 </h1>
+                <div class="flex items-center gap-2">
+                    <button onclick="window.toggleLock()" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center transition hover:bg-gray-100 shadow-sm border border-gray-100">
+                        <i id="list-lock-icon" class="fa-solid fa-lock text-red-400"></i>
+                    </button>
+                </div>
             </header>
             <div id="trip-list-container"></div>
             <div onclick="window.openModal('createTripModal')" class="w-full py-4 mt-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 font-bold hover:border-custom-primary hover:text-custom-primary transition-all flex items-center justify-center cursor-pointer">
