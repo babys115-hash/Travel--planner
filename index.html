@@ -2917,7 +2917,7 @@
                                     <input type="hidden" id="wishlist-cat" value="伴手禮">
                                 </div>
                                 <div class="flex gap-2 mb-3">
-                                    <input type="number" id="wishlist-price" placeholder="價格 (JPY)" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
+                                    <input type="number" id="wishlist-price" placeholder="價格" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-2xl font-bold" required>
                                     <input type="number" id="wishlist-qty" value="1" class="w-20 p-3 border-0 bg-gray-50 rounded-2xl font-bold text-center">
                                 </div>
                                 <div class="mb-4">
@@ -3232,14 +3232,14 @@
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </h3>
-                <div class="grid grid-cols-1 gap-4 mb-4">
+                <div class="grid grid-cols-2 gap-2 mb-4">
                     <div>
                         <label class="block mb-1 text-sm font-bold text-gray-500">開始日期</label>
-                        <input type="date" id="edit-trip-start" class="w-full p-3 border-0 bg-gray-50 rounded-xl font-bold text-gray-700" onchange="window.calculateEditTripDays()">
+                        <input type="date" id="edit-trip-start" class="w-full p-2 text-sm border-0 bg-gray-50 rounded-xl font-bold text-gray-700 min-w-0" onchange="window.calculateEditTripDays()">
                     </div>
                     <div>
                         <label class="block mb-1 text-sm font-bold text-gray-500">結束日期</label>
-                        <input type="date" id="edit-trip-end" class="w-full p-3 border-0 bg-gray-50 rounded-xl font-bold text-gray-700" onchange="window.calculateEditTripDays()">
+                        <input type="date" id="edit-trip-end" class="w-full p-2 text-sm border-0 bg-gray-50 rounded-xl font-bold text-gray-700 min-w-0" onchange="window.calculateEditTripDays()">
                     </div>
                 </div>
                 <div class="mb-6">
