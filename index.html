@@ -1602,10 +1602,106 @@
                     });
                     splitContainer.innerHTML = html;
                 }
+                
+                // RENDER CHART HERE
+                window.renderExpenseChart();
 
                 window.renderExpenseList();
             }
             ;
+            
+            // --- NEW FUNCTION: Render Donut Chart ---
+            window.renderExpenseChart = () => {
+                const container = document.getElementById('expense-chart-container');
+                if(!container) return;
+
+                const catTotals = {};
+                let grandTotal = 0;
+
+                // Using global data to show full breakdown regardless of current list filters
+                // Excluding 'Transfer' to match the "Total Spent" concept
+                window.EXPENSES_DATA.forEach(e => {
+                    if (e.category === 'Transfer') return; 
+                    const rate = e.exchangeRate || window.EXCHANGE_RATE;
+                    const val = e.currency !== 'TWD' ? e.amount * rate : e.amount;
+                    
+                    if (!catTotals[e.category]) catTotals[e.category] = 0;
+                    catTotals[e.category] += val;
+                    grandTotal += val;
+                });
+
+                if (grandTotal === 0) {
+                    container.classList.add('hidden');
+                    return;
+                }
+                container.classList.remove('hidden');
+
+                const sortedCats = Object.keys(catTotals).sort((a,b) => catTotals[b] - catTotals[a]);
+                
+                // Macaron Palette
+                const colors = [
+                    '#FF8BA7', // Pink
+                    '#4ECDC4', // Green
+                    '#FFD166', // Yellow
+                    '#A0C4FF', // Blue
+                    '#BDB2FF', // Purple
+                    '#FFC6FF', // Light Pink
+                    '#FDFFB6', // Light Yellow
+                    '#CAFFBF', // Light Green
+                    '#9BF6FF'  // Cyan
+                ];
+                
+                let gradientStr = '';
+                let currentPerc = 0;
+                let legendHtml = '';
+
+                sortedCats.forEach((cat, index) => {
+                    const amount = catTotals[cat];
+                    const perc = (amount / grandTotal) * 100;
+                    const color = colors[index % colors.length];
+                    
+                    const endPerc = currentPerc + perc;
+                    gradientStr += `${color} ${currentPerc}% ${endPerc}%, `;
+                    currentPerc = endPerc;
+
+                    legendHtml += `
+                        <div class="flex items-center justify-between mb-2 text-sm">
+                            <div class="flex items-center">
+                                <span class="w-3 h-3 rounded-full mr-2" style="background-color: ${color}"></span>
+                                <span class="text-gray-600 font-bold">${cat}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="font-bold text-gray-700">$${Math.round(amount).toLocaleString()}</span>
+                                <span class="text-xs text-gray-400 ml-1">(${perc.toFixed(1)}%)</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                gradientStr = gradientStr.slice(0, -2); // Remove last comma
+
+                container.innerHTML = `
+                    <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center gap-6">
+                         <div class="w-full text-center">
+                            <p class="text-xs font-bold text-gray-400 mb-2">消費分佈 (不含轉帳)</p>
+                         </div>
+                         <div class="flex flex-col sm:flex-row items-center gap-8 w-full justify-center">
+                            <!-- Donut -->
+                            <div class="relative w-40 h-40 flex-shrink-0">
+                                <div class="w-full h-full rounded-full" style="background: conic-gradient(${gradientStr});"></div>
+                                <div class="absolute inset-4 bg-white rounded-full flex items-center justify-center flex-col shadow-inner">
+                                    <span class="text-[10px] text-gray-400 font-bold">總支出</span>
+                                    <span class="text-sm font-bold text-gray-700">$${Math.round(grandTotal).toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <!-- Legend -->
+                            <div class="flex-1 w-full sm:max-w-xs grid grid-cols-1 gap-x-4 gap-y-1">
+                                ${legendHtml}
+                            </div>
+                         </div>
+                    </div>
+                `;
+            };
 
             window.settleUp = (debtor, creditor, amount) => {
                 // Pre-fill Add Expense Form for Settlement
@@ -2913,6 +3009,9 @@
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="payment-cards-container"></div>
                         </div>
                         <div class="mt-6">
+                            <!-- Expense Chart Container (New) -->
+                            <div id="expense-chart-container" class="mb-6 hidden animate-fade-in"></div>
+
                             <!-- Split Filter Container -->
                             <div id="split-filter-container" class="flex gap-2 mb-4 overflow-x-auto no-scrollbar"></div>
 
@@ -2928,11 +3027,11 @@
                 <!-- Itinerary -->
                 <div id="itinerary-tab" class="main-tab-content p-4">
                     <!-- Weather Widget -->
-                    <div class="bg-blue-50 p-4 md:p-6 rounded-3xl shadow-sm border-2 border-white mb-6 relative overflow-hidden ring-1 ring-blue-100">
+                    <div class="bg-theme-50 p-4 md:p-6 rounded-3xl shadow-sm border-2 border-white mb-6 relative overflow-hidden ring-1 ring-theme-100">
                         <!-- Header -->
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="font-bold text-gray-700 flex items-center text-lg">
-                                <span class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-400 mr-2 text-sm">
+                                <span class="w-8 h-8 rounded-full bg-theme-100 flex items-center justify-center text-theme-500 mr-2 text-sm">
                                     <i class="fa-solid fa-earth-americas"></i>
                                 </span>
                                 全球城市天氣
@@ -2943,18 +3042,18 @@
                         <div class="flex gap-2 relative z-10">
                             <input type="text" id="weather-city-input" 
                                    placeholder="輸入城市 (如: Tokyo)" 
-                                   class="flex-1 min-w-0 p-3 bg-white border-0 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm placeholder-gray-400"
+                                   class="flex-1 min-w-0 p-3 bg-white border-0 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-theme-200 transition-all text-sm placeholder-gray-400"
                                    onkeypress="if(event.key === 'Enter') window.searchWeather()">
                             <button onclick="window.searchWeather()" 
-                                    class="w-12 shrink-0 bg-blue-400 text-white font-bold rounded-2xl shadow-md hover:bg-blue-500 transition active:scale-95 flex items-center justify-center">
+                                    class="w-12 shrink-0 bg-white text-gray-500 font-bold rounded-2xl shadow-sm hover:text-theme-500 transition active:scale-95 flex items-center justify-center">
                                 <i class="fa-solid fa-magnifying-glass"></i>
                             </button>
                         </div>
 
                         <!-- Loading -->
                         <div id="weather-loading" class="hidden mt-4 text-center">
-                            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
-                            <p class="text-xs text-blue-300 font-bold mt-2">Searching...</p>
+                            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-theme-500"></div>
+                            <p class="text-xs text-theme-500 font-bold mt-2">Searching...</p>
                         </div>
 
                         <!-- Results -->
@@ -3247,7 +3346,7 @@
                         </label>
                         <label class="cursor-pointer group">
                             <input type="radio" name="edit-trip-color" value="blue" class="hidden peer">
-                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#6CB4EE] group-hover:scale-110 transition" style="background-color: #6CB4EE;"></div>
+                            <div class="w-10 h-10 rounded-full ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-[#6CB4EE] group-hover:scale-100 transition" style="background-color: #6CB4EE;"></div>
                         </label>
                         <label class="cursor-pointer group">
                             <input type="radio" name="edit-trip-color" value="purple" class="hidden peer">
