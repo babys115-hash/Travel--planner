@@ -1465,29 +1465,66 @@
                     );
                 }
                 );
-                let maxDebtor = null, maxDebt = 0;
-                let maxCreditor = null, maxCredit = 0;
+                
+                // --- MULTI-PERSON SETTLEMENT LOGIC ---
+                let debtors = [];
+                let creditors = [];
 
                 Object.keys(balance).forEach(p => {
-                    if (balance[p] < 0 && Math.abs(balance[p]) > maxDebt) {
-                        maxDebtor = p;
-                        maxDebt = Math.abs(balance[p]);
-                    }
-                    if (balance[p] > 0 && balance[p] > maxCredit) {
-                        maxCreditor = p;
-                        maxCredit = balance[p];
-                    }
+                    let amount = balance[p];
+                    amount = Math.round(amount * 100) / 100; // Reduce floating point errors
+                    if (amount < -1) debtors.push({ p, amount });
+                    else if (amount > 1) creditors.push({ p, amount });
                 });
 
-                let settlementHtml = maxDebtor ? `<div class="mb-3 text-sm"><span class="text-[#FF8BA7] font-bold text-lg">${maxDebtor}</span> 應支付 <span class="text-gray-700 font-bold">${maxCreditor}</span> <br><span class="text-[#FF8BA7] font-bold text-xl">$${Math.round(maxDebt).toLocaleString()}</span></div>` : "<div class='text-green-500 font-bold'><i class='fa-solid fa-circle-check mr-1'></i> 款項已全部結清</div>";
-                
-                if (maxDebtor && maxCreditor) {
-                    settlementHtml += `
-                        <button onclick="window.settleUp('${maxDebtor}', '${maxCreditor}', ${Math.round(maxDebt)})" class="auth-only w-full py-2 bg-blue-500 text-white rounded-xl font-bold shadow-md hover:bg-blue-600 transition text-sm mb-2">
-                            <i class="fa-solid fa-hand-holding-dollar mr-1"></i> 點此標記為「已付款」
-                        </button>
-                        <p class="text-[10px] text-gray-400">* 新增紀錄後，系統將自動重新計算餘額</p>
-                    `;
+                debtors.sort((a, b) => a.amount - b.amount); // Ascending (most negative first)
+                creditors.sort((a, b) => b.amount - a.amount); // Descending (most positive first)
+
+                let settlements = [];
+                let i = 0; // debtor index
+                let j = 0; // creditor index
+
+                while (i < debtors.length && j < creditors.length) {
+                    let debtor = debtors[i];
+                    let creditor = creditors[j];
+                    
+                    // The amount to settle is the minimum of what debtor owes and what creditor is owed
+                    let amount = Math.min(Math.abs(debtor.amount), creditor.amount);
+                    if (amount < 1) break; 
+
+                    settlements.push({
+                        from: debtor.p,
+                        to: creditor.p,
+                        amount: Math.round(amount)
+                    });
+
+                    // Adjust remaining amounts
+                    debtor.amount += amount;
+                    creditor.amount -= amount;
+
+                    // Move indices if settled
+                    if (Math.abs(debtor.amount) < 1) i++;
+                    if (creditor.amount < 1) j++;
+                }
+
+                // Render settlements
+                let settlementHtml = '';
+                if (settlements.length === 0) {
+                    settlementHtml = "<div class='text-green-500 font-bold'><i class='fa-solid fa-circle-check mr-1'></i> 款項已全部結清</div>";
+                } else {
+                    settlementHtml = settlements.map(s => `
+                        <div class="mb-3 text-sm border-b border-gray-100 pb-2 last:border-0">
+                            <span class="text-[#FF8BA7] font-bold text-lg">${s.from}</span> 
+                            <span class="text-xs text-gray-400 mx-1">支付</span> 
+                            <span class="text-gray-700 font-bold">${s.to}</span> 
+                            <br>
+                            <span class="text-[#FF8BA7] font-bold text-xl">$${s.amount.toLocaleString()}</span>
+                            <button onclick="window.settleUp('${s.from}', '${s.to}', ${s.amount})" class="auth-only ml-2 px-3 py-1 bg-blue-100 text-blue-500 rounded-lg text-xs font-bold hover:bg-blue-200">
+                                <i class="fa-solid fa-check"></i> 結清
+                            </button>
+                        </div>
+                    `).join('');
+                    settlementHtml += `<p class="text-[10px] text-gray-400 mt-2">* 新增紀錄後，系統將自動重新計算餘額</p>`;
                 }
 
                 document.getElementById('settlement-result').innerHTML = settlementHtml;
@@ -3032,7 +3069,7 @@
         </div>
         <!-- Modals -->
         <div id="createTripModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('createTripModal')">
-            <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
+            <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
                     建立新旅程
                     <button onclick="window.closeModal('createTripModal')" class="flex items-center justify-center w-8 h-8 text-gray-400 bg-gray-100 rounded-full">
