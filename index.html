@@ -187,6 +187,19 @@
 
             .filter-card-active {
                 @apply ring-2 ring-offset-1 transform scale-105; }
+            
+            /* Mobile Date Input Fix - Added Container to prevent overflow */
+            input[type="date"] {
+                -webkit-appearance: none;
+                min-height: 44px; /* Better touch target */
+                width: 100%;
+                max-width: 100%;
+            }
+            
+            .date-input-container {
+                width: 100%;
+                overflow: hidden;
+            }
         </style>
         <script type="module">
             import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
@@ -1572,18 +1585,30 @@
                 if (settlements.length === 0) {
                     settlementHtml = "<div class='text-green-500 font-bold'><i class='fa-solid fa-circle-check mr-1'></i> 款項已全部結清</div>";
                 } else {
-                    settlementHtml = settlements.map(s => `
-                        <div class="mb-3 text-sm border-b border-gray-100 pb-2 last:border-0">
-                            <span class="text-custom-primary font-bold text-lg">${s.from}</span> 
-                            <span class="text-xs text-gray-400 mx-1">支付</span> 
-                            <span class="text-gray-700 font-bold">${s.to}</span> 
-                            <br>
-                            <span class="text-custom-primary font-bold text-xl">$${s.amount.toLocaleString()}</span>
-                            <button onclick="window.settleUp('${s.from}', '${s.to}', ${s.amount})" class="auth-only ml-2 px-3 py-1 bg-blue-100 text-blue-500 rounded-lg text-xs font-bold hover:bg-blue-200">
-                                <i class="fa-solid fa-check"></i> 結清
-                            </button>
-                        </div>
-                    `).join('');
+                    settlementHtml = settlements.map(s => {
+    // 計算當地貨幣約略值
+    const localAmount = Math.round(s.amount / window.EXCHANGE_RATE);
+    
+    return `
+        <div class="mb-3 text-sm border-b border-gray-100 pb-3 last:border-0">
+            <span class="text-custom-primary font-bold text-lg">${s.from}</span> 
+            <span class="text-xs text-gray-400 mx-1">應付給</span> 
+            <span class="text-gray-700 font-bold">${s.to}</span> 
+            <br>
+            <div class="flex flex-wrap items-center justify-center gap-2 mt-2">
+                <!-- 選擇台幣結清 -->
+                <button onclick="window.settleUp('${s.from}', '${s.to}', ${s.amount}, 'TWD')" class="auth-only px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition shadow-sm border border-blue-200">
+                    支付台幣 $${s.amount.toLocaleString()}
+                </button>
+                
+                <!-- 選擇當地貨幣結清 -->
+                <button onclick="window.settleUp('${s.from}', '${s.to}', ${localAmount}, '${window.CURRENT_CURRENCY}')" class="auth-only px-3 py-1.5 bg-pink-50 text-pink-600 rounded-xl text-xs font-bold hover:bg-pink-100 transition shadow-sm border border-pink-200">
+                    支付${window.CURRENT_CURRENCY} ${localAmount.toLocaleString()}
+                </button>
+            </div>
+        </div>
+    `;
+}).join('');
                     settlementHtml += `<p class="text-[10px] text-gray-400 mt-2">* 新增紀錄後，系統將自動重新計算餘額</p>`;
                 }
 
@@ -1703,53 +1728,52 @@
                 `;
             };
 
-            window.settleUp = (debtor, creditor, amount) => {
-                // Pre-fill Add Expense Form for Settlement
-                window.switchMainNav('expense-tab');
-                window.switchExpenseView('add');
-                
-                // Set Date to Today
-                const dateInput = document.getElementById('expense-date');
-                const today = new Date().toISOString().split('T')[0];
-                dateInput.value = today;
-                
-                document.getElementById('expense-description').value = `💸 款項結清 (Payment)`;
-                document.getElementById('expense-amount').value = amount;
-                
-                // Set Payer to Debtor
-                ACTIVE_PAYER = debtor;
-                window.renderExpensePayerButtons();
-                
-                // Set Split to Personal
-                window.selectSplitType('personal');
-                
-                // Set Beneficiary to Creditor
-                ACTIVE_BENEFICIARIES = [creditor];
-                window.renderBeneficiaryButtons();
-                
-                // Set Category to Transfer
-                if(window.TRIP_CATEGORIES.includes('Transfer')) {
-                    window.selectCategory('Transfer');
-                } else {
-                    // Automatically add Transfer category if missing for better UX
-                    ACTIVE_CATEGORY = 'Transfer';
-                    window.TRIP_CATEGORIES.push('Transfer');
-                    const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
-                    setDoc(ref, { categories: window.TRIP_CATEGORIES }, { merge: true });
-                    window.renderCategorySelection('expense-category-options');
-                }
-                
-                // Scroll to top
-                document.getElementById('add-expense-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                // Visual Highlight
-                dateInput.classList.add('bg-yellow-100', 'transition-colors', 'duration-500');
-                
-                setTimeout(() => {
-                     alert(`已自動填入今天日期與結算金額。\n\n由 ${debtor} 支付 $${amount} 給 ${creditor} (個人支出)。\n\n確認無誤後，請點擊下方的「確認紀錄」，系統將自動重新計算餘額。`);
-                     // Removed background clear to keep visual indicator until cancel/submit
-                }, 500);
-            };
+           window.settleUp = (debtor, creditor, amount, currency) => {
+    // 1. 切換至記帳頁面並開啟新增表單
+    window.switchMainNav('expense-tab');
+    window.switchExpenseView('add');
+    
+    // 2. 自動設定日期為今天
+    const dateInput = document.getElementById('expense-date');
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.value = today;
+    
+    // 3. 自動填寫描述與金額
+    const emoji = currency === 'TWD' ? '🇹🇼' : '🇯🇵'; // 簡單標記
+    document.getElementById('expense-description').value = `${emoji} 結清付款: ${debtor} ➔ ${creditor}`;
+    document.getElementById('expense-amount').value = amount;
+    
+    // 4. 重要：執行幣別切換按鈕的點擊效果
+    window.selectCurrency(currency);
+    
+    // 5. 設定付款人為 債務人 (debtor)
+    ACTIVE_PAYER = debtor;
+    window.renderExpensePayerButtons();
+    
+    // 6. 設定分帳方式為「個人支出」
+    window.selectSplitType('personal');
+    
+    // 7. 設定受益人為 債權人 (creditor)
+    ACTIVE_BENEFICIARIES = [creditor];
+    window.renderBeneficiaryButtons();
+    
+    // 8. 設定類別為 Transfer (轉帳/結算)
+    if(window.TRIP_CATEGORIES.includes('Transfer')) {
+        window.selectCategory('Transfer');
+    } else {
+        // 如果沒有 Transfer 類別則手動加入或選預設
+        window.selectCategory(window.TRIP_CATEGORIES[0]); 
+    }
+    
+    // 捲動至表單頂端並給予視覺提示
+    document.getElementById('add-expense-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    dateInput.classList.add('bg-yellow-100');
+    setTimeout(() => {
+        dateInput.classList.remove('bg-yellow-100');
+    }, 1500);
+
+    alert(`已自動填寫結算資料：\n使用「${currency}」支付，金額為 ${amount}。\n\n請確認資訊後點擊「確認紀錄」即可完成結清。`);
+};
 
             window.renderExpenseList = () => {
                 // Use TRIP_CATEGORIES instead of deriving from data to ensure custom ones show up even if empty
@@ -2016,11 +2040,19 @@
 
             window.openEditTripInfoModal = () => {
                 // Get current trip meta
-                const trip = window.TRIP_LIST.find(t => t.id === window.CURRENT_TRIP_ID);
-                if (!trip) return;
+                let trip = window.TRIP_LIST.find(t => t.id === window.CURRENT_TRIP_ID);
+                
+                // Fallback for legacy or if not found (shouldn't happen often, but good for safety)
+                if (!trip) {
+                    trip = {
+                        name: window.CURRENT_TRIP_NAME,
+                        color: 'pink', // Default
+                        icon: 'fa-suitcase'
+                    };
+                }
 
                 document.getElementById('edit-trip-info-name').value = window.CURRENT_TRIP_NAME;
-                document.getElementById('edit-trip-info-pin').value = window.CURRENT_TRIP_PIN;
+                document.getElementById('edit-trip-info-pin').value = window.CURRENT_TRIP_PIN || "8888";
                 
                 // Set Color Radio
                 const color = trip.color || 'pink';
@@ -2877,7 +2909,9 @@
                                         <!-- Row 1: Date (Full Width) -->
                                         <div class="mb-4">
                                             <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">日期</label>
-                                            <input type="date" id="expense-date" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 text-lg shadow-sm border-2 border-transparent focus:border-theme-200">
+                                            <div class="date-input-container">
+                                                <input type="date" id="expense-date" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 text-lg shadow-sm border-2 border-transparent focus:border-theme-200">
+                                            </div>
                                         </div>
 
                                         <!-- Row 2: Amount & Currency (Full Width) -->
@@ -3250,7 +3284,7 @@
             </main>
         </div>
         <!-- Modals -->
-        <div id="createTripModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('createTripModal')">
+        <div id="createTripModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('createTripModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
                     建立新旅程
@@ -3319,7 +3353,7 @@
             </div>
         </div>
         <!-- Edit Trip Info (New) -->
-        <div id="editTripInfoModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripInfoModal')">
+        <div id="editTripInfoModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripInfoModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
                     編輯旅程資訊
@@ -3406,7 +3440,7 @@
             </div>
         </div>
         <!-- Edit Trip Date Modal -->
-        <div id="editTripDateModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripDateModal')">
+        <div id="editTripDateModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripDateModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
                     調整旅程日期
@@ -3439,7 +3473,7 @@
             </div>
         </div>
         <!-- Edit Expense -->
-        <div id="editExpenseModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editExpenseModal')">
+        <div id="editExpenseModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editExpenseModal')">
             <div class="w-full max-w-sm md:max-w-2xl p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[85vh]" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700">
                     編輯記帳
@@ -3454,7 +3488,9 @@
                         <input type="hidden" id="edit-expense-old-image">
                         <div class="mb-4">
                             <label class="block mb-1 text-sm font-bold text-gray-500">日期</label>
-                            <input type="date" id="edit-expense-date" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl font-bold">
+                            <div class="date-input-container">
+                                <input type="date" id="edit-expense-date" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl font-bold">
+                            </div>
                         </div>
                         <div class="mb-4">
                             <label class="block mb-1 text-sm font-bold text-gray-500">金額</label>
@@ -3535,7 +3571,7 @@
             </div>
         </div>
         <!-- Edit Wishlist -->
-        <div id="editWishlistModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editWishlistModal')">
+        <div id="editWishlistModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editWishlistModal')">
             <div class="w-full max-w-sm p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[85vh]" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700">
                     編輯物品
@@ -3581,7 +3617,7 @@
             </div>
         </div>
        <!-- Add Itinerary -->
-        <div id="addItineraryModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('addItineraryModal')">
+        <div id="addItineraryModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('addItineraryModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl max-h-[85vh] overflow-y-auto" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
                     新增行程
@@ -3607,7 +3643,7 @@
                 </form>
             </div>
         </div>
-        <div id="editItineraryModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="window.closeModal('editItineraryModal')">
+        <div id="editItineraryModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4" onclick="window.closeModal('editItineraryModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl max-h-[85vh] overflow-y-auto" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-2 text-xl font-bold text-gray-700">
                     編輯行程
@@ -3641,14 +3677,14 @@
                 </form>
             </div>
         </div>
-        <div id="editDailyTitleModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editDailyTitleModal')">
+        <div id="editDailyTitleModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editDailyTitleModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700">編輯當日標題</h3>
                 <input type="text" id="edit-daily-title-input" class="w-full p-4 mb-4 border-2 border-gray-100 bg-gray-50 rounded-2xl font-bold text-gray-700" placeholder="例如: 高雄 -> 福岡">
                 <button onclick="window.saveDailyTitle()" class="w-full p-3 font-bold text-white shadow-lg bg-custom-primary rounded-2xl">儲存</button>
             </div>
         </div>
-        <div id="editSpotModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editSpotModal')">
+        <div id="editSpotModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editSpotModal')">
             <div class="w-full max-w-sm p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[90vh]" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700">
                     編輯景點
@@ -3678,7 +3714,7 @@
                 </form>
             </div>
         </div>
-        <div id="editPackingModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editPackingModal')">
+        <div id="editPackingModal" class="fixed inset-0 z-50 flex items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editPackingModal')">
             <div class="w-full max-w-sm p-6 overflow-y-auto bg-white shadow-2xl rounded-3xl max-h-[90vh]" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-4 text-xl font-bold text-gray-700">
                     編輯行李項目
