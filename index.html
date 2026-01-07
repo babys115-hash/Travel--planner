@@ -205,6 +205,26 @@
             const db = getFirestore(app);
             const storage = getStorage(app);
 
+            // --- HELPER: Safe Calculator ---
+            window.calculateString = (str) => {
+                if(!str) return 0;
+                try {
+                    // 只允許數字與運算符號
+                    const sanitized = str.toString().replace(/[^0-9+\-*/().]/g, '');
+                    const result = new Function('return ' + sanitized)();
+                    return parseFloat(result.toFixed(2));
+                } catch (e) {
+                    return parseFloat(str) || 0;
+                }
+            };
+
+            window.applyCalculation = (input) => {
+                const val = input.value;
+                if(val && /[\+\-\*\/]/.test(val)) {
+                    input.value = window.calculateString(val);
+                }
+            };
+
             window.TRIP_LIST = [];
             window.CURRENT_TRIP_ID = '';
             window.ITINERARY_DATA = [];
@@ -216,7 +236,6 @@
             window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
             
             // --- Macaron Pastel Theme Config ---
-            // t50/t100: Very light backgrounds, t500: Primary/Buttons
             const THEMES = {
                 pink:   { primary: '#FF8BA7', t50: '#FFF0F5', t100: '#FFE4E9', t200: '#FFC2D1', t500: '#FF8BA7' },
                 blue:   { primary: '#6CB4EE', t50: '#F0F9FF', t100: '#E0F2FE', t200: '#BAE6FD', t500: '#6CB4EE' },
@@ -251,8 +270,8 @@
             };
 
             // --- Permissions ---
-            window.IS_LOCKED = true; // Default to locked (Guest Mode)
-            window.CURRENT_TRIP_PIN = "8888"; // Will be loaded from trip settings
+            window.IS_LOCKED = true; 
+            window.CURRENT_TRIP_PIN = "8888"; 
 
             // Default Categories
             window.DEFAULT_CATEGORIES = ['Food', 'Transport', 'Accommodation', 'Shopping', 'Ticket', '代購', 'Transfer'];
@@ -329,13 +348,15 @@
                 }
             }
             ;
+            window.previewEditImage = (input, imgId, containerId) => {
+                 window.previewImage(input, imgId, containerId);
+            };
 
             document.addEventListener('DOMContentLoaded', () => {
                 window.initTripList();
                 document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
                 updateLiveExchangeRate();
                 
-                // Check Global Master Lock (For List View)
                 const isMasterUnlocked = localStorage.getItem('is_unlocked_master');
                 if(isMasterUnlocked === 'true') {
                     window.IS_LOCKED = false;
@@ -367,12 +388,10 @@
             window.toggleLock = () => {
                 if (window.IS_LOCKED) {
                     const input = prompt("請輸入旅程編輯密碼:");
-                    // Use Trip PIN if inside a trip, otherwise default "8888" for list view admin
                     const targetPin = window.CURRENT_TRIP_ID ? window.CURRENT_TRIP_PIN : "8888";
                     
                     if (input === targetPin) {
                         window.IS_LOCKED = false;
-                        // Save to localStorage based on context
                         if(window.CURRENT_TRIP_ID) {
                             localStorage.setItem(`is_unlocked_${window.CURRENT_TRIP_ID}`, 'true');
                         } else {
@@ -385,7 +404,6 @@
                     }
                 } else {
                     window.IS_LOCKED = true;
-                    // Remove from localStorage
                     if(window.CURRENT_TRIP_ID) {
                         localStorage.removeItem(`is_unlocked_${window.CURRENT_TRIP_ID}`);
                     } else {
@@ -426,8 +444,6 @@
                         icon = (t.color === 'blue') ? 'fa-earth-asia' : 'fa-suitcase';
                     }
 
-                    // For list view, we use static colors or we could use style map
-                    // Let's use the actual theme color for the icon background
                     const theme = THEMES[color] || THEMES['pink'];
 
                     return `<div onclick="window.enterTrip('${t.id}')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-4 cursor-pointer hover:shadow-md transition relative group">
@@ -450,18 +466,16 @@
             window.enterTrip = (id) => {
                 window.CURRENT_TRIP_ID = id;
                 
-                // Check if previously unlocked
                 const isUnlocked = localStorage.getItem(`is_unlocked_${id}`);
                 if (isUnlocked === 'true') {
                     window.IS_LOCKED = false;
                 } else {
-                    window.IS_LOCKED = true; // Default locked if not found
+                    window.IS_LOCKED = true;
                 }
                 window.applyLockState();
 
                 const trip = window.TRIP_LIST.find(t => t.id === id);
                 
-                // Apply Dynamic Theme based on trip color
                 const themeColor = trip ? (trip.color || 'pink') : 'pink';
                 window.applyTheme(themeColor);
 
@@ -491,7 +505,6 @@
                 const start = new Date(startInput.value);
                 const end = new Date(endInput.value);
                 
-                // Set constraint: End date cannot be before start date
                 if (startInput.value) {
                     endInput.min = startInput.value;
                 }
@@ -546,7 +559,6 @@
                 });
                 window.closeModal('createTripModal');
                 window.enterTrip(ref.id);
-                // Unlock immediately for creator
                 window.IS_LOCKED = false;
                 window.CURRENT_TRIP_PIN = pin;
                 localStorage.setItem(`is_unlocked_${ref.id}`, 'true');
@@ -566,18 +578,15 @@
                 try {
                     const batch = writeBatch(db);
                     
-                    // 1. Delete Meta & Settings
                     batch.delete(doc(db, "trips_meta", id));
                     batch.delete(doc(db, "trips_settings", id));
                     
-                    // 2. Helper to delete sub-collection docs
                     const delCol = async (name) => {
                         const q = query(collection(db, name), where("tripId", "==", id));
                         const s = await getDocs(q);
                         s.forEach(d => batch.delete(d.ref));
                     };
                     
-                    // 3. Queue deletions
                     await Promise.all([
                         delCol('expenses'),
                         delCol('itineraries'),
@@ -587,7 +596,6 @@
                     ]);
 
                     await batch.commit();
-                    // UI updates automatically via onSnapshot
                 } catch (e) {
                     console.error(e);
                     alert('刪除失敗: ' + e.message);
@@ -611,7 +619,6 @@
                         document.getElementById('overview-duration-display').innerText = meta.days || 0;
                         window.renderTripSummaryBlock(meta.startDate, meta.days, meta.color, meta.icon);
                         
-                        // Update theme if color changes in real-time
                         if(meta.color) window.applyTheme(meta.color);
                     } else if (isLegacy) {
                         document.getElementById('overview-duration-display').innerText = 6;
@@ -703,21 +710,18 @@
                         if (data.participants)
                             window.TRIP_PARTICIPANTS = data.participants;
                         
-                        // Sync Payment Methods
                         if (data.paymentMethods) {
                             window.TRIP_PAYMENT_METHODS = data.paymentMethods;
                         } else {
                             window.TRIP_PAYMENT_METHODS = ['Cash', 'Card'];
                         }
 
-                        // Sync Expense Categories
                         if (data.categories && Array.isArray(data.categories)) {
                             window.TRIP_CATEGORIES = data.categories;
                         } else {
                             window.TRIP_CATEGORIES = [...window.DEFAULT_CATEGORIES];
                         }
                         
-                        // Sync Wishlist Categories
                         if (data.wishlistCategories && Array.isArray(data.wishlistCategories)) {
                             window.TRIP_WISHLIST_CATEGORIES = data.wishlistCategories;
                         } else {
@@ -728,7 +732,6 @@
                             window.applyCurrencySettings(data.currency || 'JPY');
                         }
                         
-                        // Sync PIN
                         if (data.pin) window.CURRENT_TRIP_PIN = data.pin;
                         else window.CURRENT_TRIP_PIN = "8888";
 
@@ -738,14 +741,12 @@
                         window.renderPaymentMethodsSelect('edit-expense-payment-select-container', true);
                         window.renderCategorySelection('expense-category-options');
                         window.renderCategorySelection('edit-expense-category-options', true);
-                        // Initial Render
                         window.renderWishlistCategoryOptions();
                         window.renderWishlistCategoryOptions(true);
                         
                         window.renderExpenseDashboard();
                         window.renderParticipantsList();
                         
-                        // Load PIN into edit modal if open
                         if (document.getElementById('edit-trip-info-pin')) {
                             document.getElementById('edit-trip-info-pin').value = window.CURRENT_TRIP_PIN;
                         }
@@ -753,7 +754,6 @@
                 });
             }
             ;
-
 
             window.bindLegacyData = async () => {
                 if (!confirm("確定要將所有未分類的舊資料綁定到此旅程嗎？"))
@@ -792,31 +792,26 @@
             }
             ;
             
-            // --- CURRENCY FUNCTIONS ADDED HERE ---
+            // --- CURRENCY FUNCTIONS ---
             window.saveTripCurrency = async () => {
                 const currency = document.getElementById('currency-selector').value;
                 if(currency === window.CURRENT_CURRENCY) return;
 
-                // Save to DB
                 const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
                 await setDoc(ref, { currency }, { merge: true });
 
-                // Apply visual changes locally immediately
                 await window.applyCurrencySettings(currency);
             };
 
             window.applyCurrencySettings = async (currency) => {
                 window.CURRENT_CURRENCY = currency;
 
-                // 1. Update Top Selector
                 const selector = document.getElementById('currency-selector');
                 if(selector && selector.value !== currency) selector.value = currency;
 
-                // 2. Update Calculator Label
                 const calcLabel = document.getElementById('calc-currency-label');
                 if(calcLabel) calcLabel.innerText = currency;
 
-                // 3. Update Add/Edit Expense Buttons (The non-TWD one)
                 const updateBtn = (containerId, prefix = '') => {
                     const container = document.getElementById(containerId);
                     if(!container) return;
@@ -825,7 +820,6 @@
                         btn.innerText = currency;
                         btn.setAttribute('data-currency', currency);
                         btn.setAttribute('onclick', `window.selectCurrency('${currency}', '${prefix}')`);
-                        // If currently selected, ensure hidden input is updated
                         const hidden = document.getElementById(prefix + 'expense-currency');
                         if(hidden && hidden.value !== 'TWD') hidden.value = currency;
                     }
@@ -834,16 +828,12 @@
                 updateBtn('add-currency-container');
                 updateBtn('edit-currency-container', 'edit-');
 
-                // 4. Update Rate
                 await updateLiveExchangeRate();
 
-                // 5. Re-render Dashboard (to update "≈ TWD" values in list and totals)
                 if(window.renderExpenseDashboard) window.renderExpenseDashboard();
                 
-                // 6. Re-render Wishlist to update currency symbol
                 if(window.renderWishlist) window.renderWishlist();
             };
-            // -------------------------------------
 
             async function updateLiveExchangeRate() {
                 try {
@@ -876,12 +866,10 @@
             ;
 
             window.cancelAddExpense = () => {
-                // Clear Form
                 document.getElementById('expense-description').value = '';
                 document.getElementById('expense-amount').value = '';
                 document.getElementById('expense-date').classList.remove('bg-yellow-100');
                 
-                // Return to details view
                 window.switchExpenseView('details');
             };
 
@@ -907,7 +895,6 @@
                     window.renderEditExpensePayerButtons();
                     document.getElementById('edit-expense-payer').value = p;
                     
-                    // Logic Update: If in Personal mode, changing payer also changes beneficiary default
                     if (EDIT_SPLIT_TYPE === 'personal') {
                         EDIT_BENEFICIARIES = [p];
                         window.renderEditBeneficiaryButtons();
@@ -917,7 +904,6 @@
                     window.renderExpensePayerButtons();
                     document.getElementById('expense-payer').value = p;
 
-                    // Logic Update: If in Personal mode, changing payer also changes beneficiary default
                     if (ACTIVE_SPLIT_TYPE === 'personal') {
                         ACTIVE_BENEFICIARIES = [p];
                         window.renderBeneficiaryButtons();
@@ -928,10 +914,8 @@
             
             // --- Global Delete Logic ---
             window.toggleDeleteMode = (type) => {
-                // type: 'expenseCat', 'payment', 'wishlist'
                 window.DELETE_MODE[type] = !window.DELETE_MODE[type];
                 
-                // Re-render
                 if (type === 'expenseCat') {
                     window.renderCategorySelection('expense-category-options');
                     window.renderCategorySelection('edit-expense-category-options', true);
@@ -963,16 +947,12 @@
 
                 await setDoc(ref, updateData, { merge: true });
                 
-                // Toggle mode off after delete
                 if (type === 'expenseCat') window.DELETE_MODE.expenseCat = false;
                 if (type === 'payment') window.DELETE_MODE.payment = false;
                 if (type === 'wishlist') window.DELETE_MODE.wishlist = false;
             };
-            // ---------------------------
-
 
             window.selectCategory = (c, isEdit=false) => {
-                // Check if delete mode is active
                 if (window.DELETE_MODE.expenseCat) {
                     window.deleteItem('expenseCat', c);
                     return;
@@ -1011,9 +991,9 @@
                 const currentCat = isEdit ? EDIT_CATEGORY : ACTIVE_CATEGORY;
                 const isDeleteMode = window.DELETE_MODE.expenseCat;
                 
-                // If current category is not in list (legacy data), add it temporarily
                 let displayList = [...window.TRIP_CATEGORIES];
                 if (currentCat && !displayList.includes(currentCat)) {
+javascript
                     displayList.push(currentCat);
                 }
 
@@ -1025,10 +1005,8 @@
                     return `<button type="button" data-category="${c}" onclick="${clickFn}" class="category-btn block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass} ${deleteClass}">${c}</button>`;
                 }).join('');
 
-                // Add "Plus" button - AUTH ONLY
                 html += `<button type="button" onclick="window.addCategory()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
 
-                // Add "Trash" button - AUTH ONLY
                 html += `<button type="button" onclick="window.toggleDeleteMode('expenseCat')" class="auth-only block-select-btn bg-gray-100 ${isDeleteMode ? 'text-red-500 border-red-200' : 'text-gray-300'} border-dashed border-2 hover:border-red-400 hover:text-red-400 ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid ${isDeleteMode ? 'fa-check' : 'fa-trash-can'}"></i></button>`;
 
                 if (isEdit) {
@@ -1051,7 +1029,6 @@
             };
 
             window.selectWishlistCategory = (c, isEdit=false) => {
-                 // Check if delete mode is active
                 if (window.DELETE_MODE.wishlist) {
                     window.deleteItem('wishlist', c);
                     return;
@@ -1096,10 +1073,8 @@
                    return `<button type="button" onclick="${clickFn}" class="block-select-btn ${isEdit ? '!text-xs !p-1 !m-0' : ''} ${activeClass} ${deleteClass}">${icon} ${c}</button>`;
                 }).join('');
 
-                // Add Button - AUTH ONLY
                 html += `<button type="button" onclick="window.addWishlistCategory()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid fa-plus"></i></button>`;
                 
-                // Add "Trash" button - AUTH ONLY
                 html += `<button type="button" onclick="window.toggleDeleteMode('wishlist')" class="auth-only block-select-btn bg-gray-100 ${isDeleteMode ? 'text-red-500 border-red-200' : 'text-gray-300'} border-dashed border-2 hover:border-red-400 hover:text-red-400 ${isEdit ? '!text-xs !p-1 !m-0' : ''}"><i class="fa-solid ${isDeleteMode ? 'fa-check' : 'fa-trash-can'}"></i></button>`;
 
 
@@ -1113,7 +1088,6 @@
             };
 
             window.selectPayment = (p, isEdit=false) => {
-                 // Check if delete mode is active
                 if (window.DELETE_MODE.payment) {
                     window.deleteItem('payment', p);
                     return;
@@ -1151,7 +1125,6 @@
                 const btnClass = isEdit ? 'edit-payment-btn' : 'payment-btn';
                 const isDeleteMode = window.DELETE_MODE.payment;
 
-                // Ensure selection matches something, default to first available if not
                 if (!window.TRIP_PAYMENT_METHODS.includes(currentSelection) && window.TRIP_PAYMENT_METHODS.length > 0) {
                      if(isEdit) EDIT_PAYMENT = window.TRIP_PAYMENT_METHODS[0];
                      else ACTIVE_PAYMENT = window.TRIP_PAYMENT_METHODS[0];
@@ -1165,18 +1138,15 @@
                     return `<button type="button" ${dataAttr} onclick="window.selectPayment('${p}', ${isEdit})" class="${btnClass} block-select-btn ${activeClass} ${deleteClass}">${p}</button>`;
                 }).join('');
 
-                // AUTH ONLY
                 html += `<button type="button" onclick="window.addPaymentMethod()" class="auth-only block-select-btn bg-gray-100 text-gray-400 border-dashed border-2 hover:border-custom-primary hover:text-custom-primary"><i class="fa-solid fa-plus"></i></button>`;
 
-                // Add "Trash" button - AUTH ONLY
                 html += `<button type="button" onclick="window.toggleDeleteMode('payment')" class="auth-only block-select-btn bg-gray-100 ${isDeleteMode ? 'text-red-500 border-red-200' : 'text-gray-300'} border-dashed border-2 hover:border-red-400 hover:text-red-400"><i class="fa-solid ${isDeleteMode ? 'fa-check' : 'fa-trash-can'}"></i></button>`;
                 
-                // Force horizontal scroll for non-edit mode
                 container.className = isEdit ? "flex flex-wrap gap-2" : "flex gap-2 overflow-x-auto no-scrollbar pb-1";
                 container.innerHTML = html;
             };
 
-            // ★★★ UPDATED SPLIT LOGIC ★★★
+            // --- SPLIT LOGIC ---
             window.selectSplitType = (t, isEdit=false) => {
                 if (isEdit) {
                     EDIT_SPLIT_TYPE = t;
@@ -1184,7 +1154,6 @@
                     document.getElementById('edit-btn-split-personal').className = t === 'personal' ? 'split-type-btn active' : 'split-type-btn inactive';
                     
                     if (t === 'personal') {
-                        // Default to payer when switching to personal
                         const currentPayer = EDIT_PAYER || window.TRIP_PARTICIPANTS[0];
                         EDIT_BENEFICIARIES = [currentPayer];
                     } else {
@@ -1197,7 +1166,6 @@
                     document.getElementById('btn-split-personal').className = t === 'personal' ? 'split-type-btn active !text-xs !py-1 !px-2' : 'split-type-btn inactive !text-xs !py-1 !px-2';
                     
                     if (t === 'personal') {
-                        // Default to payer when switching to personal
                         const currentPayer = ACTIVE_PAYER;
                         ACTIVE_BENEFICIARIES = [currentPayer];
                     } else {
@@ -1206,7 +1174,6 @@
                     window.renderBeneficiaryButtons();
                 }
 
-                // Toggle Swap Button Visibility
                 const btnId = isEdit ? 'edit-btn-swap-payer' : 'btn-swap-payer';
                 const btn = document.getElementById(btnId);
                 if(btn) {
@@ -1219,10 +1186,8 @@
             window.toggleBeneficiary = (p, isEdit=false) => {
                 if (isEdit) {
                     if (EDIT_SPLIT_TYPE === 'personal') {
-                        // Radio Button Logic
                         EDIT_BENEFICIARIES = [p];
                     } else {
-                        // Checkbox Logic
                         if (EDIT_BENEFICIARIES.includes(p))
                             EDIT_BENEFICIARIES = EDIT_BENEFICIARIES.filter(x => x !== p);
                         else
@@ -1231,10 +1196,8 @@
                     window.renderEditBeneficiaryButtons();
                 } else {
                     if (ACTIVE_SPLIT_TYPE === 'personal') {
-                        // Radio Button Logic
                         ACTIVE_BENEFICIARIES = [p];
                     } else {
-                        // Checkbox Logic
                         if (ACTIVE_BENEFICIARIES.includes(p))
                             ACTIVE_BENEFICIARIES = ACTIVE_BENEFICIARIES.filter(x => x !== p);
                         else
@@ -1245,24 +1208,19 @@
             }
             ;
 
-            // --- REVERSE (SWAP) LOGIC ---
             window.swapPayerBeneficiary = (isEdit = false) => {
-                // Get current states
                 const currentPayer = isEdit ? EDIT_PAYER : ACTIVE_PAYER;
                 const currentBens = isEdit ? EDIT_BENEFICIARIES : ACTIVE_BENEFICIARIES;
                 const currentSplit = isEdit ? EDIT_SPLIT_TYPE : ACTIVE_SPLIT_TYPE;
 
-                // Only works if split type is 'personal' and there is exactly 1 beneficiary
                 if (currentSplit === 'personal' && currentBens.length === 1) {
                     const oldBeneficiary = currentBens[0];
                     
-                    // Swap
                     if (isEdit) {
                         EDIT_PAYER = oldBeneficiary;
                         EDIT_BENEFICIARIES = [currentPayer];
                         window.renderEditExpensePayerButtons();
                         window.renderEditBeneficiaryButtons();
-                        // Visual feedback
                         document.getElementById('edit-expense-payer').value = EDIT_PAYER;
                     } else {
                         ACTIVE_PAYER = oldBeneficiary;
@@ -1310,9 +1268,10 @@
 
                 try {
                     const date = document.getElementById('expense-date').value
-                      , amount = parseFloat(document.getElementById('expense-amount').value)
-                      , desc = document.getElementById('expense-description').value
-                      , currency = document.getElementById('expense-currency').value;
+                    // Use calculator helper here
+                    const amount = window.calculateString(document.getElementById('expense-amount').value)
+                    const desc = document.getElementById('expense-description').value
+                    const currency = document.getElementById('expense-currency').value;
                     const fileIn = document.getElementById('expense-camera-input');
                     
                     if (!date || isNaN(amount) || amount <= 0 || !desc) {
@@ -1327,7 +1286,6 @@
                         imgUrl = await getDownloadURL(snap.ref);
                     }
                     
-                    // Fallback to defaults to prevent undefined errors
                     const payer = ACTIVE_PAYER || window.TRIP_PARTICIPANTS[0] || 'Josh';
                     const category = ACTIVE_CATEGORY || 'Food';
                     const payment = ACTIVE_PAYMENT || 'Cash';
@@ -1349,14 +1307,12 @@
                         timestamp: serverTimestamp()
                     });
                     
-                    // Clear Form
                     document.getElementById('expense-description').value = '';
                     document.getElementById('expense-amount').value = '';
                     document.getElementById('expense-preview-container').classList.add('hidden');
                     document.getElementById('expense-camera-input').value = ''; 
                     document.getElementById('expense-date').classList.remove('bg-yellow-100');
                     
-                    // Reset Filters
                     PAYER_FILTER = 'All';
                     PAYMENT_FILTER = 'All';
                     CATEGORY_FILTER = 'All';
@@ -1419,23 +1375,21 @@
             ;
             
             window.getParticipantTheme = (name) => {
-                // Hardcoded themes for specific users
                 if (name === 'Josh') return {
                     bg: 'bg-blue-50',
                     text: 'text-blue-500',
                     border: 'border-blue-100',
                     ring: 'ring-blue-400',
-                    lightBg: 'bg-blue-50' // For cards
+                    lightBg: 'bg-blue-50'
                 };
                 if (name === 'Candice') return {
                     bg: 'bg-pink-50',
                     text: 'text-pink-500',
                     border: 'border-pink-100',
                     ring: 'ring-pink-400',
-                    lightBg: 'bg-pink-50' // For cards
+                    lightBg: 'bg-pink-50' 
                 };
                 
-                // Fallback for others
                 const styles = [
                     { bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-100', ring: 'ring-orange-400', lightBg: 'bg-orange-50' },
                     { bg: 'bg-emerald-50', text: 'text-emerald-500', border: 'border-emerald-100', ring: 'ring-emerald-400', lightBg: 'bg-emerald-50' },
@@ -1459,7 +1413,7 @@
                   , cash = 0
                   , card = 0;
                 let payerTotals = {};
-                let paymentTotals = {}; // Dynamic payment totals
+                let paymentTotals = {}; 
 
                 window.TRIP_PARTICIPANTS.forEach(p => payerTotals[p] = 0);
                 window.TRIP_PAYMENT_METHODS.forEach(pm => paymentTotals[pm] = 0);
@@ -1468,7 +1422,6 @@
                     const rate = e.exchangeRate || window.EXCHANGE_RATE;
                     const v = e.currency !== 'TWD' ? e.amount * rate : e.amount;
                     
-                    // Only add to Total Spent if it is NOT a Transfer
                     if (e.category !== 'Transfer') {
                         total += v;
                     }
@@ -1476,7 +1429,6 @@
                     if (e.payer && payerTotals[e.payer] !== undefined)
                         payerTotals[e.payer] += v;
                     
-                    // Count Payment Methods (Handle legacy or custom)
                     const pMethod = e.payment || 'Cash';
                     if (paymentTotals[pMethod] === undefined) paymentTotals[pMethod] = 0;
                     paymentTotals[pMethod] += v;
@@ -1486,23 +1438,17 @@
                 document.getElementById('total-spent').innerText = Math.round(total).toLocaleString();
                 document.getElementById('overview-budget-display').innerText = (window.TOTAL_BUDGET || 0).toLocaleString();
                 
-                // UNIFIED COLORS - PAYER CARDS
                 document.getElementById('payer-cards-container').innerHTML = window.TRIP_PARTICIPANTS.map( (p, i) => {
                     const isActive = PAYER_FILTER === p;
                     const theme = window.getParticipantTheme(p);
-                    
-                    // Use theme colors for background, making them distinct
                     let cardClass = isActive ? `ring-2 ${theme.ring} ${theme.lightBg} shadow-md` : `${theme.lightBg} hover:opacity-80 border-transparent`;
-                    
                     const icon = isActive ? `<i class="fa-solid fa-check ${theme.text}"></i>` : '';
                     
                     return `<div onclick="window.togglePayerFilter('${p}')" class="p-4 rounded-3xl border transition cursor-pointer ${cardClass}"><p class="text-xs font-bold mb-1 ${theme.text} flex justify-between">${p} 付 ${icon}</p><p class="text-xl font-bold text-gray-700">$ ${Math.round(payerTotals[p]).toLocaleString()}</p></div>`;
                 }).join('');
                 
-                // UNIFIED COLORS - PAYMENT CARDS
                 document.getElementById('payment-cards-container').innerHTML = window.TRIP_PAYMENT_METHODS.map((pm, i) => {
                      const isActive = PAYMENT_FILTER === pm;
-                     // Teal Theme for Payments
                      const activeClass = isActive ? 'ring-2 ring-theme-50 bg-theme-50' : 'bg-white hover:bg-gray-50 border-gray-100';
                      const textClass = isActive ? 'text-custom-primary' : 'text-gray-400';
                      const icon = isActive ? '<i class="fa-solid fa-check text-custom-primary"></i>' : '';
@@ -1532,23 +1478,22 @@
 
                 Object.keys(balance).forEach(p => {
                     let amount = balance[p];
-                    amount = Math.round(amount * 100) / 100; // Reduce floating point errors
+                    amount = Math.round(amount * 100) / 100;
                     if (amount < -1) debtors.push({ p, amount });
                     else if (amount > 1) creditors.push({ p, amount });
                 });
 
-                debtors.sort((a, b) => a.amount - b.amount); // Ascending (most negative first)
-                creditors.sort((a, b) => b.amount - a.amount); // Descending (most positive first)
+                debtors.sort((a, b) => a.amount - b.amount); 
+                creditors.sort((a, b) => b.amount - a.amount);
 
                 let settlements = [];
-                let i = 0; // debtor index
-                let j = 0; // creditor index
+                let i = 0;
+                let j = 0;
 
                 while (i < debtors.length && j < creditors.length) {
                     let debtor = debtors[i];
                     let creditor = creditors[j];
                     
-                    // The amount to settle is the minimum of what debtor owes and what creditor is owed
                     let amount = Math.min(Math.abs(debtor.amount), creditor.amount);
                     if (amount < 1) break; 
 
@@ -1558,38 +1503,43 @@
                         amount: Math.round(amount)
                     });
 
-                    // Adjust remaining amounts
                     debtor.amount += amount;
                     creditor.amount -= amount;
 
-                    // Move indices if settled
                     if (Math.abs(debtor.amount) < 1) i++;
                     if (creditor.amount < 1) j++;
                 }
 
-                // Render settlements
+                // Render settlements (Dual Currency)
                 let settlementHtml = '';
                 if (settlements.length === 0) {
                     settlementHtml = "<div class='text-green-500 font-bold'><i class='fa-solid fa-circle-check mr-1'></i> 款項已全部結清</div>";
                 } else {
-                    settlementHtml = settlements.map(s => `
+                    settlementHtml = settlements.map(s => {
+                        // Calc Foreign Amount
+                        const foreignAmount = Math.round(s.amount / window.EXCHANGE_RATE);
+                        
+                        return `
                         <div class="mb-3 text-sm border-b border-gray-100 pb-2 last:border-0">
                             <span class="text-custom-primary font-bold text-lg">${s.from}</span> 
                             <span class="text-xs text-gray-400 mx-1">支付</span> 
                             <span class="text-gray-700 font-bold">${s.to}</span> 
                             <br>
-                            <span class="text-custom-primary font-bold text-xl">$${s.amount.toLocaleString()}</span>
-                            <button onclick="window.settleUp('${s.from}', '${s.to}', ${s.amount})" class="auth-only ml-2 px-3 py-1 bg-blue-100 text-blue-500 rounded-lg text-xs font-bold hover:bg-blue-200">
-                                <i class="fa-solid fa-check"></i> 結清
-                            </button>
+                            <div class="flex items-center mt-1">
+                                <span class="text-custom-primary font-bold text-xl mr-2">${window.CURRENT_CURRENCY} ${foreignAmount.toLocaleString()}</span>
+                                <span class="text-xs text-gray-400 font-bold">(≈ $${s.amount.toLocaleString()} TWD)</span>
+                                
+                                <button onclick="window.settleUp('${s.from}', '${s.to}', ${s.amount})" class="auth-only ml-auto px-3 py-1 bg-blue-100 text-blue-500 rounded-lg text-xs font-bold hover:bg-blue-200 shadow-sm">
+                                    <i class="fa-solid fa-hand-holding-dollar"></i> 結清
+                                </button>
+                            </div>
                         </div>
-                    `).join('');
-                    settlementHtml += `<p class="text-[10px] text-gray-400 mt-2">* 新增紀錄後，系統將自動重新計算餘額</p>`;
+                    `}).join('');
+                    settlementHtml += `<p class="text-[10px] text-gray-400 mt-2">* 系統以台幣為基準計算，外幣金額僅供參考</p>`;
                 }
 
                 document.getElementById('settlement-result').innerHTML = settlementHtml;
 
-                // --- Render Split Filters ---
                 const splitContainer = document.getElementById('split-filter-container');
                 if(splitContainer) {
                     let html = `
@@ -1607,35 +1557,32 @@
             }
             ;
 
-            window.settleUp = (debtor, creditor, amount) => {
-                // Pre-fill Add Expense Form for Settlement
+            window.settleUp = (debtor, creditor, amountTwd) => {
                 window.switchMainNav('expense-tab');
                 window.switchExpenseView('add');
                 
-                // Set Date to Today
                 const dateInput = document.getElementById('expense-date');
                 const today = new Date().toISOString().split('T')[0];
                 dateInput.value = today;
                 
-                document.getElementById('expense-description').value = `💸 款項結清 (Payment)`;
-                document.getElementById('expense-amount').value = amount;
+                // Convert back to Foreign Currency for Input
+                const foreignAmount = Math.round(amountTwd / window.EXCHANGE_RATE);
                 
-                // Set Payer to Debtor
+                document.getElementById('expense-description').value = `💸 款項結清 (Payment)`;
+                document.getElementById('expense-amount').value = foreignAmount;
+                window.selectCurrency(window.CURRENT_CURRENCY);
+                
                 ACTIVE_PAYER = debtor;
                 window.renderExpensePayerButtons();
                 
-                // Set Split to Personal
                 window.selectSplitType('personal');
                 
-                // Set Beneficiary to Creditor
                 ACTIVE_BENEFICIARIES = [creditor];
                 window.renderBeneficiaryButtons();
                 
-                // Set Category to Transfer
                 if(window.TRIP_CATEGORIES.includes('Transfer')) {
                     window.selectCategory('Transfer');
                 } else {
-                    // Automatically add Transfer category if missing for better UX
                     ACTIVE_CATEGORY = 'Transfer';
                     window.TRIP_CATEGORIES.push('Transfer');
                     const ref = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
@@ -1643,26 +1590,19 @@
                     window.renderCategorySelection('expense-category-options');
                 }
                 
-                // Scroll to top
                 document.getElementById('add-expense-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
                 
-                // Visual Highlight
                 dateInput.classList.add('bg-yellow-100', 'transition-colors', 'duration-500');
                 
                 setTimeout(() => {
-                     alert(`已自動填入今天日期與結算金額。\n\n由 ${debtor} 支付 $${amount} 給 ${creditor} (個人支出)。\n\n確認無誤後，請點擊下方的「確認紀錄」，系統將自動重新計算餘額。`);
-                     // Removed background clear to keep visual indicator until cancel/submit
+                     alert(`已自動填入：${debtor} 支付 ${window.CURRENT_CURRENCY} ${foreignAmount} 給 ${creditor} (個人支出)。`);
                 }, 500);
             };
 
             window.renderExpenseList = () => {
-                // Use TRIP_CATEGORIES instead of deriving from data to ensure custom ones show up even if empty
-                // But for filters, we might want to show all used + all configured. 
-                // Let's merge them.
                 const usedCats = new Set(window.EXPENSES_DATA.map(e => e.category));
                 const allCats = [...new Set([...window.TRIP_CATEGORIES, ...usedCats, 'All'])];
                 
-                // Sorting: 'All' first, then defined categories, then others
                 const sortedCats = ['All', ...window.TRIP_CATEGORIES];
                 allCats.forEach(c => { if(!sortedCats.includes(c)) sortedCats.push(c); });
 
@@ -1670,10 +1610,9 @@
                 
                 const filteredData = window.EXPENSES_DATA.filter(e => {
                     const matchPayer = PAYER_FILTER === 'All' || e.payer === PAYER_FILTER;
-                    const matchPayment = PAYMENT_FILTER === 'All' || e.payment === PAYMENT_FILTER; // Updated
+                    const matchPayment = PAYMENT_FILTER === 'All' || e.payment === PAYMENT_FILTER; 
                     const matchCategory = CATEGORY_FILTER === 'All' || e.category === CATEGORY_FILTER;
                     
-                    // Split Filter Logic
                     let matchSplit = true;
                     const currentSplit = e.splitType || 'shared'; 
 
@@ -1682,14 +1621,11 @@
                     } else if (SPLIT_FILTER === 'shared') {
                         matchSplit = currentSplit === 'shared';
                     } else {
-                        // If SPLIT_FILTER is a specific person (e.g., 'Josh')
-                        // We show items that are 'personal' AND the beneficiary includes 'Josh'
                         const isPersonal = currentSplit === 'personal';
                         const isBeneficiary = e.beneficiaries && e.beneficiaries.includes(SPLIT_FILTER);
                         matchSplit = isPersonal && isBeneficiary;
                     }
 
-                    // Search Filter
                     const searchLower = EXPENSE_SEARCH_TERM.toLowerCase();
                     const matchSearch = !searchLower || 
                                         (e.description && e.description.toLowerCase().includes(searchLower)) ||
@@ -1699,7 +1635,6 @@
                     return matchPayer && matchPayment && matchCategory && matchSplit && matchSearch;
                 });
 
-                // Calculate Total for displayed list
                 let currentTotal = 0;
                 filteredData.forEach(e => {
                      const rate = e.exchangeRate || window.EXCHANGE_RATE;
@@ -1707,7 +1642,6 @@
                      currentTotal += val;
                 });
                 
-                // Update Display
                 const totalDisplay = document.getElementById('category-total-display');
                 if(totalDisplay) {
                     const prefix = CATEGORY_FILTER === 'All' ? '總計' : CATEGORY_FILTER;
@@ -1720,40 +1654,34 @@
                     Accommodation: 'fa-bed',
                     Shopping: 'fa-bag-shopping',
                     Ticket: 'fa-ticket',
-                    '代購': 'fa-cart-plus', // Updated
+                    '代購': 'fa-cart-plus', 
                     Transfer: 'fa-money-bill-transfer'
                 };
                 document.getElementById('expense-list').innerHTML = filteredData.map(e => {
                     const rate = e.exchangeRate || window.EXCHANGE_RATE;
                     const twd = e.currency !== 'TWD' ? Math.round(e.amount * rate) : e.amount;
-                    const iconClass = iconMap[e.category] || 'fa-tag'; // Default icon for custom categories
+                    const iconClass = iconMap[e.category] || 'fa-tag'; 
                     const isTransfer = e.category === 'Transfer';
-                    // Use dynamic theme classes
                     const iconColorClass = isTransfer ? 'text-green-500 bg-green-50' : 'text-custom-primary bg-theme-50';
                     const amountColorClass = isTransfer ? 'text-green-500' : 'text-[#FF6B6B]';
                     
                     const imgHtml = e.imageUrl ? `<img src="${e.imageUrl}" class="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-100" onclick="event.stopPropagation(); window.openImagePreview(this.src)">` : `<div class="w-10 h-10 rounded-full ${iconColorClass} flex items-center justify-center mr-3"><i class="fa-solid ${iconClass}"></i></div>`;
                     
                     const isPersonal = e.splitType === 'personal';
-                    // Tag Logic
                     let splitTag = '';
                     let payerTag = '';
 
-                    // Payer Tag (Use theme)
                     const payerTheme = window.getParticipantTheme(e.payer);
                     payerTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold ${payerTheme.bg} ${payerTheme.text} ${payerTheme.border} border"><i class="fa-solid fa-wallet mr-1"></i>${e.payer}</span>`;
 
                     if (isPersonal) {
-                        // If personal, show who it's for
                         const ben = e.beneficiaries && e.beneficiaries.length > 0 ? e.beneficiaries[0] : '個人';
                         const theme = window.getParticipantTheme(ben);
                         splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold ${theme.bg} ${theme.text} ${theme.border} border">👤 ${ben}</span>`;
                     } else {
-                        // Shared = Purple
                         splitTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-600 border border-purple-200">👥 共同</span>`;
                     }
                     
-                    // Payment Method Tag
                     const pMethod = e.payment || 'Cash';
                     const pTag = `<span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200">${pMethod}</span>`;
 
@@ -1776,15 +1704,10 @@
                 window.selectSplitType(EDIT_SPLIT_TYPE, true);
                 EDIT_CATEGORY = e.category || 'Food';
                 
-                // Re-render categories here to ensure we capture any that might be in data but not in list (legacy edge case) 
-                // and to set the active class correctly
                 window.renderCategorySelection('edit-expense-category-options', true);
                 window.selectCategory(EDIT_CATEGORY, true);
                 
-                // Dynamic Payment
                 EDIT_PAYMENT = e.payment || 'Cash';
-                // Ensure payment exists in list, if not add it temporarily or handle it? 
-                // Currently just selecting it.
                 window.renderPaymentMethodsSelect('edit-expense-payment-select-container', true);
                 window.selectPayment(EDIT_PAYMENT, true);
 
@@ -1796,7 +1719,6 @@
                     img.parentElement.classList.add('hidden');
                 }
                 
-                // Allow opening details in View-Only mode by default
                 window.openModal('editExpenseModal');
             }
             ;
@@ -1814,7 +1736,6 @@
                         imgUrl = await getDownloadURL(snap.ref);
                     }
 
-                    // Fallback defaults if global variables are somehow empty
                     const finalPayer = EDIT_PAYER || window.TRIP_PARTICIPANTS[0];
                     const finalCategory = EDIT_CATEGORY || 'Food';
                     const finalPayment = EDIT_PAYMENT || 'Cash';
@@ -1824,7 +1745,7 @@
 
                     await updateDoc(doc(db, "expenses", id), {
                         date: document.getElementById('edit-expense-date').value,
-                        amount: parseFloat(document.getElementById('edit-expense-amount').value),
+                        amount: window.calculateString(document.getElementById('edit-expense-amount').value),
                         description: document.getElementById('edit-expense-desc').value,
                         currency: finalCurrency,
                         payer: finalPayer,
@@ -1883,7 +1804,6 @@
                 }
                 
                 const theme = THEMES[color] || THEMES['pink'];
-                // Force update root variables just in case
                 window.applyTheme(color);
 
                 document.getElementById('trip-summary-block').innerHTML = `
@@ -1901,7 +1821,6 @@
                     <div onclick="window.openEditTripInfoModal()" class="cursor-pointer w-12 h-12 rounded-full bg-theme-100 flex items-center justify-center text-theme-500 text-xl shadow-sm hover:scale-110 transition"><i class="fa-solid ${icon}"></i></div>
                 </div>`;
                 
-                // Update container border color dynamically
                 const container = document.getElementById('trip-summary-block');
                 container.className = `bg-white border-l-4 border-custom-primary p-5 rounded-r-2xl shadow-sm relative z-10 mt-2`;
             }
@@ -1918,19 +1837,16 @@
             ;
 
             window.openEditTripInfoModal = () => {
-                // Get current trip meta
                 const trip = window.TRIP_LIST.find(t => t.id === window.CURRENT_TRIP_ID);
                 if (!trip) return;
 
                 document.getElementById('edit-trip-info-name').value = window.CURRENT_TRIP_NAME;
                 document.getElementById('edit-trip-info-pin').value = window.CURRENT_TRIP_PIN;
                 
-                // Set Color Radio
                 const color = trip.color || 'pink';
                 const colorRadio = document.querySelector(`input[name="edit-trip-color"][value="${color}"]`);
                 if(colorRadio) colorRadio.checked = true;
 
-                // Set Icon Radio
                 const icon = trip.icon || 'fa-suitcase';
                 const iconRadio = document.querySelector(`input[name="edit-trip-icon"][value="${icon}"]`);
                 if(iconRadio) iconRadio.checked = true;
@@ -1945,31 +1861,26 @@
                 const color = document.querySelector('input[name="edit-trip-color"]:checked')?.value || 'pink';
                 const icon = document.querySelector('input[name="edit-trip-icon"]:checked')?.value || 'fa-suitcase';
 
-                // Update Meta (for List view)
                 await updateDoc(doc(db, "trips_meta", window.CURRENT_TRIP_ID), {
                     name,
                     color,
                     icon
                 });
 
-                // Update Settings (for Dashboard title view - keeping legacy consistency)
                 const settingsRef = window.CURRENT_TRIP_ID === 'trip_legacy_default' ? doc(db, "trips", "currentTrip") : doc(db, "trips_settings", window.CURRENT_TRIP_ID);
                 await setDoc(settingsRef, {
                     tripName: name,
                     pin: pin
                 }, { merge: true });
 
-                // Update local visual state immediately for better UX
                 window.CURRENT_TRIP_NAME = name;
                 window.CURRENT_TRIP_PIN = pin;
                 
-                // CRITICAL: Apply Theme immediately
                 window.applyTheme(color);
                 
                 document.getElementById('trip-title-display').innerText = name;
                 document.getElementById('trip-name-input').value = name;
                 
-                // Re-render summary block with new color/icon
                 const trip = window.TRIP_LIST.find(t => t.id === window.CURRENT_TRIP_ID);
                 if(trip) {
                     trip.name = name;
@@ -2005,13 +1916,11 @@
                 btn.disabled = true;
 
                 try {
-                    // 1. Delete Old Dates
                     const oldDocs = await getDocs(query(collection(db, "itineraries"), where("tripId", "==", window.CURRENT_TRIP_ID)));
                     const deleteBatch = writeBatch(db);
                     oldDocs.forEach(doc => deleteBatch.delete(doc.ref));
                     await deleteBatch.commit();
 
-                    // 2. Update Meta (even for legacy)
                     const metaRef = doc(db, "trips_meta", window.CURRENT_TRIP_ID);
                     await setDoc(metaRef, {
                         startDate: startStr,
@@ -2020,7 +1929,6 @@
                         merge: true
                     });
 
-                    // 3. Generate New Dates
                     const startDate = new Date(startStr);
                     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                     const createBatch = writeBatch(db);
@@ -2180,7 +2088,6 @@
                 const activitiesHtml = (d.activities || []).map( (a, i) => {
                     const t = a.title.toLowerCase();
                     let iconClass = 'fa-location-dot';
-                    // Default
                     if (t.includes('吃') || t.includes('餐') || t.includes('食') || t.includes('飯') || t.includes('麵') || t.includes('飲') || t.includes('喝') || t.includes('酒') || t.includes('咖') || t.includes('茶') || t.includes('甜') || t.includes('蛋') || t.includes('燒') || t.includes('鍋')) {
                         iconClass = 'fa-utensils';
                     } else if (t.includes('車') || t.includes('鐵') || t.includes('站') || t.includes('jr') || t.includes('巴士')) {
@@ -2249,18 +2156,15 @@
             ;
 
             window.openEditItineraryModal = (dId, idx) => {
-                // Allow opening modal in guest mode to view details
                 
                 const d = window.ITINERARY_DATA.find(x => x.id === dId);
                 const act = d.activities[idx];
 
-                // Populate date dropdown
                 const select = document.getElementById('edit-itinerary-date-select');
                 select.innerHTML = window.ITINERARY_DATA.map(d => `<option value="${d.id}">${d.date} (${d.day_of_week})</option>`).join('');
                 select.value = dId;
 
                 document.getElementById('edit-itinerary-id').value = dId;
-                // Old Date ID
                 document.getElementById('edit-itinerary-idx').value = idx;
                 document.getElementById('edit-itinerary-time').value = act.time;
                 document.getElementById('edit-itinerary-title').value = act.title;
@@ -2280,7 +2184,6 @@
                 const oldDoc = window.ITINERARY_DATA.find(x => x.id === oldDateId);
                 const act = oldDoc.activities[idx];
 
-                // Update activity object
                 const updatedAct = {
                     ...act,
                     time: document.getElementById('edit-itinerary-time').value,
@@ -2290,7 +2193,6 @@
                 };
 
                 if (oldDateId === newDateId) {
-                    // Same day update
                     let acts = [...oldDoc.activities];
                     acts[idx] = updatedAct;
                     acts.sort( (a, b) => a.time.localeCompare(b.time));
@@ -2298,14 +2200,11 @@
                         activities: acts
                     });
                 } else {
-                    // Move to different day
-                    // 1. Remove from old
                     const newOldActs = oldDoc.activities.filter( (_, i) => i !== idx);
                     await updateDoc(doc(db, "itineraries", oldDateId), {
                         activities: newOldActs
                     });
 
-                    // 2. Add to new
                     const newDoc = window.ITINERARY_DATA.find(x => x.id === newDateId);
                     const newActs = [...(newDoc.activities || []), updatedAct].sort( (a, b) => a.time.localeCompare(b.time));
                     await updateDoc(doc(db, "itineraries", newDateId), {
@@ -2370,7 +2269,7 @@
             ;
             
             window.toggleWishlistStatus = async (id, currentStatus) => {
-                if (window.IS_LOCKED) return; // Prevent Guests from checking off items
+                if (window.IS_LOCKED) return; 
                 event.stopPropagation();
                 const nextStatusMap = {
                     'pending': 'bought',
@@ -2408,7 +2307,6 @@
                 document.getElementById('edit-wishlist-qty').value = item.quantity;
                 document.getElementById('edit-wishlist-old-image').value = item.imageUrl || '';
                 
-                // Set Category State
                 window.selectWishlistCategory(item.category || '其他', true);
 
                 if (item.imageUrl) {
@@ -2429,7 +2327,6 @@
                     imgUrl = await getDownloadURL(snap.ref);
                 }
                 
-                // Get value from hidden input now
                 const cat = document.getElementById('edit-wishlist-category').value;
 
                 await updateDoc(doc(db, "wishlists", id), {
@@ -2468,20 +2365,16 @@
             }
             ;
             
-            // --- OPTIMIZED PACKING LIST TOGGLE ---
             window.togglePackingItem = async (id, currentPacked) => {
                 if (window.IS_LOCKED) return;
 
-                // Visual Feedback Immediate (Optimistic)
                 const row = document.getElementById(`pkg-${id}`);
                 if(row) {
                     const isChecking = !currentPacked;
                     
-                    // Toggle Opacity
                     if(isChecking) row.classList.add('opacity-50');
                     else row.classList.remove('opacity-50');
 
-                    // Toggle Icon
                     const icon = row.querySelector('.status-icon');
                     if(icon) {
                         if(isChecking) {
@@ -2493,7 +2386,6 @@
                         }
                     }
 
-                    // Toggle Text
                     const text = row.querySelector('.item-name');
                     if(text) {
                         if(isChecking) text.classList.add('line-through');
@@ -2552,11 +2444,9 @@
             }
             ;
 
-            // Excel Export Functions
             window.exportExpensesToExcel = () => {
                 if (!window.EXPENSES_DATA.length) return alert('無記帳資料可匯出');
                 
-                // Transform data
                 const data = window.EXPENSES_DATA.map(e => ({
                     "日期": e.date,
                     "項目": e.description,
@@ -2600,7 +2490,6 @@
                 XLSX.writeFile(wb, `${window.CURRENT_TRIP_NAME}_行程.xlsx`);
             }
 
-            // Weather Search Function
             window.searchWeather = async () => {
                 const city = document.getElementById('weather-city-input').value.trim();
                 if (!city) return alert('請輸入城市名稱');
@@ -2613,7 +2502,6 @@
                 container.innerHTML = '';
 
                 try {
-                    // 1. Geocoding
                     const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=zh&format=json`;
                     const geoRes = await fetch(geoUrl);
                     const geoData = await geoRes.json();
@@ -2626,12 +2514,10 @@
 
                     const { latitude, longitude, name, country } = geoData.results[0];
 
-                    // 2. Weather Forecast (7 days)
                     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
                     const weatherRes = await fetch(weatherUrl);
                     const weatherData = await weatherRes.json();
 
-                    // 3. Render
                     const daily = weatherData.daily;
                     let html = `<div class="mb-2 text-xs font-bold text-gray-400 text-center">📍 ${name}, ${country}</div>`;
                     html += `<div class="flex overflow-x-auto no-scrollbar gap-2 pb-2">`;
@@ -2665,9 +2551,7 @@
                         const minT = Math.round(daily.temperature_2m_min[i]);
                         const rainProb = daily.precipitation_probability_max[i]; 
                         
-                        // Default icon
                         let iconObj = weatherCodeMap[code] || { icon: 'fa-cloud', color: 'text-gray-400' };
-                        // Simple grouping for unmapped codes (Snow etc)
                         if (code >= 71 && code <= 77) iconObj = { icon: 'fa-snowflake', color: 'text-cyan-300' };
 
                         html += `
@@ -2770,24 +2654,24 @@
                         </button>
                     </div>
                     
-                    <!-- Add Expense Form (Default Hidden if in Details mode) -->
+                    <!-- Add Expense Form -->
                     <div id="add-expense-container" class="auth-only hidden">
                         <div class="bg-white p-4 md:p-6 rounded-[30px] shadow-sm border border-theme-100">
                             <form onsubmit="event.preventDefault(); window.addExpense();">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <!-- LEFT COLUMN -->
                                     <div>
-                                        <!-- Row 1: Date (Full Width) -->
+                                        <!-- Row 1: Date -->
                                         <div class="mb-4">
                                             <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">日期</label>
                                             <input type="date" id="expense-date" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 text-lg shadow-sm border-2 border-transparent focus:border-theme-200">
                                         </div>
 
-                                        <!-- Row 2: Amount & Currency (Full Width) -->
+                                        <!-- Row 2: Amount & Currency (With Calculator) -->
                                         <div class="mb-4">
                                             <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">金額</label>
                                             <div class="flex gap-2 items-center">
-                                                <input type="number" id="expense-amount" placeholder="0" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl text-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-theme-200">
+                                                <input type="text" inputmode="decimal" id="expense-amount" placeholder="可輸入算式 (如 100+50)" onblur="window.applyCalculation(this)" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl text-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-theme-200">
                                                 <div id="add-currency-container" class="flex bg-gray-100 rounded-xl p-1 items-center shrink-0 h-[56px]">
                                                     <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold text-gray-400 transition-all">TWD</button>
                                                     <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold bg-custom-primary text-white shadow-md transition-all">JPY</button>
@@ -2807,7 +2691,7 @@
                                             </div>
                                             <input type="file" id="expense-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'expense-preview-img', 'expense-preview-container')">
                                             <div id="expense-preview-container" class="hidden mt-2 text-center">
-                                                <img id="expense-preview-img" class="h-40 rounded-xl mx-auto border-2 border-theme-100 object-cover shadow-sm">
+                                                <img id="expense-preview-img" onclick="window.openImagePreview(this.src)" class="h-40 rounded-xl mx-auto border-2 border-theme-100 object-cover shadow-sm cursor-pointer hover:opacity-90 transition">
                                             </div>
                                         </div>
                                     </div>
@@ -2839,9 +2723,7 @@
                                         <!-- Category (Horizontal Scroll) -->
                                         <div class="mb-4">
                                             <label class="text-xs font-bold text-gray-400 block mb-2 ml-1">類別</label>
-                                            <div id="expense-category-options" class="flex flex-wrap gap-2">
-                                                <!-- Dynamic -->
-                                            </div>
+                                            <div id="expense-category-options" class="flex flex-wrap gap-2"></div>
                                         </div>
 
                                         <!-- Payment (Horizontal Scroll) -->
@@ -2859,7 +2741,7 @@
                         </div>
                     </div>
                     
-                    <!-- Expense Details (Search, Summary, List) -->
+                    <!-- Expense Details -->
                     <div id="expense-details-container" class="">
                         <div class="space-y-4">
                             
@@ -2874,7 +2756,7 @@
                                 </button>
                             </div>
 
-                            <!-- Settlement Suggestion (Moved to Top) -->
+                            <!-- Settlement Suggestion -->
                             <div class="bg-white p-5 rounded-3xl shadow-md border-l-4 border-custom-primary border-y border-r border-gray-50 text-center flex flex-col justify-center">
                                 <p class="text-xs font-bold text-gray-400 mb-2">💡 結算建議</p>
                                 <div id="settlement-result" class="text-lg font-bold text-gray-700">計算中...</div>
@@ -2929,7 +2811,6 @@
                 <div id="itinerary-tab" class="main-tab-content p-4">
                     <!-- Weather Widget -->
                     <div class="bg-blue-50 p-4 md:p-6 rounded-3xl shadow-sm border-2 border-white mb-6 relative overflow-hidden ring-1 ring-blue-100">
-                        <!-- Header -->
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="font-bold text-gray-700 flex items-center text-lg">
                                 <span class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-400 mr-2 text-sm">
@@ -2939,7 +2820,6 @@
                             </h3>
                         </div>
                         
-                        <!-- Search -->
                         <div class="flex gap-2 relative z-10">
                             <input type="text" id="weather-city-input" 
                                    placeholder="輸入城市 (如: Tokyo)" 
@@ -2951,26 +2831,19 @@
                             </button>
                         </div>
 
-                        <!-- Loading -->
                         <div id="weather-loading" class="hidden mt-4 text-center">
                             <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
                             <p class="text-xs text-blue-300 font-bold mt-2">Searching...</p>
                         </div>
 
-                        <!-- Results -->
-                        <div id="weather-result-container" class="hidden mt-6 animate-fade-in">
-                            <!-- Content injected via JS -->
-                        </div>
+                        <div id="weather-result-container" class="hidden mt-6 animate-fade-in"></div>
                     </div>
                     
-                    <!-- Date Selector with Integrated Export Icon (New Layout) -->
                     <div class="bg-white p-2 rounded-3xl shadow-sm border border-theme-100 mb-6 sticky top-[70px] z-10 flex items-center gap-2">
                         <div id="date-buttons-container" class="flex-1 flex overflow-x-auto no-scrollbar p-1 gap-2"></div>
                         
-                        <!-- Separator -->
                         <div class="w-[1px] h-6 bg-gray-100 mx-1"></div>
                         
-                        <!-- Small Excel Export Icon (Green) -->
                         <button onclick="window.exportItineraryToExcel()" class="flex-shrink-0 w-9 h-9 rounded-full bg-white border border-custom-primary text-custom-primary shadow-sm flex items-center justify-center mr-1 hover:bg-theme-50 transition" title="匯出行程 Excel">
                              <i class="fa-solid fa-file-excel"></i>
                         </button>
@@ -3007,7 +2880,7 @@
                                     </button>
                                     <input type="file" id="item-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'item-preview-img', 'item-preview-container')">
                                     <div id="item-preview-container" class="hidden mb-2 text-center">
-                                        <img id="item-preview-img" class="h-40 rounded-xl mx-auto border-2 border-theme-100 object-cover">
+                                        <img id="item-preview-img" onclick="window.openImagePreview(this.src)" class="h-40 rounded-xl mx-auto border-2 border-theme-100 object-cover shadow-sm cursor-pointer hover:opacity-90 transition">
                                     </div>
                                 </div>
                             </div>
@@ -3126,7 +2999,7 @@
                                     </button>
                                     <input type="file" id="spot-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'spot-preview-img', 'spot-preview-container')">
                                     <div id="spot-preview-container" class="hidden mb-2 text-center">
-                                        <img id="spot-preview-img" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl">
+                                        <img id="spot-preview-img" onclick="window.openImagePreview(this.src)" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl cursor-pointer hover:opacity-90 transition">
                                     </div>
                                     <button onclick="window.addSpot()" class="w-full p-3 font-bold text-white bg-custom-primary rounded-xl shadow-md active:scale-95">新增景點</button>
                                 </div>
@@ -3137,7 +3010,7 @@
                         </div>
                     </div>
                     <div id="spots-list" class="space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-                    <!-- Data Binding Button (Only for Legacy Trip) -->
+                    <!-- Data Binding Button -->
                     <div id="legacy-import-container" class="mt-8 text-center hidden">
                         <button id="bind-data-btn" onclick="window.bindLegacyData()" class="auth-only px-6 py-3 bg-gray-100 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition text-sm">
                             <i class="fa-solid fa-wrench mr-2"></i>
@@ -3218,7 +3091,7 @@
                 </form>
             </div>
         </div>
-        <!-- Edit Trip Info (New) -->
+        <!-- Edit Trip Info -->
         <div id="editTripInfoModal" class="fixed inset-0 z-50 items-center justify-center hidden p-4 bg-gray-900/60 backdrop-blur-sm" onclick="window.closeModal('editTripInfoModal')">
             <div class="w-full max-w-sm p-6 bg-white shadow-2xl rounded-3xl" onclick="event.stopPropagation()">
                 <h3 class="flex items-center justify-between mb-6 text-xl font-bold text-gray-700">
@@ -3359,7 +3232,7 @@
                         <div class="mb-4">
                             <label class="block mb-1 text-sm font-bold text-gray-500">金額</label>
                             <div class="flex flex-wrap gap-2 items-center">
-                                <input type="number" id="edit-expense-amount" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-xl font-bold text-xl">
+                                <input type="text" inputmode="decimal" id="edit-expense-amount" onblur="window.applyCalculation(this)" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-xl font-bold text-xl">
                                 <div id="edit-currency-container" class="flex-shrink-0 flex bg-gray-100 rounded-xl p-1 items-center">
                                     <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold text-gray-400">TWD</button>
                                     <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold bg-custom-primary text-white">JPY</button>
@@ -3372,7 +3245,7 @@
                             <input type="text" id="edit-expense-desc" class="w-full p-3 mb-4 border-0 bg-gray-50 rounded-xl">
                         </div>
                          <div id="edit-expense-preview-container" class="relative hidden mb-3 text-center">
-                            <img id="edit-expense-preview" src="" class="object-cover w-full h-40 border-2 border-pink-100 rounded-xl mb-2">
+                            <img id="edit-expense-preview" src="" onclick="window.openImagePreview(this.src)" class="object-cover w-full h-40 border-2 border-pink-100 rounded-xl mb-2 cursor-pointer hover:opacity-90 transition">
                             <button type="button" onclick="window.removeEditExpensePhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                         </div>
                         <button type="button" onclick="document.getElementById('edit-expense-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-custom-primary transition border border-theme-100 bg-theme-50 rounded-xl hover:bg-theme-100">
@@ -3398,7 +3271,6 @@
                                         共同分擔
                                     </button>
                                     
-                                    <!-- SWAP BUTTON EDIT -->
                                     <button type="button" id="edit-btn-swap-payer" onclick="window.swapPayerBeneficiary(true)" class="hidden mx-1 text-gray-300 hover:text-custom-primary transition transform active:scale-95 flex-shrink-0" title="交換付款人與受益人">
                                         <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
                                     </button>
@@ -3413,9 +3285,7 @@
                         </div>
                         <div class="mb-4">
                             <label class="block mb-2 text-sm font-bold">類別</label>
-                            <div id="edit-expense-category-options" class="grid grid-cols-3 gap-2 mb-6">
-                                <!-- Dynamic Categories Injected Here -->
-                            </div>
+                            <div id="edit-expense-category-options" class="grid grid-cols-3 gap-2 mb-6"></div>
                         </div>
                          <div class="mb-4">
                             <label class="block mb-2 text-sm font-bold text-gray-500">支付方式</label>
@@ -3462,7 +3332,7 @@
                     <input type="hidden" id="edit-wishlist-category">
                 </div>
                 <div id="edit-wishlist-preview-container" class="relative hidden mb-3 text-center">
-                    <img id="edit-wishlist-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
+                    <img id="edit-wishlist-preview" src="" onclick="window.openImagePreview(this.src)" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2 cursor-pointer hover:opacity-90 transition">
                     <button type="button" onclick="window.removeEditWishlistPhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                 </div>
                 <button type="button" onclick="document.getElementById('edit-wishlist-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-6 text-sm font-bold text-custom-primary transition border border-theme-100 bg-theme-50 rounded-xl hover:bg-theme-100">
@@ -3514,7 +3384,6 @@
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </h3>
-                <!-- Date Selection Dropdown -->
                 <label class="block mb-1 ml-1 text-sm font-bold text-gray-500">哪一天?</label>
                 <div class="relative mb-3">
                     <select id="edit-itinerary-date-select" class="w-full p-3 font-bold border-0 appearance-none bg-gray-50 rounded-xl text-gray-700" required></select>
@@ -3562,7 +3431,7 @@
                     <textarea id="edit-spot-desc" rows="2" class="w-full p-3 mb-3 border-0 bg-gray-50 rounded-xl"></textarea>
                     <input type="text" id="edit-spot-link" class="w-full p-3 mb-4 text-sm border-0 bg-gray-50 rounded-xl">
                     <div id="edit-spot-preview-container" class="relative hidden mb-3 text-center">
-                        <img id="edit-spot-preview" src="" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2">
+                        <img id="edit-spot-preview" src="" onclick="window.openImagePreview(this.src)" class="object-cover w-full h-40 border border-gray-200 rounded-xl mb-2 cursor-pointer hover:opacity-90 transition">
                         <button type="button" onclick="window.removeEditSpotPhoto()" class="auth-only text-red-500 text-sm font-bold hover:underline">🗑️ 移除照片</button>
                     </div>
                     <button type="button" onclick="document.getElementById('edit-spot-file').click()" class="auth-only flex items-center justify-center w-full gap-2 p-2 mb-2 text-sm font-bold text-custom-primary transition border border-pink-100 bg-pink-50 rounded-xl hover:bg-pink-100">
