@@ -225,6 +225,14 @@
                 }
             };
 
+            // ★★★ 新增：插入運算符號的函式 ★★★
+            window.insertMath = (symbol, inputId) => {
+                const input = document.getElementById(inputId);
+                // 游標對焦回輸入框，方便繼續打字
+                input.focus(); 
+                input.value += symbol;
+            };
+
             window.TRIP_LIST = [];
             window.CURRENT_TRIP_ID = '';
             window.ITINERARY_DATA = [];
@@ -993,7 +1001,6 @@
                 
                 let displayList = [...window.TRIP_CATEGORIES];
                 if (currentCat && !displayList.includes(currentCat)) {
-javascript
                     displayList.push(currentCat);
                 }
 
@@ -2667,16 +2674,24 @@ javascript
                                             <input type="date" id="expense-date" class="w-full p-3 bg-gray-50 rounded-2xl font-bold text-gray-700 text-lg shadow-sm border-2 border-transparent focus:border-theme-200">
                                         </div>
 
-                                        <!-- Row 2: Amount & Currency (With Calculator) -->
+                                        <!-- Row 2: Amount & Currency (With Calculator Buttons) -->
                                         <div class="mb-4">
-                                            <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">金額</label>
-                                            <div class="flex gap-2 items-center">
-                                                <input type="text" inputmode="decimal" id="expense-amount" placeholder="可輸入算式 (如 100+50)" onblur="window.applyCalculation(this)" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl text-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-theme-200">
+                                            <label class="text-xs font-bold text-gray-400 block mb-1 ml-1">金額 (可算數)</label>
+                                            <div class="flex gap-2 items-center mb-2">
+                                                <input type="text" inputmode="decimal" id="expense-amount" placeholder="例如: 500+200" onblur="window.applyCalculation(this)" class="flex-1 min-w-0 p-3 bg-gray-50 rounded-2xl text-2xl font-bold text-gray-700 shadow-sm border-2 border-transparent focus:border-theme-200">
                                                 <div id="add-currency-container" class="flex bg-gray-100 rounded-xl p-1 items-center shrink-0 h-[56px]">
                                                     <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold text-gray-400 transition-all">TWD</button>
                                                     <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY')" class="currency-toggle px-3 py-2 rounded-lg text-sm font-bold bg-custom-primary text-white shadow-md transition-all">JPY</button>
                                                     <input type="hidden" id="expense-currency" value="JPY">
                                                 </div>
+                                            </div>
+                                            
+                                            <!-- ★ 新增這排：計算機輔助按鈕 -->
+                                            <div class="flex gap-2">
+                                                <button type="button" onclick="window.insertMath('+', 'expense-amount')" class="flex-1 py-3 bg-gray-100 text-gray-500 rounded-xl font-bold text-xl hover:bg-gray-200 active:scale-95 transition"><i class="fa-solid fa-plus"></i></button>
+                                                <button type="button" onclick="window.insertMath('-', 'expense-amount')" class="flex-1 py-3 bg-gray-100 text-gray-500 rounded-xl font-bold text-xl hover:bg-gray-200 active:scale-95 transition"><i class="fa-solid fa-minus"></i></button>
+                                                <button type="button" onclick="window.insertMath('*', 'expense-amount')" class="flex-1 py-3 bg-gray-100 text-gray-500 rounded-xl font-bold text-xl hover:bg-gray-200 active:scale-95 transition"><i class="fa-solid fa-xmark"></i></button>
+                                                <button type="button" onclick="window.applyCalculation(document.getElementById('expense-amount'))" class="flex-1 py-3 bg-orange-100 text-orange-500 rounded-xl font-bold text-xl hover:bg-orange-200 active:scale-95 transition"><i class="fa-solid fa-equals"></i></button>
                                             </div>
                                         </div>
 
@@ -2999,7 +3014,7 @@ javascript
                                     </button>
                                     <input type="file" id="spot-camera-input" accept="image/*" class="hidden" onchange="window.previewImage(this, 'spot-preview-img', 'spot-preview-container')">
                                     <div id="spot-preview-container" class="hidden mb-2 text-center">
-                                        <img id="spot-preview-img" onclick="window.openImagePreview(this.src)" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl cursor-pointer hover:opacity-90 transition">
+                                        <img id="spot-preview-img" onclick="window.openImagePreview(this.src)" class="h-40 mx-auto object-cover border-2 border-pink-100 rounded-xl">
                                     </div>
                                     <button onclick="window.addSpot()" class="w-full p-3 font-bold text-white bg-custom-primary rounded-xl shadow-md active:scale-95">新增景點</button>
                                 </div>
@@ -3231,13 +3246,20 @@ javascript
                         </div>
                         <div class="mb-4">
                             <label class="block mb-1 text-sm font-bold text-gray-500">金額</label>
-                            <div class="flex flex-wrap gap-2 items-center">
+                            <div class="flex flex-wrap gap-2 items-center mb-2">
                                 <input type="text" inputmode="decimal" id="edit-expense-amount" onblur="window.applyCalculation(this)" class="flex-1 min-w-0 p-3 border-0 bg-gray-50 rounded-xl font-bold text-xl">
                                 <div id="edit-currency-container" class="flex-shrink-0 flex bg-gray-100 rounded-xl p-1 items-center">
                                     <button type="button" data-currency="TWD" onclick="window.selectCurrency('TWD', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold text-gray-400">TWD</button>
                                     <button type="button" data-currency="JPY" onclick="window.selectCurrency('JPY', 'edit-')" class="px-3 py-2 rounded-lg text-sm font-bold bg-custom-primary text-white">JPY</button>
                                     <input type="hidden" id="edit-expense-currency">
                                 </div>
+                            </div>
+                            <!-- 計算機按鈕 (編輯模式) -->
+                            <div class="flex gap-2 w-full">
+                                <button type="button" onclick="window.insertMath('+', 'edit-expense-amount')" class="flex-1 py-2 bg-gray-100 text-gray-500 rounded-lg font-bold text-lg hover:bg-gray-200 active:scale-95 transition"><i class="fa-solid fa-plus"></i></button>
+                                <button type="button" onclick="window.insertMath('-', 'edit-expense-amount')" class="flex-1 py-2 bg-gray-100 text-gray-500 rounded-lg font-bold text-lg hover:bg-gray-200 active:scale-95 transition"><i class="fa-solid fa-minus"></i></button>
+                                <button type="button" onclick="window.insertMath('*', 'edit-expense-amount')" class="flex-1 py-2 bg-gray-100 text-gray-500 rounded-lg font-bold text-lg hover:bg-gray-200 active:scale-95 transition"><i class="fa-solid fa-xmark"></i></button>
+                                <button type="button" onclick="window.applyCalculation(document.getElementById('edit-expense-amount'))" class="flex-1 py-2 bg-orange-100 text-orange-500 rounded-lg font-bold text-lg hover:bg-orange-200 active:scale-95 transition"><i class="fa-solid fa-equals"></i></button>
                             </div>
                         </div>
                         <div class="mb-4">
