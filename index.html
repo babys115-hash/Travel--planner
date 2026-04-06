@@ -525,7 +525,7 @@
                 }
             }
             ;
-            window.createNewTrip = async (e) => {
+           window.createNewTrip = async (e) => {
                 e.preventDefault();
                 const name = document.getElementById('new-trip-name').value;
                 const start = document.getElementById('new-trip-start').value;
@@ -535,6 +535,39 @@
                 const color = document.querySelector('input[name="new-trip-color"]:checked')?.value || 'pink';
                 const icon = document.querySelector('input[name="new-trip-icon"]:checked')?.value || 'fa-suitcase';
 
+                // --- ★ 新增：日期衝突預檢功能 ★ ---
+                const startDateObj = new Date(start);
+                const datesToCheck = [];
+                for (let i = 0; i < days; i++) {
+                    const d = new Date(startDateObj);
+                    d.setDate(startDateObj.getDate() + i);
+                    datesToCheck.push(d.toISOString().split('T')[0]);
+                }
+
+                try {
+                    // 檢查資料庫中是否已存在這些日期的行程
+                    // 註：這是在你目前「以日期為 ID」的架構下進行檢查
+                    for (const dateId of datesToCheck) {
+                        const docRef = doc(db, "itineraries", dateId);
+                        const docSnap = await getDoc(docRef);
+                        
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            // 如果該日期已有 tripId 或已存在活動，則視為衝突
+                            if (data.tripId || (data.activities && data.activities.length > 0)) {
+                                alert(`⚠️ 警示：日期「${dateId}」已經有行程安排了！\n\n系統將停止生成，請先刪除舊行程或更換日期。`);
+                                return; // 停止往下執行
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error("預檢日期時出錯:", error);
+                    alert("系統檢查日期時發生錯誤，請稍後再試。");
+                    return;
+                }
+                // --- ★ 預檢結束 ★ ---
+
+                // 如果檢查通過，才開始建立旅程 meta
                 const ref = await addDoc(collection(db, "trips_meta"), {
                     name,
                     startDate: start,
@@ -543,6 +576,7 @@
                     icon,
                     createdAt: serverTimestamp()
                 });
+
                 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                 const startDate = new Date(start);
                 for (let i = 0; i < days; i++) {
@@ -571,8 +605,7 @@
                 window.CURRENT_TRIP_PIN = pin;
                 localStorage.setItem(`is_unlocked_${ref.id}`, 'true');
                 window.applyLockState();
-            }
-            ;
+            };
             window.deleteTrip = async (id) => {
                 const trip = window.TRIP_LIST.find(t => t.id === id);
                 if (!confirm(`確定要刪除「${trip ? trip.name : '此旅程'}」嗎? \n\n⚠️ 警告: 此動作將刪除所有相關的行程、記帳與清單資料，且無法復原！`)) return;
