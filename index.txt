@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>My Travel History  v1.1</title>
+        <title>My Travel History v1.02</title>
         <link rel="icon" type="image/png" href="./luggage.png">
         <link rel="apple-touch-icon" href="./luggage.png">
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -525,7 +525,7 @@
                 }
             }
             ;
-           window.createNewTrip = async (e) => {
+            window.createNewTrip = async (e) => {
                 e.preventDefault();
                 const name = document.getElementById('new-trip-name').value;
                 const start = document.getElementById('new-trip-start').value;
@@ -535,39 +535,6 @@
                 const color = document.querySelector('input[name="new-trip-color"]:checked')?.value || 'pink';
                 const icon = document.querySelector('input[name="new-trip-icon"]:checked')?.value || 'fa-suitcase';
 
-                // --- ★ 新增：日期衝突預檢功能 ★ ---
-                const startDateObj = new Date(start);
-                const datesToCheck = [];
-                for (let i = 0; i < days; i++) {
-                    const d = new Date(startDateObj);
-                    d.setDate(startDateObj.getDate() + i);
-                    datesToCheck.push(d.toISOString().split('T')[0]);
-                }
-
-                try {
-                    // 檢查資料庫中是否已存在這些日期的行程
-                    // 註：這是在你目前「以日期為 ID」的架構下進行檢查
-                    for (const dateId of datesToCheck) {
-                        const docRef = doc(db, "itineraries", dateId);
-                        const docSnap = await getDoc(docRef);
-                        
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            // 如果該日期已有 tripId 或已存在活動，則視為衝突
-                            if (data.tripId || (data.activities && data.activities.length > 0)) {
-                                alert(`⚠️ 警示：日期「${dateId}」已經有行程安排了！\n\n系統將停止生成，請先刪除舊行程或更換日期。`);
-                                return; // 停止往下執行
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("預檢日期時出錯:", error);
-                    alert("系統檢查日期時發生錯誤，請稍後再試。");
-                    return;
-                }
-                // --- ★ 預檢結束 ★ ---
-
-                // 如果檢查通過，才開始建立旅程 meta
                 const ref = await addDoc(collection(db, "trips_meta"), {
                     name,
                     startDate: start,
@@ -576,7 +543,6 @@
                     icon,
                     createdAt: serverTimestamp()
                 });
-
                 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                 const startDate = new Date(start);
                 for (let i = 0; i < days; i++) {
@@ -605,7 +571,8 @@
                 window.CURRENT_TRIP_PIN = pin;
                 localStorage.setItem(`is_unlocked_${ref.id}`, 'true');
                 window.applyLockState();
-            };
+            }
+            ;
             window.deleteTrip = async (id) => {
                 const trip = window.TRIP_LIST.find(t => t.id === id);
                 if (!confirm(`確定要刪除「${trip ? trip.name : '此旅程'}」嗎? \n\n⚠️ 警告: 此動作將刪除所有相關的行程、記帳與清單資料，且無法復原！`)) return;
@@ -2113,7 +2080,7 @@
                 document.getElementById('date-buttons-container').innerHTML = window.ITINERARY_DATA.map( (d, i) => `<button onclick="window.switchItineraryDate('${d.id}')" class="tab-button ${d.id === ACTIVE_DATE ? 'active' : ''}"><span class="text-xs opacity-80 mb-1">Day ${i + 1}</span><span class="text-sm font-bold">${d.date.substring(5)} (${d.day_of_week || 'Day'})</span></button>`).join('');
             }
             ;
-            window.renderItinerary = () => {
+           window.renderItinerary = () => {
                 const d = window.ITINERARY_DATA.find(x => x.id === ACTIVE_DATE);
                 const container = document.getElementById('itinerary-container');
                 if (!d)
@@ -2128,7 +2095,7 @@
                 const activitiesHtml = (d.activities || []).map( (a, i) => {
                     const t = a.title.toLowerCase();
                     let iconClass = 'fa-location-dot';
-                    if (t.includes('吃') || t.includes('餐') || t.includes('食') || t.includes('飯') || t.includes('麵') || t.includes('飲') || t.includes('喝') || t.includes('酒') || t.includes('咖') || t.includes('茶') || t.includes('甜') || t.includes('蛋') || t.includes('燒') || t.includes('鍋')) {
+                    if (t.includes('吃') || t.includes('餐') || t.includes('食') || t.includes('飯') || t.includes('麵') || t.includes('飲') || t.includes('喝') || t.includes('酒') || t.includes('咖') || t.includes('茶') || t.includes('甜')) {
                         iconClass = 'fa-utensils';
                     } else if (t.includes('車') || t.includes('鐵') || t.includes('站') || t.includes('jr') || t.includes('巴士')) {
                         iconClass = 'fa-train-subway';
@@ -2140,19 +2107,34 @@
                         iconClass = 'fa-plane';
                     }
 
-                    const mapLinkHtml = a.link ? `<a href="${a.link}" target="_blank" onclick="event.stopPropagation()" class="text-custom-secondary text-sm ml-2 font-bold hover:underline">(地圖 🗺️)</a>` : '';
-                    const noteHtml = a.location ? `<p class="text-xs text-gray-400 mt-1 pl-6">${a.location}</p>` : '';
+                    // --- 智慧地圖連結產生 ---
+                    // 優先權：1. 儲存的地圖連結 2. 標題搜尋 3. 備註搜尋
+                    const searchQuery = encodeURIComponent(a.title + (a.location ? ' ' + a.location : ''));
+                    const googleMapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${searchQuery}`;
+                    const finalMapUrl = (a.link && a.link.trim().startsWith('http')) ? a.link : googleMapSearchUrl;
+
+                    const mapBtnHtml = `
+                        <a href="${finalMapUrl}" target="_blank" onclick="event.stopPropagation()" 
+                           class="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-blue-100">
+                            <i class="fa-solid fa-map-location-dot text-lg"></i>
+                        </a>
+                    `;
 
                     return `
                 <div class="flex items-start mb-6 group relative" onclick="window.openEditItineraryModal('${d.id}', ${i})">
                     <div class="w-14 pt-3 text-right mr-4 text-xs font-bold text-gray-400 font-mono">${a.time}</div>
                     <div class="absolute left-[69px] top-4 w-3 h-3 bg-custom-primary rounded-full ring-4 ring-[#FFFDF9] z-20"></div>
                     <div class="flex-1 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 relative z-10 hover:shadow-md transition cursor-pointer">
-                        <div class="flex items-start">
-                            <div class="mt-1 mr-2 text-custom-primary"><i class="fa-solid ${iconClass}"></i></div>
-                            <div class="flex-1">
-                                <h3 class="font-bold text-gray-700 text-base leading-tight">${a.title} ${mapLinkHtml}</h3>
-                                ${noteHtml}
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center overflow-hidden mr-2">
+                                <div class="mr-3 text-custom-primary flex-shrink-0 w-5 text-center"><i class="fa-solid ${iconClass}"></i></div>
+                                <div class="overflow-hidden">
+                                    <h3 class="font-bold text-gray-700 text-sm md:text-base truncate">${a.title}</h3>
+                                    ${a.location ? `<p class="text-[10px] text-gray-400 truncate mt-0.5">${a.location}</p>` : ''}
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0">
+                                ${mapBtnHtml}
                             </div>
                         </div>
                     </div>
@@ -2162,7 +2144,6 @@
 
                 container.innerHTML = headerHtml + `<div class="timeline-container relative pl-2">${activitiesHtml}</div>`;
             }
-            ;
 
             window.populateItineraryModalDates = () => {
                 document.getElementById('new-itinerary-date').innerHTML = window.ITINERARY_DATA.map(d => `<option value="${d.id}">${d.date} (${d.day_of_week})</option>`).join('');
